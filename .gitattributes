@@ -1,0 +1,5 @@
+# Preserve the exact release bytes, including on Windows checkouts.
+main.js -text
+manifest.json -text
+styles.css -text
+versions.json -text

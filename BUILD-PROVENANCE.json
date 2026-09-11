@@ -1,0 +1,25 @@
+{
+  "version": "0.2.0",
+  "sourceRepository": "eddyficial/pericode",
+  "sourceVisibility": "private",
+  "sourceCommit": "0402046191ef57772a0c7f6e11a49879dc2933d6",
+  "sourceBranch": "feature/agent-loop-autonomy",
+  "pluginDirectory": "plugins/obsidian",
+  "build": "npm ci; npm run build; cd plugins/obsidian; npm ci; npm run release",
+  "sdkTests": 350,
+  "pluginTests": 60,
+  "sourceReview": "Pending Obsidian private-source integration",
+  "sha256": {
+    "main.js": "39cacc5fa57c29bb13ed3fb6af4f617cb5a27bd3cd9b41391096834d451106e7",
+    "manifest.json": "fa897e133772c131dddd7817c225161cb40749b030e0b5f2a0f434626b229e75",
+    "styles.css": "011d8632dea03d21b5395793d2dde04579dc67501ae319de3ab14608d89c829b",
+    "versions.json": "59434e2ab670f92b058373d4f7c0f4773128232f908d716bf7d501984684aaa5",
+    "LICENSE": "86126678c4c4bda534892ef0660cae7530d01159407a20337ada20752edbcccd",
+    "THIRD_PARTY_NOTICES.md": "18ec88d7d9bd983f79cc2cbb7ae8dc86ccf3ac6bf7caad5a92d87765acc65d0d",
+    "Install-PeriCode.cmd": "980822974a218814c15c8aacba1ea3dbae7c7c06ac9e3481109caa58a5c75c49",
+    "Install-PeriCode.ps1": "cd5739847eb0223370b51717e51d88c7d9af31e75f1034e354d882af84128b1e",
+    "README.md": "534e4556cf790fac5b3c2553efa21c56ae35d23966275c8c8fba83385bb9e717",
+    "QA.md": "0f9dbc4ca008db326755c8ec95dfbc5ef5a9258c69ba5039b0b96ecf3da6ac93",
+    "RELEASE-NOTES.md": "d1457127dc4f75bec7277e133b31703b5665e3d561951a736417ea12427d0764"
+  }
+}

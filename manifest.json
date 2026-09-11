@@ -1,0 +1,10 @@
+{
+  "id": "pericode",
+  "name": "PeriCode Inside",
+  "version": "0.2.0",
+  "minAppVersion": "1.13.7",
+  "description": "Research your notes with multiple AI providers, resume saved conversations, and review revisions before applying them, with a configurable permission policy.",
+  "author": "Eddy Ogutu",
+  "authorUrl": "https://github.com/eddyficial",
+  "isDesktopOnly": true
+}

@@ -1,0 +1,38 @@
+PeriCode Inside for Obsidian â€” Proprietary License
+
+Copyright (c) 2026 Eddy Ogutu. All rights reserved.
+
+The PeriCode Inside plugin source code, compiled artifacts (main.js,
+manifest.json, styles.css), and accompanying documentation in this
+directory ("the Software") are proprietary work of the copyright
+holder.
+
+Permitted uses, no fee required:
+  - Personal, non-commercial evaluation in your own Obsidian vault.
+  - Reading, auditing, and modifying the source for your own use.
+  - Forking and submitting changes back to the upstream repository
+    via pull request.
+
+Use beyond personal evaluation requires a paid subscription. See
+https://pericode.dev/terms (or the LICENSE_TERMS file shipped with
+your distribution) for the active subscription terms, including
+covered features, refund policy, and revocation conditions.
+
+Restrictions (without separate written permission):
+  - You may not redistribute, sell, sublicense, or host the Software
+    as a service for third parties.
+  - You may not remove or alter copyright, license, or attribution
+    notices.
+  - You may not use the Software's name, logo, or trademarks to
+    endorse derivative products without permission.
+
+Disclaimer:
+  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+  EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+  MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, AND
+  NONINFRINGEMENT. IN NO EVENT SHALL THE COPYRIGHT HOLDER BE LIABLE
+  FOR ANY CLAIM, DAMAGES, OR OTHER LIABILITY ARISING FROM, OUT OF, OR
+  IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+  SOFTWARE.
+
+Contact: eddy.ogutu@gmail.com

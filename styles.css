@@ -1,0 +1,351 @@
+/* PeriCode Sidecar — Obsidian (in-process) mode — sidebar chat view styles. */
+
+.pericode-view {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  font-family: var(--font-text);
+  color: var(--text-normal);
+  font-feature-settings: "tnum" 1, "kern" 1, "calt" 1, "ss01" 1;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+.workspace-leaf-content[data-type="pericode-chat"] .view-content { padding: 0; overflow: hidden; }
+.pericode-view { min-width: 0; min-height: 0; overflow: hidden; background: var(--background-primary); }
+.pericode-header {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex: 0 0 40px;
+  min-width: 0;
+  padding: 4px 8px;
+  border-bottom: 1px solid var(--background-modifier-border);
+}
+.pericode-view .pericode-icon-button {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 28px; height: 28px; min-width: 28px; padding: 5px;
+  flex: 0 0 28px; border: 0; box-shadow: none; background: transparent;
+  color: var(--text-muted); border-radius: 4px; cursor: pointer;
+}
+.pericode-view .pericode-icon-button:hover { background: var(--background-modifier-hover); color: var(--text-normal); }
+.pericode-icon-button svg { width: 16px; height: 16px; }
+.pericode-view .pericode-session-picker {
+  flex: 1; width: 0; min-width: 0; max-width: 100%; height: 28px;
+  padding-left: 4px; border: 0; box-shadow: none; background-color: transparent;
+  font-size: 12px; font-weight: 600; text-overflow: ellipsis;
+}
+.pericode-expanded {
+  position: fixed; inset: 48px 24px 28px; height: auto;
+  z-index: calc(var(--layer-modal, 50) - 1);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 10px; box-shadow: 0 12px 48px rgba(0,0,0,.25);
+}
+.pericode-expanded .pericode-messages { padding-inline: max(20px, calc((100% - 900px) / 2)); }
+.pericode-expanded .pericode-composer, .pericode-expanded .pericode-footer { width: calc(100% - 24px); max-width: 900px; align-self: center; }
+
+.pericode-messages {
+  flex: 1 1 0;
+  min-height: 0;
+  min-width: 0;
+  overflow-y: auto;
+  padding: 14px 12px;
+  font-size: 13px;
+  line-height: 1.55;
+  /* Obsidian's parent view sometimes inherits user-select: none; force
+     text selection back on for the messages region so click-and-drag
+     highlighting works for copy/paste. */
+  user-select: text;
+  -webkit-user-select: text;
+}
+
+.pericode-message {
+  margin-bottom: 12px;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  user-select: text;
+  -webkit-user-select: text;
+  position: relative;
+}
+
+.pericode-message:hover .pericode-copy-button {
+  opacity: 1;
+}
+
+.pericode-copy-button {
+  position: absolute;
+  top: 0;
+  right: 0;
+  background: var(--background-secondary);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 3px;
+  color: var(--text-muted);
+  font-size: 10px;
+  padding: 1px 6px;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 120ms ease-in-out;
+  user-select: none;
+  font-family: var(--font-text);
+}
+
+.pericode-copy-button:hover {
+  color: var(--text-normal);
+  background: var(--background-modifier-hover);
+}
+
+.pericode-copy-button.pericode-copy-button-copied {
+  color: var(--text-success, var(--interactive-accent));
+  opacity: 1;
+}
+
+.pericode-message-user {
+  color: var(--text-accent);
+  font-weight: 500;
+  border-left: 2px solid var(--text-accent);
+  padding-left: 10px;
+}
+
+.pericode-message-assistant {
+  color: var(--text-normal);
+}
+
+.pericode-message-system {
+  color: var(--text-muted);
+  font-size: 11px;
+  font-style: italic;
+}
+
+.pericode-message-tool {
+  color: var(--text-muted);
+  font-family: var(--font-monospace);
+  font-size: 11px;
+  background: var(--background-secondary);
+  padding: 5px 8px;
+  border-radius: 4px;
+  border-left: 2px solid var(--background-modifier-border);
+  margin: 6px 0;
+}
+
+.pericode-message-tool-error {
+  border-left-color: var(--text-error);
+  color: var(--text-error);
+}
+
+/* Per-tool-call collapsible entry. Default state: one compact summary
+   line, no JSON wire data. Click the summary to expand the input args +
+   truncated output. */
+.pericode-tool-entry {
+  margin: 4px 0;
+  border-left: 2px solid var(--background-modifier-border);
+  background: var(--background-secondary);
+  border-radius: 3px;
+  font-family: var(--font-monospace);
+  font-size: 11px;
+  color: var(--text-muted);
+  user-select: text;
+}
+
+.pericode-tool-entry-error {
+  border-left-color: var(--text-error);
+}
+
+.pericode-tool-entry-busy .pericode-tool-icon {
+  opacity: 0.6;
+}
+
+.pericode-tool-summary {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.pericode-tool-summary:hover {
+  background: var(--background-modifier-hover);
+}
+
+.pericode-tool-chevron {
+  font-size: 9px;
+  color: var(--text-muted);
+  flex-shrink: 0;
+  width: 10px;
+}
+
+.pericode-tool-icon {
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
+.pericode-tool-entry-error .pericode-tool-icon {
+  color: var(--text-error);
+}
+
+.pericode-tool-name {
+  color: var(--text-normal);
+  font-weight: 500;
+}
+
+.pericode-tool-source {
+  color: var(--text-muted);
+  font-size: 10px;
+}
+
+.pericode-tool-hint {
+  margin-left: auto;
+  color: var(--text-faint);
+  font-size: 10px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+
+.pericode-tool-entry-error .pericode-tool-hint {
+  color: var(--text-error);
+}
+
+.pericode-tool-details {
+  display: none;
+  padding: 0 8px 8px 24px;
+  border-top: 1px solid var(--background-modifier-border);
+}
+
+.pericode-tool-entry-expanded .pericode-tool-details {
+  display: block;
+}
+
+.pericode-tool-payload {
+  background: var(--background-primary);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 3px;
+  padding: 6px 8px;
+  margin: 6px 0 0 0;
+  font-size: 10px;
+  line-height: 1.45;
+  white-space: pre-wrap;
+  word-break: break-all;
+  max-height: 280px;
+  overflow: auto;
+  user-select: text;
+}
+
+.pericode-tool-payload-error {
+  border-color: var(--text-error);
+  color: var(--text-error);
+}
+
+.pericode-composer {
+  flex: 0 0 auto; min-width: 0; margin: 4px 8px 0;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 8px; background: var(--background-primary);
+}
+.pericode-composer:focus-within { border-color: var(--interactive-accent); }
+.pericode-view textarea.pericode-input {
+  display: block; width: 100%; min-width: 0; resize: none;
+  padding: 10px 10px 4px; border: 0; box-shadow: none;
+  background: transparent; color: var(--text-normal);
+  font-family: var(--font-text); font-size: 13px; line-height: 1.5;
+  border-radius: 8px; min-height: 56px; max-height: 180px; overflow-y: auto;
+}
+.pericode-composer-controls { display: flex; align-items: center; gap: 3px; padding: 4px 5px; min-width: 0; }
+.pericode-view .pericode-mode-picker {
+  flex: 0 1 auto; max-width: 96px; min-width: 66px; height: 28px;
+  font-size: 11px; padding-left: 4px; border: 0; box-shadow: none; background-color: transparent;
+}
+.pericode-view .pericode-model-button {
+  display: block;
+  flex: 1 1 0; min-width: 0; height: 28px; border: 0; padding: 0 3px;
+  box-shadow: none; background: transparent; color: var(--text-muted);
+  font-size: 11px; text-align: left; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.pericode-model-button:hover { color: var(--text-normal); }
+.pericode-view .pericode-send-button { background: var(--interactive-accent); color: var(--text-on-accent); }
+.pericode-view .pericode-send-button:hover { background: var(--interactive-accent-hover); color: var(--text-on-accent); }
+.pericode-send-button[disabled] { opacity: 0.5; cursor: not-allowed; }
+.pericode-footer { display: flex; align-items: center; gap: 8px; padding: 3px 10px 7px; flex: 0 0 24px; min-width: 0; }
+.pericode-status { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 10px; color: var(--text-muted); }
+.pericode-usage { flex: 0 1 auto; white-space: nowrap; overflow: hidden; font-size: 10px; color: var(--text-faint); }
+.pericode-copy-button:focus-visible { opacity: 1; }
+.pericode-error-details { font-style: normal; }
+.pericode-error-details summary { color: var(--text-error); cursor: pointer; font-size: 12px; }
+.pericode-error-details > div { max-height: 240px; overflow: auto; padding-top: 8px; white-space: pre-wrap; }
+
+.pericode-permission-modal-body {
+  margin: 12px 0;
+}
+
+.pericode-permission-input-preview {
+  font-family: var(--font-monospace);
+  font-size: 11px;
+  line-height: 1.45;
+  background: var(--background-secondary);
+  padding: 8px;
+  border-radius: 4px;
+  max-height: 240px;
+  overflow: auto;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+}
+
+.pericode-permission-delete-warning {
+  color: var(--text-error);
+  font-weight: 600;
+  margin-bottom: 10px;
+}
+
+.pericode-permission-risk-warning {
+  color: var(--text-warning);
+  font-weight: 600;
+  margin-bottom: 10px;
+}
+
+/*
+  Settings panel: when a Setting row has dropdown + multiple buttons
+  (e.g. Model row), Obsidian's default flex layout collapses the
+  name+description column to near-zero width and wraps the text to one
+  character per line. Apply globally so every PeriCode setting row keeps
+  the description readable; controls wrap below when narrow.
+*/
+.setting-item:has(.pericode-mark),
+.pericode-settings-tab .setting-item {
+  flex-wrap: wrap;
+}
+.pericode-settings-tab .setting-item-info {
+  min-width: 220px;
+  flex: 1 1 220px;
+}
+.pericode-settings-tab .setting-item-control {
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+/* First-launch welcome card — fills the otherwise-empty chat pane on
+   initial open and after Clear so a new user sees what the plugin can
+   actually do instead of dead whitespace. */
+.pericode-welcome-card { text-align: center; margin: clamp(20px, 12vh, 100px) auto 20px; max-width: 300px; color: var(--text-muted); }
+.pericode-welcome-icon { display: flex; justify-content: center; color: var(--text-faint); margin-bottom: 12px; }
+.pericode-welcome-icon svg { width: 28px; height: 28px; }
+.pericode-welcome-heading { margin: 0 0 8px; font-size: 16px; font-weight: 500; color: var(--text-normal); }
+.pericode-welcome-sub { font-size: 12px; line-height: 1.5; }
+
+/* Conversation workspace */
+.pericode-attachments { display: flex; flex-wrap: wrap; gap: 4px; padding: 6px 8px 0; max-height: 80px; overflow: auto; }
+.pericode-attachments:empty { display: none; }
+.pericode-context-chip { display: flex; gap: 4px; align-items: center; border: 1px solid var(--background-modifier-border); border-radius: 6px; padding: 3px 6px; font-size: var(--font-smallest); max-width: 100%; }
+.pericode-context-chip span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.pericode-context-chip button { padding: 0 5px; height: 22px; }
+.pericode-message-content.markdown-rendered { white-space: normal; overflow-wrap: anywhere; }
+.pericode-message-content.markdown-rendered pre { overflow-x: auto; }
+.pericode-message-content.markdown-rendered table { display: block; overflow-x: auto; max-width: 100%; }
+.pericode-message-content.markdown-rendered p:first-child { margin-top: 0; }
+.pericode-edit-modal { min-width: min(640px, 75vw); }
+.pericode-edit-modal textarea { width: 100%; min-height: 90px; }
+.pericode-edit-preview { white-space: pre-wrap; overflow-wrap: anywhere; max-height: 50vh; overflow: auto; padding: 12px; border: 1px solid var(--background-modifier-border); border-radius: 8px; margin: 12px 0; }
+.pericode-edit-preview del { background: var(--text-selection); text-decoration: line-through; border-bottom: 2px solid var(--text-error); }
+.pericode-edit-preview ins { background: var(--text-selection); text-decoration: none; border-bottom: 2px solid var(--text-success); }
+.pericode-view button:focus-visible, .pericode-view select:focus-visible { outline: 2px solid var(--interactive-accent); outline-offset: 2px; }
