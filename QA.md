@@ -1,3 +1,20 @@
+## 0.3.5 scorecard follow-up
+
+The four new schema tests passed with JavaScript code generation disabled,
+including a real MCP client/server exchange over an in-memory transport. The
+existing 77 plugin tests and installer fixtures also passed. Release checks
+reject generated-code validators, dynamic execution calls and the previously
+reported CSS patterns. The complete package carries its license notices in
+main.js; generating the notices twice produces identical bytes.
+
+The installed 0.3.5 candidate also passed create, read, stale-write refusal,
+edit and trash in Obsidian 1.13.7. The synthetic note was removed, and the
+existing provider and model selection were preserved.
+
+Signed build reproduction and release attestations are verified by the
+Build and attest Obsidian release workflow in the distribution repository.
+See SECURITY-REVIEW-0.3.5.md for capability disclosures and verification limits.
+
 ## 0.3.4 access hardening
 
 All 77 plugin tests, installer fixtures and release checks passed. The shared

@@ -1,0 +1,84 @@
+name: Build and attest Obsidian release
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: obsidian-release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: windows-latest
+    timeout-minutes: 20
+    permissions:
+      contents: write
+      id-token: write
+      attestations: write
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - name: Checkout distribution
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - name: Read pinned source
+        id: source
+        run: |
+          $proof = Get-Content BUILD-PROVENANCE.json -Raw | ConvertFrom-Json
+          $manifest = Get-Content manifest.json -Raw | ConvertFrom-Json
+          if ($proof.sourceRepository -ne 'https://github.com/eddyficial/pericode') { throw 'Unexpected source repository' }
+          if ($proof.sourceCommit -notmatch '^[a-f0-9]{40}$') { throw 'Source must be an immutable commit' }
+          if ($proof.version -ne $manifest.version -or $proof.version -notmatch '^\d+\.\d+\.\d+$') { throw 'Version mismatch' }
+          "sha=$($proof.sourceCommit)" >> $env:GITHUB_OUTPUT
+          "version=$($proof.version)" >> $env:GITHUB_OUTPUT
+      - name: Checkout exact source
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          repository: eddyficial/pericode
+          ref: ${{ steps.source.outputs.sha }}
+          path: source
+          persist-credentials: false
+      - name: Set up Node
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '24.14.1'
+      - name: Build and test SDK
+        working-directory: source
+        run: |
+          npm ci
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          npm test
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Build and test plugin
+        working-directory: source/plugins/obsidian
+        run: |
+          npm ci
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          npm run release
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Verify reproduced release bytes
+        run: |
+          foreach ($name in @('main.js','manifest.json','styles.css')) {
+            $committed = (Get-FileHash -LiteralPath $name -Algorithm SHA256).Hash
+            $rebuilt = (Get-FileHash -LiteralPath "source/plugins/obsidian/$name" -Algorithm SHA256).Hash
+            if ($committed -ne $rebuilt) { throw "Build does not reproduce $name" }
+          }
+      - name: Attest rebuilt plugin files
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4
+        with:
+          subject-path: |
+            source/plugins/obsidian/main.js
+            source/plugins/obsidian/manifest.json
+            source/plugins/obsidian/styles.css
+      - name: Create draft with only community assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_VERSION: ${{ steps.source.outputs.version }}
+        run: |
+          gh release create $env:RELEASE_VERSION source/plugins/obsidian/main.js source/plugins/obsidian/manifest.json source/plugins/obsidian/styles.css --repo $env:GITHUB_REPOSITORY --target $env:GITHUB_SHA --draft --title "PeriCode $env:RELEASE_VERSION" --notes-file RELEASE-NOTES.md
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }

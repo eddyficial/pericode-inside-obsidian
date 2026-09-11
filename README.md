@@ -3,6 +3,20 @@
 This repository publishes the plugin releases and user documentation.
 [Full source and build instructions](https://github.com/eddyficial/pericode/tree/release/open-source/plugins/obsidian) are in the public source repository.
 
+## Release verification
+
+Community releases contain three plugin files. License notices are included in
+main.js; documentation and checksums are in this repository. The build workflow
+reproduces the files from the pinned source commit and generates GitHub artifact
+attestations. Verify a downloaded file with:
+
+```sh
+gh attestation verify main.js --repo eddyficial/pericode-inside-obsidian
+```
+
+See [the scorecard follow-up](SECURITY-REVIEW-0.3.5.md) for changes and remaining
+capability disclosures.
+
 ## 0.3.4 access changes
 
 MCP servers require explicit approval in Settings for each plugin session.
@@ -39,7 +53,7 @@ Research your notes, keep conversations across sessions, and review suggested
 revisions before changing a note. PeriCode runs its own agent loop in
 Obsidian and connects to the model provider you choose.
 
-**0.3.4 open-source preview · Desktop only · Obsidian 1.13.7 or newer**
+**0.3.5 open-source preview · Desktop only · Obsidian 1.13.7 or newer**
 
 ## Install PeriCode
 
@@ -136,7 +150,7 @@ Choose a mode before sending. Mode controls are disabled during an active reques
 
 ## Install the candidate
 
-On Windows, extract the release ZIP and double-click **Install-PeriCode.cmd**.
+On Windows, download the ZIP from the [Windows installer release](https://github.com/eddyficial/pericode/releases/tag/obsidian-0.3.5), extract it, and double-click **Install-PeriCode.cmd**. The community release contains only the three plugin files.
 It detects registered Obsidian vaults and asks you to choose when there is more
 than one. It copies and verifies the plugin, preserves data.json and vault notes,
 and backs up previous plugin files under `.obsidian/pericode-backups/`.
@@ -183,8 +197,8 @@ npm ci
 npm run release
 ```
 
-The candidate files and checksums are in `dist/community-0.3.4/`; the ZIP is in
-`dist/pericode-obsidian-0.3.4.zip`. `npm run dev:install` requires an explicit
+The candidate files and checksums are in `dist/community-0.3.5/`; the ZIP is in
+`dist/pericode-obsidian-0.3.5.zip`. `npm run dev:install` requires an explicit
 `PERICODE_OBSIDIAN_VAULT` environment variable so it never chooses a vault for you.
 
 ## Context and editing

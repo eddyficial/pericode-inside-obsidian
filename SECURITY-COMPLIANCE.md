@@ -1,3 +1,5 @@
+See [the 0.3.5 scorecard follow-up](SECURITY-REVIEW-0.3.5.md) for interpreted schema validation, signed release builds and current capability disclosures.
+
 # Security remediation and submission checks
 
 ## 0.3.4 access changes

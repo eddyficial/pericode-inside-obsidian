@@ -14,7 +14,7 @@ recovery backup. Installation instructions now lead with this verified path.
 
 # PeriCode community listing
 
-Version 0.3.4 is free and MIT-licensed, with no PeriCode paid tier or activation.
+Version 0.3.5 is free and MIT-licensed, with no PeriCode paid tier or activation.
 The full source is in https://github.com/eddyficial/pericode and release assets
 are in https://github.com/eddyficial/pericode-inside-obsidian.
 

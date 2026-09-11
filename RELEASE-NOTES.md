@@ -1,3 +1,15 @@
+## 0.3.5
+
+MCP schema validation now uses an interpreter, removing dynamic JavaScript
+compilation from the plugin. Validation remains enabled, with regressions run
+under Node's code-generation restriction.
+
+The release workflow rebuilds the pinned source, runs tests, compares the three
+plugin files byte for byte, and creates GitHub artifact attestations. Community
+assets now contain only main.js, manifest.json and styles.css. License notices
+are embedded in main.js. The optional [Windows installer](https://github.com/eddyficial/pericode/releases/tag/obsidian-0.3.5)
+has a separate download. See SECURITY-REVIEW-0.3.5.md for remaining capabilities.
+
 # PeriCode 0.3.4
 
 MCP startup now requires explicit approval for the current plugin session.

@@ -1,21 +1,22 @@
 {
-  "version": "0.3.4",
+  "version": "0.3.5",
   "sourceRepository": "https://github.com/eddyficial/pericode",
-  "sourceCommit": "d394ea5ca28497584db0ca1273f1da287a519596",
+  "sourceCommit": "452a372a56c78cf53e625ac213b584b8c5c80be6",
   "sourceDirectory": "plugins/obsidian",
   "license": "MIT",
-  "build": "npm ci && npm run build; cd plugins/obsidian && npm ci && npm run release",
+  "build": "npm ci && npm test; cd plugins/obsidian && npm ci && npm run release",
   "validation": {
-    "pluginTests": 77,
-    "sdkTests": 352,
-    "installerAndReleaseChecks": "passed",
-    "productionDependencyAudits": "zero known advisories",
-    "live": "Obsidian 1.13.7: guarded native create, read, stale-write refusal, exact edit, read-back and trash passed. Settings rendered correctly. Provider selection preserved."
+    "pluginTests": 81,
+    "schemaTestsWithoutCodeGeneration": 4,
+    "installerAndReleaseChecks": "passed locally; repeated by release workflow",
+    "live": "Obsidian 1.13.7 native create, read, stale-write refusal, exact edit and trash passed. Provider/model selection preserved.",
+    "productionDependencyAudit": "zero known advisories"
   },
+  "releaseWorkflow": ".github/workflows/release.yml",
   "limitations": [
-    "External MCP services and provider inference were not retested for this release.",
-    "Filesystem and process access remain required for documented features; approved processes are not OS sandboxed.",
-    "Community malware and network scans were unavailable; 0.3.4 review has not yet been verified.",
-    "In-app catalog installation previously returned No results found. Use the documented manual installation if unavailable."
+    "Capability disclosures remain for filesystem, process, clipboard writes, vault enumeration and network use.",
+    "External provider inference was not repeated in this release.",
+    "Community malware and network scans are controlled by the review service.",
+    "In-app catalog installation was previously unavailable; follow the manual installation guide if needed."
   ]
 }
