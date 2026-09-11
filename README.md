@@ -1,10 +1,11 @@
-# PeriCode Inside
+# PeriCode Inside for Obsidian
 
-**Free and open source. Every feature included under MIT.**
+**Free and open source. Every plugin feature included under MIT.**
 
-[Full source: CLI, SDK, desktop engine and plugin](https://github.com/eddyficial/pericode).
-This repository hosts the Obsidian release files. The plugin is not yet listed
-in Obsidian Community; use the manual installation instructions below.
+[Website](https://www.pericode.ai/) · [Download](https://github.com/eddyficial/pericode-inside-obsidian/releases/latest) · [Plugin source](https://github.com/eddyficial/pericode/tree/HEAD/plugins/obsidian)
+
+This repository publishes the Obsidian plugin releases and user documentation.
+The plugin is not yet listed in Obsidian Community; use the installation guide below.
 
 Research your notes, keep conversations across sessions, and review suggested
 revisions before changing a note. PeriCode Inside runs its own agent loop in
@@ -131,8 +132,8 @@ npm ci
 npm run release
 ```
 
-The candidate files and checksums are in `dist/community-0.2.0/`; the ZIP is in
-`dist/pericode-inside-0.2.0.zip`. `npm run dev:install` requires an explicit
+The candidate files and checksums are in `dist/community-0.3.0/`; the ZIP is in
+`dist/pericode-inside-0.3.0.zip`. `npm run dev:install` requires an explicit
 `PERICODE_OBSIDIAN_VAULT` environment variable so it never chooses a vault for you.
 
 ## Context and editing
@@ -188,8 +189,8 @@ open, and chat/revision requests recheck the selected subscription model before
 sending. A failed lookup or unavailable saved model shows a connection/selection
 error instead of falling back to an unrelated model. Manual model IDs remain
 available for API-key and local endpoints. Provider usage limits still apply.
-The CLI remains a separately installed, unmodified runtime, not bundled or
-automatically downloaded by this community plugin.
+Claude Code remains a separately installed provider runtime; this plugin does
+not bundle or automatically download it.
 
 Subscription requests run through Claude Code with its native tools disabled.
 Only the current PeriCode registry is exposed through an authenticated loopback
@@ -294,7 +295,7 @@ Real-provider authentication remains a release validation requirement.
 ## Validation and contribution
 
 Run `npm test`, `npm run build`, and `npm run release:check` in this directory.
-See [QA](QA.md) for recorded functional evidence and [submission preparation](SUBMISSION.md)
+See [QA](QA.md) for recorded functional evidence and [submission preparation](https://github.com/eddyficial/pericode/blob/HEAD/plugins/obsidian/SUBMISSION.md)
 for publication steps and remaining gates. No overall superiority or complete
 feature parity with another plugin is claimed by a passing local test suite.
 
