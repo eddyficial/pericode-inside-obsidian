@@ -36,8 +36,8 @@ there is no permanent-delete option. CLI rollback files and syntax-check
 subprocesses are not used by these tools.
 
 Direct filesystem access remains for canonical path checks, bounded vault
-search, private plugin metadata, auth/runtime bookkeeping and explicit import
-operations. Process access remains for separately installed Claude/Grok
+search, private plugin metadata and auth/runtime bookkeeping.
+Process access remains for separately installed Claude/Grok
 runtimes and approved MCP servers. These run with the user's OS permissions;
 PeriCode is not an OS sandbox. The removed CLI shell, network-fetch and desktop
 tool implementations are excluded from the shipping bundle.
@@ -53,7 +53,7 @@ Research your notes, keep conversations across sessions, and review suggested
 revisions before changing a note. PeriCode runs its own agent loop in
 Obsidian and connects to the model provider you choose.
 
-**0.3.5 open-source preview · Desktop only · Obsidian 1.13.7 or newer**
+**0.3.6 open-source preview · Desktop only · Obsidian 1.13.7 or newer**
 
 ## Install PeriCode
 
@@ -88,6 +88,22 @@ Installation is per vault. Repeat these steps for each vault where you want
 PeriCode. Requires Obsidian desktop 1.13.7 or newer.
 
 ## Settings and providers
+
+### First setup and first question
+
+Open **Setup guide** in PeriCode settings. Choose your provider and connect it.
+If you enter a key or server address, choose **Save connection** before
+**Load models**. Select a returned model to continue. Loading the list sends
+no prompt or vault content; your first message tests the actual response.
+**Set up later** leaves the connection unchecked and keeps the guide from
+reopening on every reload. You can reopen it from settings at any time.
+
+The guide uses your existing vault without importing files or opening other
+views. In an empty chat, **Find a note**, **Summarize notes**, and **Review a
+note** prepare editable drafts in Research mode. Replace the topic or attach
+notes with **@**, review the draft, then send. These buttons do not send a
+request or overwrite an existing draft. Use Agent mode when you want changes,
+subject to your permission settings and edit review.
 
 Settings now use six focused sections: **AI connection**, **Privacy & safety**,
 **Integrations**, **Vault**, **About**, and **Advanced**. The connection page
@@ -160,7 +176,7 @@ Choose a mode before sending. Mode controls are disabled during an active reques
 
 ## Install the candidate
 
-On Windows, download the ZIP from the [Windows installer release](https://github.com/eddyficial/pericode/releases/tag/obsidian-0.3.5), extract it, and double-click **Install-PeriCode.cmd**. The community release contains only the three plugin files.
+On Windows, download the ZIP from the [Windows installer release](https://github.com/eddyficial/pericode/releases/tag/obsidian-0.3.6), extract it, and double-click **Install-PeriCode.cmd**. The community release contains only the three plugin files.
 It detects registered Obsidian vaults and asks you to choose when there is more
 than one. It copies and verifies the plugin, preserves data.json and vault notes,
 and backs up previous plugin files under `.obsidian/pericode-backups/`.
@@ -207,8 +223,8 @@ npm ci
 npm run release
 ```
 
-The candidate files and checksums are in `dist/community-0.3.5/`; the ZIP is in
-`dist/pericode-obsidian-0.3.5.zip`. `npm run dev:install` requires an explicit
+The candidate files and checksums are in `dist/community-0.3.6/`; the ZIP is in
+`dist/pericode-obsidian-0.3.6.zip`. `npm run dev:install` requires an explicit
 `PERICODE_OBSIDIAN_VAULT` environment variable so it never chooses a vault for you.
 
 ## Context and editing

@@ -1,3 +1,19 @@
+## 0.3.6
+
+PeriCode 0.3.6 makes setup and your first vault questions easier.
+
+- Connect your provider and choose a model from its returned list before finishing setup. Keys and server addresses save only when you choose Save connection.
+- Set up later is remembered. Setup no longer imports or archives files or opens extra workspace views.
+- Find a note, Summarize notes and Review a note prepare editable Research drafts without sending a request. Existing drafts are preserved.
+- Sending without a model keeps your draft and attachments and opens connection settings.
+
+Validation: 86 plugin tests, 352 SDK tests, installer fixtures and release checks passed. Live Obsidian testing loaded seven models from the saved ChatGPT/Codex account and verified vault create, read, stale-write refusal, edit and trash. Model discovery does not establish successful inference for every provider or account.
+
+The release workflow rebuilds the pinned source, checks all three plugin files and issues artifact attestations. Filesystem, process, clipboard and network capability disclosures remain. The earlier 0.3.5 community review does not cover this update.
+
+The optional Windows installer is available in the [separate installer release](https://github.com/eddyficial/pericode/releases/tag/obsidian-0.3.6).
+
+
 ## 0.3.5
 
 MCP schema validation now uses an interpreter, removing dynamic JavaScript

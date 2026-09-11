@@ -14908,22 +14908,22 @@ async function scaffoldVault(vaultPath) {
   const created = [];
   const skipped = [];
   for (const rel of PIPELINE_DIRS) {
-    const abs = (0, import_node_path16.join)(vaultPath, rel);
-    if ((0, import_node_fs13.existsSync)(abs)) {
+    const abs = (0, import_node_path15.join)(vaultPath, rel);
+    if ((0, import_node_fs12.existsSync)(abs)) {
       skipped.push(`${rel}/`);
       continue;
     }
-    await import_node_fs12.promises.mkdir(abs, { recursive: true });
+    await import_node_fs11.promises.mkdir(abs, { recursive: true });
     created.push(`${rel}/`);
   }
   for (const seed of SEED_FILES) {
-    const abs = (0, import_node_path16.join)(vaultPath, seed.path);
-    if ((0, import_node_fs13.existsSync)(abs)) {
+    const abs = (0, import_node_path15.join)(vaultPath, seed.path);
+    if ((0, import_node_fs12.existsSync)(abs)) {
       skipped.push(seed.path);
       continue;
     }
-    await import_node_fs12.promises.mkdir((0, import_node_path16.dirname)(abs), { recursive: true });
-    await import_node_fs12.promises.writeFile(abs, seed.content, "utf8");
+    await import_node_fs11.promises.mkdir((0, import_node_path15.dirname)(abs), { recursive: true });
+    await import_node_fs11.promises.writeFile(abs, seed.content, "utf8");
     created.push(seed.path);
   }
   return { created, skipped, vaultPath };
@@ -15022,14 +15022,14 @@ internal docs. Pointers only \u2014 never duplicate the contents here.
 <!-- pericode:append:references -->
 `;
 }
-var import_node_fs12, import_node_fs13, import_node_path16, PIPELINE_DIRS, SEED_FILES;
+var import_node_fs11, import_node_fs12, import_node_path15, PIPELINE_DIRS, SEED_FILES;
 var init_vaultScaffold = __esm({
   "src/vaultScaffold.ts"() {
     "use strict";
     init_scoped_fetch();
+    import_node_fs11 = require("node:fs");
     import_node_fs12 = require("node:fs");
-    import_node_fs13 = require("node:fs");
-    import_node_path16 = require("node:path");
+    import_node_path15 = require("node:path");
     PIPELINE_DIRS = [
       "raw",
       "raw/_compiled",
@@ -15065,12 +15065,12 @@ __export(obsidianHostBridge_exports, {
   seedPericodeTemplates: () => seedPericodeTemplates
 });
 async function readDailyNotesConfig(vaultPath) {
-  const path = (0, import_node_path20.join)(vaultPath, ".obsidian", "daily-notes.json");
-  if (!(0, import_node_fs16.existsSync)(path)) {
+  const path = (0, import_node_path19.join)(vaultPath, ".obsidian", "daily-notes.json");
+  if (!(0, import_node_fs15.existsSync)(path)) {
     return { folder: "", format: DEFAULT_DAILY_FORMAT, template: "", configured: false };
   }
   try {
-    const raw = await import_node_fs16.promises.readFile(path, "utf8");
+    const raw = await import_node_fs15.promises.readFile(path, "utf8");
     const parsed = JSON.parse(raw);
     return {
       folder: (parsed.folder ?? "").replace(/^\/+|\/+$/g, ""),
@@ -15104,30 +15104,30 @@ async function appendDailyNoteEntry(vaultPath, message) {
   const cfg = await readDailyNotesConfig(vaultPath);
   if (!cfg.configured) return null;
   const todayName = formatToday(cfg.format) + ".md";
-  const folderAbs = cfg.folder ? (0, import_node_path20.join)(vaultPath, cfg.folder) : vaultPath;
-  const filePath = (0, import_node_path20.join)(folderAbs, todayName);
-  await import_node_fs16.promises.mkdir(folderAbs, { recursive: true });
+  const folderAbs = cfg.folder ? (0, import_node_path19.join)(vaultPath, cfg.folder) : vaultPath;
+  const filePath = (0, import_node_path19.join)(folderAbs, todayName);
+  await import_node_fs15.promises.mkdir(folderAbs, { recursive: true });
   const now = /* @__PURE__ */ new Date();
   const hh = String(now.getHours()).padStart(2, "0");
   const mm = String(now.getMinutes()).padStart(2, "0");
   const line = `- ${hh}:${mm} ${message.trim()}`;
   const heading = "## PeriCode log";
-  if (!(0, import_node_fs16.existsSync)(filePath)) {
+  if (!(0, import_node_fs15.existsSync)(filePath)) {
     const initial = `# ${formatToday(cfg.format)}
 
 ${heading}
 
 ${line}
 `;
-    await import_node_fs16.promises.appendFile(filePath, initial, "utf8");
+    await import_node_fs15.promises.appendFile(filePath, initial, "utf8");
     return filePath;
   }
-  const existing = await import_node_fs16.promises.readFile(filePath, "utf8").catch(() => "");
+  const existing = await import_node_fs15.promises.readFile(filePath, "utf8").catch(() => "");
   if (existing.includes(heading)) {
-    await import_node_fs16.promises.appendFile(filePath, `${line}
+    await import_node_fs15.promises.appendFile(filePath, `${line}
 `, "utf8");
   } else {
-    await import_node_fs16.promises.appendFile(filePath, `
+    await import_node_fs15.promises.appendFile(filePath, `
 ${heading}
 
 ${line}
@@ -15138,26 +15138,26 @@ ${line}
 async function seedPericodeTemplates(vaultPath) {
   const result = { written: [], skipped: [] };
   if (!vaultPath) return result;
-  const dir = (0, import_node_path20.join)(vaultPath, "templates", "PeriCode");
-  await import_node_fs16.promises.mkdir(dir, { recursive: true });
+  const dir = (0, import_node_path19.join)(vaultPath, "templates", "PeriCode");
+  await import_node_fs15.promises.mkdir(dir, { recursive: true });
   for (const [name, body] of Object.entries(TEMPLATES)) {
-    const filePath = (0, import_node_path20.join)(dir, name);
-    if ((0, import_node_fs16.existsSync)(filePath)) {
+    const filePath = (0, import_node_path19.join)(dir, name);
+    if ((0, import_node_fs15.existsSync)(filePath)) {
       result.skipped.push(filePath);
       continue;
     }
-    await import_node_fs16.promises.writeFile(filePath, body, "utf8");
+    await import_node_fs15.promises.writeFile(filePath, body, "utf8");
     result.written.push(filePath);
   }
   return result;
 }
 async function readObsidianConfigSnapshot(vaultPath) {
-  const dir = (0, import_node_path20.join)(vaultPath, ".obsidian");
+  const dir = (0, import_node_path19.join)(vaultPath, ".obsidian");
   const [enabledCommunityPlugins, installedThemes, cssSnippets, customHotkeys, dailyNotes] = await Promise.all([
-    readJson((0, import_node_path20.join)(dir, "community-plugins.json"), []),
-    listDir((0, import_node_path20.join)(dir, "themes")),
-    listDir((0, import_node_path20.join)(dir, "snippets")),
-    readJson((0, import_node_path20.join)(dir, "hotkeys.json"), {}),
+    readJson((0, import_node_path19.join)(dir, "community-plugins.json"), []),
+    listDir((0, import_node_path19.join)(dir, "themes")),
+    listDir((0, import_node_path19.join)(dir, "snippets")),
+    readJson((0, import_node_path19.join)(dir, "hotkeys.json"), {}),
     readDailyNotesConfig(vaultPath)
   ]);
   return {
@@ -15169,30 +15169,30 @@ async function readObsidianConfigSnapshot(vaultPath) {
   };
 }
 async function readJson(path, fallback) {
-  if (!(0, import_node_fs16.existsSync)(path)) return fallback;
+  if (!(0, import_node_fs15.existsSync)(path)) return fallback;
   try {
-    const raw = await import_node_fs16.promises.readFile(path, "utf8");
+    const raw = await import_node_fs15.promises.readFile(path, "utf8");
     return JSON.parse(raw);
   } catch {
     return fallback;
   }
 }
 async function listDir(path) {
-  if (!(0, import_node_fs16.existsSync)(path)) return [];
+  if (!(0, import_node_fs15.existsSync)(path)) return [];
   try {
-    const entries = await import_node_fs16.promises.readdir(path);
+    const entries = await import_node_fs15.promises.readdir(path);
     return entries.sort();
   } catch {
     return [];
   }
 }
-var import_node_fs16, import_node_path20, DEFAULT_DAILY_FORMAT, TEMPLATES;
+var import_node_fs15, import_node_path19, DEFAULT_DAILY_FORMAT, TEMPLATES;
 var init_obsidianHostBridge = __esm({
   "src/obsidianHostBridge.ts"() {
     "use strict";
     init_scoped_fetch();
-    import_node_fs16 = require("node:fs");
-    import_node_path20 = require("node:path");
+    import_node_fs15 = require("node:fs");
+    import_node_path19 = require("node:path");
     DEFAULT_DAILY_FORMAT = "YYYY-MM-DD";
     TEMPLATES = {
       "Decision.md": `---
@@ -17257,21 +17257,18 @@ var GrokLoginModal = class extends import_obsidian4.Modal {
 // src/onboardingWizard.ts
 init_scoped_fetch();
 var import_obsidian5 = require("obsidian");
-var import_node_fs11 = require("node:fs");
-var import_node_path15 = require("node:path");
-var STEP_ORDER = ["welcome", "provider", "import", "done"];
 var PROVIDER_LABELS = {
-  anthropic: "Anthropic (API key)",
+  "codex-oauth": "ChatGPT / Codex subscription",
   "claude-oauth": "Claude subscription (Claude Code)",
-  openai: "OpenAI (API key)",
-  openrouter: "OpenRouter (API key)",
-  xai: "Grok (xAI API key)",
+  copilot: "GitHub Copilot subscription",
   "grok-oauth": "Grok subscription (Grok Build)",
   "ollama-cloud": "Ollama Cloud account",
   ollama: "Ollama (local)",
-  "openai-compat": "OpenAI-compatible",
-  copilot: "GitHub Copilot (OAuth)",
-  "codex-oauth": "ChatGPT / Codex (OAuth)"
+  anthropic: "Anthropic API key",
+  openai: "OpenAI API key",
+  xai: "Grok (xAI API key)",
+  openrouter: "OpenRouter API key",
+  "openai-compat": "OpenAI-compatible server"
 };
 var OnboardingWizard = class extends import_obsidian5.Modal {
   constructor(app, plugin) {
@@ -17280,346 +17277,224 @@ var OnboardingWizard = class extends import_obsidian5.Modal {
   }
   plugin;
   step = "welcome";
-  importing = false;
-  importStatus = null;
-  importPath = "";
+  drafts = {};
+  catalog;
+  checkedConnection = "";
+  loading = false;
+  closed = false;
+  error = "";
   onOpen() {
+    this.closed = false;
     this.containerEl.addClass("pericode-onboarding-modal");
     this.modalEl.style.width = "640px";
     this.render();
   }
+  onClose() {
+    this.closed = true;
+    this.drafts = {};
+    this.plugin.settings.setupDismissed = true;
+    void this.plugin.saveSettings().catch(() => new import_obsidian5.Notice("Could not save setup preferences. You may see the guide again."));
+  }
+  /** Compare connection inputs in memory only; never log credentials. */
+  connectionKey(s = this.plugin.settings) {
+    return JSON.stringify([
+      s.provider,
+      s.anthropicApiKey,
+      s.openaiApiKey,
+      s.openrouterApiKey,
+      s.xaiApiKey,
+      s.openaiCompatApiKey,
+      s.openaiCompatBaseUrl,
+      s.ollamaHost
+    ]);
+  }
+  get dirty() {
+    return Object.keys(this.drafts).length > 0;
+  }
+  get ready() {
+    return !this.dirty && this.checkedConnection === this.connectionKey() && !!this.catalog?.models.some((m2) => m2.id === this.plugin.settings.model);
+  }
+  invalidate() {
+    this.catalog = void 0;
+    this.checkedConnection = "";
+    this.error = "";
+  }
   render() {
-    const { contentEl } = this;
-    contentEl.empty();
-    const stepIdx = STEP_ORDER.indexOf(this.step);
-    const progress = contentEl.createDiv();
-    progress.style.fontSize = "11px";
-    progress.style.color = "var(--text-muted)";
-    progress.style.marginBottom = "8px";
-    progress.setText(`Step ${stepIdx + 1} of ${STEP_ORDER.length}`);
-    const body = contentEl.createDiv();
-    switch (this.step) {
-      case "welcome":
-        this.renderWelcome(body);
-        break;
-      case "provider":
-        this.renderProvider(body);
-        break;
-      case "import":
-        this.renderImport(body);
-        break;
-      case "done":
-        this.renderDone(body);
-        break;
-    }
+    if (this.closed) return;
+    this.contentEl.empty();
+    const steps = ["welcome", "provider", "done"];
+    this.contentEl.createEl("p", { cls: "setting-item-description", text: `Step ${steps.indexOf(this.step) + 1} of 3` });
+    if (this.step === "welcome") {
+      this.contentEl.createEl("h2", { text: "Welcome to PeriCode" });
+      this.contentEl.createEl("p", { text: "Your AI subscription, working with your Obsidian vault. Find notes, follow sources, and review changes before accepting them." });
+      const list = this.contentEl.createEl("ul");
+      list.createEl("li", { text: "Use a supported subscription, an API key, or a local model." });
+      list.createEl("li", { text: "Chats stay in this vault. Prompts, attached notes and tool results go to your selected model endpoint when you send a message." });
+      list.createEl("li", { text: "Start in Research to read notes. Switch to Agent when you want to make changes, subject to your permission settings." });
+      new import_obsidian5.Setting(this.contentEl).addButton((b2) => b2.setButtonText("Set up later").onClick(() => this.show("done"))).addButton((b2) => b2.setButtonText("Get started").setCta().onClick(() => this.show("provider")));
+    } else if (this.step === "provider") this.renderProvider();
+    else this.renderDone();
+    if (this.loading) this.contentEl.querySelectorAll("button, input, select").forEach((el) => {
+      el.disabled = true;
+    });
   }
-  renderWelcome(el) {
-    el.createEl("h2", { text: "Welcome to PeriCode" });
-    el.createEl("p", {
-      text: "PeriCode turns this Obsidian vault into an operational knowledge base wired to your AI provider and your local files. Attached content is sent to your configured model endpoint."
-    });
-    const promises = el.createEl("ul");
-    promises.style.fontSize = "13px";
-    [
-      "Chats are stored locally; model providers and configured integrations may use the network.",
-      "API keys live in this plugin's data.json, outside your notes.",
-      "Attach notes for context, save conversations, and review revisions before accepting them."
-    ].forEach((line) => promises.createEl("li", { text: line }));
-    el.createEl("p", {
-      text: "This wizard takes about a minute. You can skip any step and finish it later from Settings."
-    });
-    this.renderNav(el, { showBack: false, nextLabel: "Get started" });
+  show(step) {
+    this.step = step;
+    this.render();
   }
-  renderProvider(el) {
-    el.createEl("h2", { text: "Pick your AI provider" });
-    el.createEl("p", {
-      text: "PeriCode talks to one provider at a time. OAuth options use your existing subscription; API-key options need a key from the provider's console."
-    });
-    new import_obsidian5.Setting(el).setName("Provider").setDesc("You can change this any time from Settings.").addDropdown((d) => {
-      for (const [id, label] of Object.entries(PROVIDER_LABELS)) {
-        d.addOption(id, label);
-      }
-      d.setValue(this.plugin.settings.provider);
-      d.onChange(async (value) => {
+  renderProvider() {
+    const el = this.contentEl;
+    el.createEl("h2", { text: "Connect and choose a model" });
+    el.createEl("p", { text: "Connect your account, then load its available models. This check sends no prompt or vault content and does not generate a response. Your provider's plan and limits apply." });
+    new import_obsidian5.Setting(el).setName("Provider").addDropdown((d) => {
+      for (const [id, label] of Object.entries(PROVIDER_LABELS)) d.addOption(id, label);
+      d.setValue(this.plugin.settings.provider).onChange(async (value) => {
+        const previous = { ...this.plugin.settings };
         this.plugin.settings.provider = value;
-        this.plugin.settings.model = DEFAULT_MODEL_PER_PROVIDER[value];
-        await this.plugin.saveSettings();
+        this.plugin.settings.model = "";
+        this.drafts = {};
+        this.invalidate();
+        try {
+          await this.plugin.saveSettings();
+        } catch {
+          Object.assign(this.plugin.settings, previous);
+          this.error = "Could not save the provider. Try again.";
+        }
         this.render();
       });
     });
     const provider = this.plugin.settings.provider;
+    const connected = () => {
+      this.invalidate();
+      this.render();
+    };
     if (provider === "grok-oauth") {
-      new import_obsidian5.Setting(el).setName("Grok subscription").addButton((b2) => b2.setButtonText("Sign in").onClick(() => new GrokLoginModal(this.app, () => this.render(), this.plugin).open()));
-    } else if (provider === "ollama-cloud") {
-      el.createEl("p", { text: "Run ollama signin on your Ollama server, then pull a cloud model. Your account plan and limits apply." });
-      this.renderTextRow(el, "Ollama server", "ollamaHost", "http://localhost:11434");
-    } else if (provider === "anthropic") {
-      this.renderApiKeyRow(el, "Anthropic API key", "anthropicApiKey", "sk-ant-...");
-    } else if (provider === "openai") {
-      this.renderApiKeyRow(el, "OpenAI API key", "openaiApiKey", "sk-...");
-    } else if (provider === "xai") {
-      this.renderApiKeyRow(el, "xAI API key", "xaiApiKey", "xai-...");
-      el.createEl("p", { text: "Uses xAI API credits, not Grok subscription sign-in.", cls: "setting-item-description" });
-    } else if (provider === "openrouter") {
-      this.renderApiKeyRow(el, "OpenRouter API key", "openrouterApiKey", "sk-or-...");
-    } else if (provider === "openai-compat") {
-      this.renderTextRow(el, "Base URL", "openaiCompatBaseUrl", "https://api.example.com/v1");
-      this.renderApiKeyRow(el, "API key", "openaiCompatApiKey", "");
-    } else if (provider === "ollama") {
-      this.renderTextRow(el, "Ollama host", "ollamaHost", "http://localhost:11434");
+      new import_obsidian5.Setting(el).setName("Grok subscription").setDesc("Connect through your installed Grok Build.").addButton((b2) => b2.setButtonText("Sign in").onClick(() => new GrokLoginModal(this.app, connected, this.plugin).open()));
     } else if (provider === "claude-oauth") {
-      new import_obsidian5.Setting(el).setName("Claude subscription").setDesc("Sign in through your installed Claude Code.").addButton((b2) => b2.setButtonText("Connect Claude Code").onClick(() => new AnthropicLoginModal(this.app, () => {
-      }, this.plugin).open()));
-    } else {
-      new import_obsidian5.Setting(el).setName("Connect subscription").setDesc("Sign in here before sending your first message. No API key is needed.").addButton((b2) => b2.setButtonText("Sign in").setCta().onClick(() => {
-        const LoginModal = provider === "copilot" ? CopilotLoginModal : CodexLoginModal;
-        new LoginModal(this.app, (success) => {
-          if (success) new import_obsidian5.Notice("Subscription connected.");
+      new import_obsidian5.Setting(el).setName("Claude subscription").setDesc("Connect through your installed Claude Code.").addButton((b2) => b2.setButtonText("Connect Claude Code").onClick(() => new AnthropicLoginModal(this.app, connected, this.plugin).open()));
+    } else if (provider === "copilot" || provider === "codex-oauth") {
+      new import_obsidian5.Setting(el).setName("Connect subscription").setDesc("Already signed in? Load models to check your saved connection.").addButton((b2) => b2.setButtonText("Sign in").onClick(() => {
+        const Login = provider === "copilot" ? CopilotLoginModal : CodexLoginModal;
+        new Login(this.app, (success) => {
+          if (success) connected();
         }).open();
       }));
+    } else if (provider === "ollama" || provider === "ollama-cloud") {
+      if (provider === "ollama-cloud") el.createEl("p", { text: "Run ollama signin on your Ollama server, then pull a cloud model. Your account plan and limits apply." });
+      this.renderField("Ollama server", "ollamaHost", false, "http://localhost:11434");
+    } else {
+      const fields = { anthropic: "anthropicApiKey", openai: "openaiApiKey", openrouter: "openrouterApiKey", xai: "xaiApiKey", "openai-compat": "openaiCompatApiKey" };
+      if (provider === "openai-compat") this.renderField("Base URL", "openaiCompatBaseUrl", false, "http://localhost:1234/v1");
+      this.renderField("API key", fields[provider], true, "");
+      el.createEl("p", { cls: "setting-item-description", text: "API access is billed separately from chat subscriptions. Local servers may not require a key." });
     }
-    this.renderNav(el, { nextLabel: "Continue" });
-  }
-  renderApiKeyRow(el, label, field, placeholder) {
-    new import_obsidian5.Setting(el).setName(label).setDesc("Stored in this plugin's data.json. Never written to vault notes.").addText((t) => {
-      t.inputEl.type = "password";
-      t.setPlaceholder(placeholder);
-      t.setValue(this.plugin.settings[field]);
-      t.onChange(async (value) => {
-        this.plugin.settings[field] = value.trim();
+    new import_obsidian5.Setting(el).addButton((b2) => b2.setButtonText("Save connection").setDisabled(!this.dirty).onClick(async () => {
+      const previous = { ...this.plugin.settings };
+      Object.assign(this.plugin.settings, this.drafts);
+      this.invalidate();
+      try {
         await this.plugin.saveSettings();
-      });
-    });
-  }
-  renderTextRow(el, label, field, placeholder) {
-    new import_obsidian5.Setting(el).setName(label).addText((t) => {
-      t.setPlaceholder(placeholder);
-      t.setValue(this.plugin.settings[field]);
-      t.onChange(async (value) => {
-        this.plugin.settings[field] = value.trim();
-        await this.plugin.saveSettings();
-      });
-    });
-  }
-  renderImport(el) {
-    el.createEl("h2", { text: "Import existing notes (optional)" });
-    el.createEl("p", {
-      text: "Point at a folder of markdown or text files. PeriCode copies them into wiki/<folder>/ and moves the originals into raw/_archived/<folder>-<date>/ so nothing is lost."
-    });
-    const note = el.createEl("p");
-    note.style.fontSize = "11px";
-    note.style.color = "var(--text-muted)";
-    note.setText(
-      "v1 supports .md and .txt only. Other extensions are reported as skipped."
-    );
-    new import_obsidian5.Setting(el).setName("Source folder").setDesc("Absolute path. Drag a folder onto Obsidian first to copy its path, then paste here.").addText((t) => {
-      t.setPlaceholder("C:\\Users\\you\\Documents\\notes");
-      t.setValue(this.importPath);
-      t.onChange((value) => {
-        this.importPath = value.trim();
-      });
-    });
-    const statusEl = el.createDiv();
-    statusEl.style.fontSize = "12px";
-    statusEl.style.margin = "8px 0";
-    if (this.importing) {
-      statusEl.style.color = "var(--text-muted)";
-      statusEl.setText("Importing\u2026");
-    } else if (this.importStatus) {
-      statusEl.style.color = "var(--text-success)";
-      const r = this.importStatus;
-      statusEl.setText(
-        `Imported ${r.imported} of ${r.scanned} files. Skipped ${r.skipped}` + (r.unsupportedExtensions.length > 0 ? ` (unsupported: ${r.unsupportedExtensions.join(", ")})` : "") + `. Originals archived to ${r.archivedFolder}.`
-      );
-    }
-    new import_obsidian5.Setting(el).addButton((b2) => {
-      b2.setButtonText(this.importing ? "Importing\u2026" : "Import & archive");
-      b2.setDisabled(this.importing);
-      b2.onClick(async () => {
-        const vaultPath = this.plugin.vaultPath;
-        if (!vaultPath) {
-          new import_obsidian5.Notice("Vault path unavailable on this platform.");
-          return;
-        }
-        if (!this.importPath) {
-          new import_obsidian5.Notice("Enter a source folder path first.");
-          return;
-        }
-        if (!(0, import_node_fs11.existsSync)(this.importPath)) {
-          new import_obsidian5.Notice(`Source folder not found: ${this.importPath}`);
-          return;
-        }
-        this.importing = true;
-        this.importStatus = null;
-        this.render();
+        this.drafts = {};
+      } catch {
+        Object.assign(this.plugin.settings, previous);
+        this.error = "Could not save the connection. Your changes are still in the form.";
+      }
+      this.render();
+    }));
+    new import_obsidian5.Setting(el).setName("Available models").addButton((b2) => b2.setButtonText(this.loading ? "Loading models\u2026" : "Load models").setDisabled(this.dirty).onClick(() => void this.checkModels()));
+    if (this.catalog) new import_obsidian5.Setting(el).setName("Model").addDropdown((d) => {
+      d.selectEl.setAttribute("aria-label", "Model");
+      d.addOption("", "Choose a model");
+      for (const m2 of this.catalog.models) d.addOption(m2.id, m2.description || m2.id);
+      d.setValue(this.plugin.settings.model).onChange(async (value) => {
+        const previous = this.plugin.settings.model;
+        this.plugin.settings.model = value;
+        this.error = "";
         try {
-          this.importStatus = await importAndArchive(
-            this.importPath,
-            vaultPath
-          );
-        } catch (err) {
-          new import_obsidian5.Notice(
-            `Import failed: ${err instanceof Error ? err.message : String(err)}`,
-            8e3
-          );
+          await this.plugin.saveSettings();
+        } catch {
+          this.plugin.settings.model = previous;
+          this.error = "Could not save the model. Try again.";
         }
-        this.importing = false;
         this.render();
       });
     });
-    this.renderNav(el, { skipLabel: "Skip", nextLabel: "Continue" });
-  }
-  renderDone(el) {
-    el.createEl("h2", { text: "All set" });
     el.createEl("p", {
-      text: "Click Open chat to start. Open Settings \u2192 PeriCode at any time to change providers or rerun the import."
+      cls: "pericode-setup-status",
+      attr: { role: "status", "aria-live": "polite" },
+      text: this.error || (this.dirty ? "Save your connection changes before loading models." : this.ready ? "Model list loaded. Your selected model is available; a chat response has not been tested yet." : "Load models and choose one to finish setup.")
     });
-    const recap = el.createEl("ul");
-    recap.style.fontSize = "13px";
-    recap.createEl("li", {
-      text: `Provider: ${PROVIDER_LABELS[this.plugin.settings.provider]}`
-    });
-    if (this.importStatus) {
-      recap.createEl("li", {
-        text: `Imported ${this.importStatus.imported} files; archived to ${this.importStatus.archivedFolder}.`
-      });
-    }
-    const row = new import_obsidian5.Setting(el);
-    row.addButton(
-      (b2) => b2.setButtonText("Open chat").setCta().onClick(() => {
-        this.close();
-        void this.plugin.activateView();
-        void setupFirstRunLayout(this.app).catch(() => {
+    new import_obsidian5.Setting(el).addButton((b2) => b2.setButtonText("Back").onClick(() => this.show("welcome"))).addButton((b2) => b2.setButtonText("Set up later").onClick(() => {
+      this.drafts = {};
+      this.invalidate();
+      this.show("done");
+    })).addButton((b2) => b2.setButtonText("Continue").setCta().setDisabled(!this.ready).onClick(() => {
+      if (this.ready) this.show("done");
+    }));
+  }
+  renderField(label, field, secret, placeholder) {
+    new import_obsidian5.Setting(this.contentEl).setName(label).setDesc(secret ? "Saved in the plugin's data.json only when you choose Save connection. Protect this file if you sync or share your vault." : "").addText((t) => {
+      t.inputEl.type = secret ? "password" : "text";
+      t.inputEl.setAttribute("aria-label", label);
+      t.setPlaceholder(placeholder).setValue(this.drafts[field] ?? this.plugin.settings[field]).onChange((value) => {
+        this.drafts[field] = value.trim();
+        this.invalidate();
+        this.contentEl.querySelectorAll("button").forEach((b2) => {
+          if (b2.textContent === "Save connection") b2.disabled = false;
+          if (b2.textContent === "Load models" || b2.textContent === "Continue") b2.disabled = true;
         });
-      })
-    );
-    row.addButton(
-      (b2) => b2.setButtonText("Open settings").onClick(() => {
-        this.close();
-        const settingApi = this.app.setting;
-        settingApi?.open?.();
-        settingApi?.openTabById?.("pericode");
-      })
-    );
+        this.contentEl.querySelector('[aria-label="Model"]')?.remove();
+        this.contentEl.querySelector(".pericode-setup-status")?.setText("Save your connection changes before loading models.");
+      });
+    });
   }
-  renderNav(el, opts) {
-    const { showBack = true, skipLabel, nextLabel } = opts;
-    const row = new import_obsidian5.Setting(el);
-    if (showBack) {
-      row.addButton(
-        (b2) => b2.setButtonText("Back").onClick(() => {
-          this.goto(-1);
-        })
-      );
+  async checkModels() {
+    if (this.loading || this.dirty || this.closed) return;
+    if (!this.plugin.claimInteractiveTurn()) {
+      this.error = "Finish the active request, then load models.";
+      this.render();
+      return;
     }
-    if (skipLabel) {
-      row.addButton(
-        (b2) => b2.setButtonText(skipLabel).onClick(() => {
-          this.goto(1);
-        })
-      );
-    }
-    row.addButton(
-      (b2) => b2.setButtonText(nextLabel).setCta().onClick(() => {
-        this.goto(1);
-      })
-    );
-  }
-  goto(delta) {
-    const idx = STEP_ORDER.indexOf(this.step) + delta;
-    if (idx < 0 || idx >= STEP_ORDER.length) return;
-    this.step = STEP_ORDER[idx];
+    const settings = { ...this.plugin.settings };
+    const key = this.connectionKey(settings);
+    this.invalidate();
+    this.loading = true;
     this.render();
+    try {
+      const catalog = await loadAccountModels(settings);
+      if (this.closed || key !== this.connectionKey()) return;
+      this.catalog = catalog;
+      this.checkedConnection = key;
+      if (!catalog.models.some((m2) => m2.id === this.plugin.settings.model)) {
+        this.error = this.plugin.settings.model ? "Your saved model is no longer listed. Choose an available model." : "Choose a model from the list.";
+      }
+    } catch (error2) {
+      if (!this.closed) this.error = error2 instanceof Error ? error2.message : "Could not load models. Check the connection and retry.";
+    } finally {
+      this.loading = false;
+      this.plugin.releaseInteractiveTurn();
+      this.render();
+    }
+  }
+  renderDone() {
+    const el = this.contentEl;
+    el.createEl("h2", { text: this.ready ? "Ready for your first message" : "Finish connecting when you're ready" });
+    el.createEl("p", { text: this.ready ? `${PROVIDER_LABELS[this.plugin.settings.provider]} \xB7 ${this.plugin.settings.model}. The model list check passed. Open chat, choose a starting question, and send it when ready.` : "Your connection has not been checked. Open AI connection in PeriCode settings to connect and choose a model before sending a message." });
+    el.createEl("p", { text: "Research reads notes without changing files. Agent can make changes with your configured permissions. Review proposed edits before accepting them." });
+    new import_obsidian5.Setting(el).addButton((b2) => b2.setButtonText("Back").onClick(() => this.show("provider"))).addButton((b2) => b2.setButtonText("Open chat").setCta().onClick(() => {
+      this.close();
+      void this.plugin.activateView();
+    })).addButton((b2) => b2.setButtonText("Open settings").onClick(() => {
+      this.close();
+      const settings = this.app.setting;
+      settings?.open?.();
+      settings?.openTabById?.("pericode");
+    }));
   }
 };
-async function importAndArchive(sourceDir, vaultPath) {
-  const stat = (0, import_node_fs11.statSync)(sourceDir);
-  if (!stat.isDirectory()) {
-    throw new Error(`${sourceDir} is not a directory.`);
-  }
-  const sourceName = (0, import_node_path15.basename)(sourceDir).replace(/[^A-Za-z0-9._-]+/g, "_");
-  const today = (/* @__PURE__ */ new Date()).toISOString().slice(0, 10);
-  const wikiTarget = (0, import_node_path15.join)(vaultPath, "wiki", sourceName);
-  const archiveTarget = (0, import_node_path15.join)(vaultPath, "raw", "_archived", `${sourceName}-${today}`);
-  await import_node_fs11.promises.mkdir(wikiTarget, { recursive: true });
-  await import_node_fs11.promises.mkdir(archiveTarget, { recursive: true });
-  const entries = await import_node_fs11.promises.readdir(sourceDir, { withFileTypes: true });
-  let scanned = 0;
-  let imported = 0;
-  let skipped = 0;
-  const unsupportedSet = /* @__PURE__ */ new Set();
-  for (const entry of entries) {
-    if (!entry.isFile()) continue;
-    scanned += 1;
-    const name = entry.name;
-    const ext = name.toLowerCase().split(".").pop() ?? "";
-    const sourcePath = (0, import_node_path15.join)(sourceDir, name);
-    if (ext === "md") {
-      await import_node_fs11.promises.copyFile(sourcePath, (0, import_node_path15.join)(wikiTarget, name));
-      imported += 1;
-    } else if (ext === "txt") {
-      const stem = name.replace(/\.txt$/i, "");
-      await import_node_fs11.promises.copyFile(sourcePath, (0, import_node_path15.join)(wikiTarget, `${stem}.md`));
-      imported += 1;
-    } else {
-      skipped += 1;
-      if (ext) unsupportedSet.add(ext);
-      continue;
-    }
-    try {
-      await import_node_fs11.promises.rename(sourcePath, (0, import_node_path15.join)(archiveTarget, name));
-    } catch {
-      await import_node_fs11.promises.copyFile(sourcePath, (0, import_node_path15.join)(archiveTarget, name));
-      await import_node_fs11.promises.unlink(sourcePath);
-    }
-  }
-  try {
-    const remaining = await import_node_fs11.promises.readdir(sourceDir);
-    if (remaining.length === 0) {
-      await import_node_fs11.promises.rmdir(sourceDir);
-    }
-  } catch {
-  }
-  return {
-    scanned,
-    imported,
-    skipped,
-    archivedFolder: archiveTarget.replace(vaultPath, "").replace(/^[/\\]+/, ""),
-    unsupportedExtensions: [...unsupportedSet].sort()
-  };
-}
-async function setupFirstRunLayout(app) {
-  try {
-    const leftSplit = app.workspace.leftSplit;
-    leftSplit?.expand?.();
-  } catch {
-  }
-  try {
-    const folder = app.vault.getAbstractFileByPath("templates/PeriCode");
-    if (folder) {
-      const explorerLeaves = app.workspace.getLeavesOfType("file-explorer");
-      const explorer = explorerLeaves[0];
-      const view = explorer?.view;
-      view?.revealInFolder?.(folder);
-    }
-  } catch {
-  }
-  try {
-    const existingGraphs = app.workspace.getLeavesOfType("graph");
-    const existingMarkdown = app.workspace.getLeavesOfType("markdown");
-    if (existingGraphs.length === 0 && existingMarkdown.length === 0) {
-      const leaf = app.workspace.getLeaf(false);
-      await leaf.setViewState({ type: "graph", active: false });
-    }
-  } catch {
-  }
-}
 function shouldAutoOpenWizard(plugin) {
   const s = plugin.settings;
-  const hasAnyKey = Boolean(s.anthropicApiKey) || Boolean(s.openaiApiKey) || Boolean(s.openrouterApiKey) || Boolean(s.xaiApiKey) || Boolean(s.openaiCompatApiKey);
-  if (hasAnyKey) return false;
-  if (s.provider !== DEFAULT_SETTINGS.provider) return false;
-  return true;
+  return !s.setupDismissed && s.provider === DEFAULT_SETTINGS.provider && ![s.anthropicApiKey, s.openaiApiKey, s.openrouterApiKey, s.xaiApiKey, s.openaiCompatApiKey].some(Boolean);
 }
 
 // src/settingsProviders.ts
@@ -17677,6 +17552,7 @@ var OAUTH_LANES = [
   }
 ];
 var DEFAULT_SETTINGS = {
+  setupDismissed: false,
   provider: "anthropic",
   model: "claude-sonnet-4-6",
   anthropicApiKey: "",
@@ -17740,7 +17616,7 @@ var PericodeSettingsTab = class extends import_obsidian6.PluginSettingTab {
     (0, import_obsidian6.setIcon)(brand.createSpan({ cls: "pericode-settings-mark" }), "sparkles");
     const title = brand.createDiv();
     title.createEl("h2", { text: "PeriCode" });
-    title.createEl("p", { text: "Your assistant. Your workspace.", cls: "pericode-settings-muted" });
+    title.createEl("p", { text: "Your AI, working with your vault.", cls: "pericode-settings-muted" });
     const setup = header.createEl("button", { text: "Setup guide", cls: "pericode-settings-setup" });
     setup.onclick = () => new OnboardingWizard(this.app, this.plugin).open();
     const nav = containerEl.createEl("nav", { cls: "pericode-settings-nav", attr: { "aria-label": "PeriCode settings sections" } });
@@ -17950,7 +17826,7 @@ var PericodeSettingsTab = class extends import_obsidian6.PluginSettingTab {
     const subscription = subscriptionProvider(provider);
     const wantManual = !subscription && this.editing.has(isManualKey);
     const setting = new import_obsidian6.Setting(container).setName("Model").setDesc(
-      cached2 ? `${cached2.length} models available from ${providerDisplayName(provider)}.` : loading ? "Loading models from provider\u2026" : error2 ? `Account model list unavailable: ${error2}` : "Connect above, then load the models available to your account."
+      cached2 ? subscription && !cached2.some((m2) => m2.id === this.plugin.settings.model) ? "Your saved model is not in this account's list. Choose an available model before sending." : `${cached2.length} models available from ${providerDisplayName(provider)}. Loading models does not test a chat response.` : loading ? "Loading models from provider\u2026" : error2 ? `Account model list unavailable: ${error2}` : "Connect above, then load the models available to your account."
     );
     if (cached2 && cached2.length > 0 && !wantManual) {
       setting.addDropdown((d) => {
@@ -17967,6 +17843,7 @@ var PericodeSettingsTab = class extends import_obsidian6.PluginSettingTab {
         d.onChange(async (value) => {
           this.plugin.settings.model = value;
           await this.plugin.saveSettings();
+          this.display();
         });
       });
       setting.addButton(
@@ -18034,6 +17911,7 @@ var PericodeSettingsTab = class extends import_obsidian6.PluginSettingTab {
     if (this.modelLoading.size || this.editing.size) return;
     if (!this.plugin.claimInteractiveTurn()) {
       this.modelError.set(provider, "Finish the active request, then refresh models.");
+      this.display();
       return;
     }
     const settings = { ...this.plugin.settings, provider };
@@ -20869,7 +20747,7 @@ var import_obsidian9 = require("obsidian");
 // src/conversationStore.ts
 init_scoped_fetch();
 var import_promises4 = require("node:fs/promises");
-var import_node_path17 = require("node:path");
+var import_node_path16 = require("node:path");
 var import_node_crypto7 = require("node:crypto");
 function newConversation() {
   return { id: (0, import_node_crypto7.randomUUID)(), title: "New conversation", updatedAt: Date.now(), provider: "", model: "", messages: [], entries: [], draft: "" };
@@ -20922,11 +20800,11 @@ var ConversationStore = class {
   readable = false;
   directory;
   constructor(vaultPath) {
-    this.directory = (0, import_node_path17.join)(vaultPath, ".pericode", "conversations");
+    this.directory = (0, import_node_path16.join)(vaultPath, ".pericode", "conversations");
   }
   async load() {
     try {
-      const data = parseConversations(await (0, import_promises4.readFile)((0, import_node_path17.join)(this.directory, "sessions.json"), "utf8"));
+      const data = parseConversations(await (0, import_promises4.readFile)((0, import_node_path16.join)(this.directory, "sessions.json"), "utf8"));
       this.readable = true;
       return data;
     } catch (err) {
@@ -20941,9 +20819,9 @@ var ConversationStore = class {
     const write = this.queue.catch(() => {
     }).then(async () => {
       await (0, import_promises4.mkdir)(this.directory, { recursive: true });
-      const temporary = (0, import_node_path17.join)(this.directory, `sessions-${(0, import_node_crypto7.randomUUID)()}.tmp`);
+      const temporary = (0, import_node_path16.join)(this.directory, `sessions-${(0, import_node_crypto7.randomUUID)()}.tmp`);
       await (0, import_promises4.writeFile)(temporary, snapshot, { encoding: "utf8", mode: 384 });
-      await (0, import_promises4.rename)(temporary, (0, import_node_path17.join)(this.directory, "sessions.json"));
+      await (0, import_promises4.rename)(temporary, (0, import_node_path16.join)(this.directory, "sessions.json"));
     });
     this.queue = write;
     return write;
@@ -21039,8 +20917,8 @@ init_sdk_entry();
 // src/PermissionModal.ts
 init_scoped_fetch();
 var import_obsidian8 = require("obsidian");
-var import_node_fs14 = require("node:fs");
-var import_node_path18 = require("node:path");
+var import_node_fs13 = require("node:fs");
+var import_node_path17 = require("node:path");
 var PermissionModal = class extends import_obsidian8.Modal {
   constructor(app, request, resolve4) {
     super(app);
@@ -21145,18 +21023,18 @@ var PermissionModal = class extends import_obsidian8.Modal {
     if (!path) return null;
     let absolute;
     try {
-      absolute = (0, import_node_path18.resolve)(path);
+      absolute = (0, import_node_path17.resolve)(path);
     } catch {
       return null;
     }
-    if (!(0, import_node_fs14.existsSync)(absolute)) return null;
+    if (!(0, import_node_fs13.existsSync)(absolute)) return null;
     let existingSize = 0;
     let existingContent = "";
     try {
-      const stat = (0, import_node_fs14.statSync)(absolute);
+      const stat = (0, import_node_fs13.statSync)(absolute);
       existingSize = stat.size;
       if (stat.size <= 64 * 1024) {
-        existingContent = (0, import_node_fs14.readFileSync)(absolute, "utf8");
+        existingContent = (0, import_node_fs13.readFileSync)(absolute, "utf8");
       }
     } catch {
       return null;
@@ -21359,27 +21237,27 @@ function prettySource(source) {
 
 // src/pericodeAudit.ts
 init_scoped_fetch();
-var import_node_fs15 = require("node:fs");
-var import_node_path19 = require("node:path");
+var import_node_fs14 = require("node:fs");
+var import_node_path18 = require("node:path");
 var MAX_OUTPUT_PREVIEW = 4e3;
 var ROTATE_AT_BYTES = 5 * 1024 * 1024;
 var KEEP_AFTER_ROTATE_BYTES = 3 * 1024 * 1024;
 var ROTATION_CHECK_EVERY = 50;
 var _appendsSinceCheck = 0;
 function auditPath(vaultPath) {
-  return (0, import_node_path19.join)(vaultPath, ".pericode", "audit.jsonl");
+  return (0, import_node_path18.join)(vaultPath, ".pericode", "audit.jsonl");
 }
 async function maybeRotate(path) {
   let stats;
   try {
-    stats = await import_node_fs15.promises.stat(path);
+    stats = await import_node_fs14.promises.stat(path);
   } catch {
     return;
   }
   if (stats.size <= ROTATE_AT_BYTES) return;
   let raw;
   try {
-    raw = await import_node_fs15.promises.readFile(path, "utf8");
+    raw = await import_node_fs14.promises.readFile(path, "utf8");
   } catch {
     return;
   }
@@ -21388,16 +21266,16 @@ async function maybeRotate(path) {
   if (sliceStart === -1) return;
   const kept = raw.slice(sliceStart + 1);
   try {
-    await import_node_fs15.promises.writeFile(path, kept, "utf8");
+    await import_node_fs14.promises.writeFile(path, kept, "utf8");
   } catch {
   }
 }
 async function ensureAuditFile(vaultPath) {
   if (!vaultPath) return;
   const path = auditPath(vaultPath);
-  await import_node_fs15.promises.mkdir((0, import_node_path19.dirname)(path), { recursive: true });
-  if (!(0, import_node_fs15.existsSync)(path)) {
-    await import_node_fs15.promises.writeFile(path, "", "utf8");
+  await import_node_fs14.promises.mkdir((0, import_node_path18.dirname)(path), { recursive: true });
+  if (!(0, import_node_fs14.existsSync)(path)) {
+    await import_node_fs14.promises.writeFile(path, "", "utf8");
   }
 }
 async function appendAudit(vaultPath, record2) {
@@ -21406,7 +21284,7 @@ async function appendAudit(vaultPath, record2) {
   const truncated = record2.output_preview.length > MAX_OUTPUT_PREVIEW ? record2.output_preview.slice(0, MAX_OUTPUT_PREVIEW) + "\n\u2026[truncated]" : record2.output_preview;
   const line = JSON.stringify({ ...record2, output_preview: truncated }) + "\n";
   try {
-    await import_node_fs15.promises.appendFile(path, line, "utf8");
+    await import_node_fs14.promises.appendFile(path, line, "utf8");
     _appendsSinceCheck += 1;
     if (_appendsSinceCheck >= ROTATION_CHECK_EVERY) {
       _appendsSinceCheck = 0;
@@ -21418,10 +21296,10 @@ async function appendAudit(vaultPath, record2) {
 async function readRecentAudit(vaultPath, limit = 50) {
   if (!vaultPath) return [];
   const path = auditPath(vaultPath);
-  if (!(0, import_node_fs15.existsSync)(path)) return [];
+  if (!(0, import_node_fs14.existsSync)(path)) return [];
   let raw = "";
   try {
-    raw = await import_node_fs15.promises.readFile(path, "utf8");
+    raw = await import_node_fs14.promises.readFile(path, "utf8");
   } catch {
     return [];
   }
@@ -21439,10 +21317,10 @@ async function readRecentAudit(vaultPath, limit = 50) {
 async function readAuditRange(vaultPath) {
   if (!vaultPath) return [];
   const path = auditPath(vaultPath);
-  if (!(0, import_node_fs15.existsSync)(path)) return [];
+  if (!(0, import_node_fs14.existsSync)(path)) return [];
   let raw = "";
   try {
-    raw = await import_node_fs15.promises.readFile(path, "utf8");
+    raw = await import_node_fs14.promises.readFile(path, "utf8");
   } catch {
     return [];
   }
@@ -21721,6 +21599,11 @@ var PericodeView = class extends import_obsidian9.ItemView {
     if (this.busy || !this.loaded || this.transitioning) return;
     const text2 = this.inputEl.value.trim();
     if (!text2) return;
+    if (!this.plugin.settings.model?.trim()) {
+      new import_obsidian9.Notice("Choose a model in AI connection before sending. Your draft is kept here.");
+      this.openPluginSettings();
+      return;
+    }
     let prompt;
     try {
       if (getQuarantineState().active) throw new Error("PeriCode is paused by security policy.");
@@ -22343,8 +22226,33 @@ var PericodeView = class extends import_obsidian9.ItemView {
     const card = this.messagesEl.createDiv({ cls: "pericode-welcome-card" });
     const icon = card.createDiv({ cls: "pericode-welcome-icon" });
     (0, import_obsidian9.setIcon)(icon, "messages-square");
-    card.createEl("h3", { cls: "pericode-welcome-heading", text: "How can I help?" });
-    card.createEl("p", { cls: "pericode-welcome-sub", text: "Ask about your notes. Add context with @." });
+    card.createEl("h3", { cls: "pericode-welcome-heading", text: "Work with your vault" });
+    card.createEl("p", { cls: "pericode-welcome-sub", text: "Choose a starting question, or write your own." });
+    const starters = card.createDiv({ cls: "pericode-starters" });
+    const prompts = [
+      ["Find a note", "Find notes about [topic] in this vault. Cite the matching notes with [[links]] and explain why each is relevant. Do not change files."],
+      ["Summarize notes", "Summarize the notes I attach with @. Cite the source notes with [[links]], highlight decisions and open questions, and do not change files. If I have not attached any notes, ask which notes to summarize."],
+      ["Review a note", "Review the note I attach with @ for clarity, missing details and contradictions. Suggest specific changes with reasons, but do not edit any files yet. If I have not attached a note, ask which note to review."]
+    ];
+    for (const [label, prompt] of prompts) {
+      starters.createEl("button", { text: label, cls: "pericode-starter", attr: { title: "Prepare a draft. Nothing is sent until you press Send." } }).addEventListener("click", () => {
+        if (this.busy) return;
+        if (this.inputEl.value.trim()) {
+          new import_obsidian9.Notice("Send or clear your current draft before choosing a starting question.");
+          return;
+        }
+        this.modePicker.value = "research";
+        this.inputEl.value = prompt;
+        this.conversation.draft = prompt;
+        this.resizeComposer();
+        this.scheduleSave();
+        this.inputEl.focus();
+        const placeholder = prompt.indexOf("[topic]");
+        if (placeholder >= 0) this.inputEl.setSelectionRange(placeholder, placeholder + 7);
+      });
+    }
+    card.createEl("p", { cls: "pericode-welcome-sub", text: "Add notes with @. Review your draft before sending. Research mode keeps your files unchanged." });
+    card.createEl("button", { text: "Connect or change AI", cls: "pericode-setup-link" }).addEventListener("click", () => this.openPluginSettings());
   }
   /**
    * Open Obsidian's settings dialog on the PeriCode tab. Uses the same
@@ -23425,7 +23333,7 @@ function inspectConfigTool(app) {
 // src/vaultReadTools.ts
 init_scoped_fetch();
 var import_promises5 = require("node:fs/promises");
-var import_node_path21 = require("node:path");
+var import_node_path20 = require("node:path");
 function vaultReadTools(deps) {
   return ["list_dir", "search_files"].map((name) => ({
     readOnly: true,
@@ -23454,12 +23362,12 @@ function vaultReadTools(deps) {
         }
         const info = await (0, import_promises5.lstat)(path);
         if (info.isSymbolicLink()) return;
-        const label = (0, import_node_path21.relative)(vault, path).replace(/\\/g, "/");
+        const label = (0, import_node_path20.relative)(vault, path).replace(/\\/g, "/");
         if (info.isDirectory()) {
           if (name === "list_dir" && label) output.push(label + "/");
           for (const entry of (await (0, import_promises5.readdir)(path)).slice(0, 1e3)) {
             if (entry.startsWith(".") || ["node_modules", "dist", "build"].includes(entry)) continue;
-            await visit((0, import_node_path21.join)(path, entry), depth + 1);
+            await visit((0, import_node_path20.join)(path, entry), depth + 1);
           }
         } else if (info.isFile()) {
           examined++;
@@ -23803,8 +23711,8 @@ init_scoped_fetch();
 
 // src/pericodeMemory.ts
 init_scoped_fetch();
-var import_node_fs17 = require("node:fs");
-var import_node_path22 = require("node:path");
+var import_node_fs16 = require("node:fs");
+var import_node_path21 = require("node:path");
 var MEMORY_DIR = ".pericode";
 var MEMORY_INDEX = "MEMORY.md";
 var MEMORY_FILES = "memory";
@@ -23815,16 +23723,16 @@ var INDEX_HEADER = `# PeriCode memory
 ## Index
 `;
 function memoryRoot(vaultPath) {
-  return (0, import_node_path22.join)(vaultPath, MEMORY_DIR);
+  return (0, import_node_path21.join)(vaultPath, MEMORY_DIR);
 }
 function indexPath(vaultPath) {
-  return (0, import_node_path22.join)(memoryRoot(vaultPath), MEMORY_INDEX);
+  return (0, import_node_path21.join)(memoryRoot(vaultPath), MEMORY_INDEX);
 }
 function memoriesDir(vaultPath) {
-  return (0, import_node_path22.join)(memoryRoot(vaultPath), MEMORY_FILES);
+  return (0, import_node_path21.join)(memoryRoot(vaultPath), MEMORY_FILES);
 }
 function memoryPath(vaultPath, name) {
-  return (0, import_node_path22.join)(memoriesDir(vaultPath), `${slugify(name)}.md`);
+  return (0, import_node_path21.join)(memoriesDir(vaultPath), `${slugify(name)}.md`);
 }
 function slugify(name) {
   return name.trim().toLowerCase().replace(/[^a-z0-9_-]+/g, "_").replace(/^_+|_+$/g, "").slice(0, 80) || "memory";
@@ -23834,10 +23742,10 @@ function todayIso() {
 }
 async function ensureMemoryStore(vaultPath) {
   if (!vaultPath) return;
-  await import_node_fs17.promises.mkdir(memoriesDir(vaultPath), { recursive: true });
+  await import_node_fs16.promises.mkdir(memoriesDir(vaultPath), { recursive: true });
   const idx = indexPath(vaultPath);
-  if (!(0, import_node_fs17.existsSync)(idx)) {
-    await import_node_fs17.promises.writeFile(idx, INDEX_HEADER + "\n_(empty \u2014 no memories saved yet.)_\n", "utf8");
+  if (!(0, import_node_fs16.existsSync)(idx)) {
+    await import_node_fs16.promises.writeFile(idx, INDEX_HEADER + "\n_(empty \u2014 no memories saved yet.)_\n", "utf8");
   }
 }
 async function listMemories(vaultPath) {
@@ -23845,16 +23753,16 @@ async function listMemories(vaultPath) {
   const dir = memoriesDir(vaultPath);
   let entries;
   try {
-    entries = await import_node_fs17.promises.readdir(dir);
+    entries = await import_node_fs16.promises.readdir(dir);
   } catch {
     return [];
   }
   const out = [];
   for (const entry of entries) {
     if (!entry.endsWith(".md")) continue;
-    const full = (0, import_node_path22.join)(dir, entry);
+    const full = (0, import_node_path21.join)(dir, entry);
     try {
-      const raw = await import_node_fs17.promises.readFile(full, "utf8");
+      const raw = await import_node_fs16.promises.readFile(full, "utf8");
       const parsed = parseMemoryFile(raw);
       if (parsed) out.push(parsed);
     } catch {
@@ -23867,11 +23775,11 @@ async function readMemory(vaultPath, name) {
   if (!vaultPath || !name) return null;
   const candidates = [
     memoryPath(vaultPath, name),
-    (0, import_node_path22.join)(memoriesDir(vaultPath), `${name}.md`)
+    (0, import_node_path21.join)(memoriesDir(vaultPath), `${name}.md`)
   ];
   for (const path of candidates) {
     try {
-      const raw = await import_node_fs17.promises.readFile(path, "utf8");
+      const raw = await import_node_fs16.promises.readFile(path, "utf8");
       const parsed = parseMemoryFile(raw);
       if (parsed) return parsed;
     } catch {
@@ -23894,8 +23802,8 @@ created: ${created}
 ---
 
 `;
-  await import_node_fs17.promises.mkdir((0, import_node_path22.dirname)(filePath), { recursive: true });
-  await import_node_fs17.promises.writeFile(filePath, frontmatter + record2.content.trim() + "\n", "utf8");
+  await import_node_fs16.promises.mkdir((0, import_node_path21.dirname)(filePath), { recursive: true });
+  await import_node_fs16.promises.writeFile(filePath, frontmatter + record2.content.trim() + "\n", "utf8");
   await rewriteIndex(vaultPath);
   return { path: filePath, created };
 }
@@ -23903,12 +23811,12 @@ async function deleteMemory(vaultPath, name) {
   if (!vaultPath) return false;
   const candidates = [
     memoryPath(vaultPath, name),
-    (0, import_node_path22.join)(memoriesDir(vaultPath), `${name}.md`)
+    (0, import_node_path21.join)(memoriesDir(vaultPath), `${name}.md`)
   ];
   let removed = false;
   for (const path of candidates) {
     try {
-      await import_node_fs17.promises.unlink(path);
+      await import_node_fs16.promises.unlink(path);
       removed = true;
       break;
     } catch {
@@ -23925,14 +23833,14 @@ async function rewriteIndex(vaultPath) {
   } else {
     for (const m2 of memories) {
       const slug = slugify(m2.name);
-      const rel = (0, import_node_path22.relative)(memoryRoot(vaultPath), memoryPath(vaultPath, m2.name));
+      const rel = (0, import_node_path21.relative)(memoryRoot(vaultPath), memoryPath(vaultPath, m2.name));
       const link = rel.replace(/\\/g, "/");
       body += `- [${m2.name}](${link}) \u2014 *${m2.type}* \xB7 ${m2.description.replace(/\n/g, " ")}
 `;
       void slug;
     }
   }
-  await import_node_fs17.promises.writeFile(indexPath(vaultPath), body, "utf8");
+  await import_node_fs16.promises.writeFile(indexPath(vaultPath), body, "utf8");
 }
 function parseMemoryFile(raw) {
   if (!raw.startsWith("---")) return null;
@@ -24130,8 +24038,8 @@ function deleteMemoryTool(getVaultPath) {
 
 // src/strategicTools.ts
 init_scoped_fetch();
-var import_node_fs18 = require("node:fs");
-var import_node_path23 = require("node:path");
+var import_node_fs17 = require("node:fs");
+var import_node_path22 = require("node:path");
 var DECISIONS_DIR = "Decisions";
 function todayIso2() {
   return (/* @__PURE__ */ new Date()).toISOString().slice(0, 10);
@@ -24226,9 +24134,9 @@ ${stakeholders.map((s) => `- ${s}`).join("\n")}
 _Update later \u2014 was this the right call? What did we learn?_
 `;
       const full = fmLines.join("\n") + body;
-      const absPath = (0, import_node_path23.join)(vault, relPath);
-      await import_node_fs18.promises.mkdir((0, import_node_path23.join)(vault, DECISIONS_DIR), { recursive: true });
-      await import_node_fs18.promises.writeFile(absPath, full, "utf8");
+      const absPath = (0, import_node_path22.join)(vault, relPath);
+      await import_node_fs17.promises.mkdir((0, import_node_path22.join)(vault, DECISIONS_DIR), { recursive: true });
+      await import_node_fs17.promises.writeFile(absPath, full, "utf8");
       return {
         output: `Logged decision '${decision}' at ${relPath}.`,
         isError: false
@@ -24255,10 +24163,10 @@ function queryDecisionsTool(app, getVaultPath) {
     async execute(input) {
       const vault = getVaultPath();
       if (!vault) return { output: "vault path unknown", isError: true };
-      const dir = (0, import_node_path23.join)(vault, DECISIONS_DIR);
+      const dir = (0, import_node_path22.join)(vault, DECISIONS_DIR);
       let files;
       try {
-        files = await import_node_fs18.promises.readdir(dir);
+        files = await import_node_fs17.promises.readdir(dir);
       } catch {
         return { output: JSON.stringify({ count: 0, decisions: [] }, null, 2), isError: false };
       }
@@ -24269,7 +24177,7 @@ function queryDecisionsTool(app, getVaultPath) {
       for (const file of files.sort().reverse()) {
         if (!file.endsWith(".md")) continue;
         try {
-          const raw = await import_node_fs18.promises.readFile((0, import_node_path23.join)(dir, file), "utf8");
+          const raw = await import_node_fs17.promises.readFile((0, import_node_path22.join)(dir, file), "utf8");
           const meta = parseFrontmatter(raw);
           if (!meta) continue;
           if (contains && !String(meta.decision ?? "").toLowerCase().includes(contains)) continue;
@@ -24460,31 +24368,31 @@ function resolveWikilink(target, pathSet, basenameToPath) {
   const cleaned = target.trim().replace(/\\/g, "/");
   if (pathSet.has(`${cleaned}.md`)) return `${cleaned}.md`;
   if (pathSet.has(cleaned)) return cleaned;
-  const basename5 = cleaned.split("/").pop()?.toLowerCase();
-  if (!basename5) return null;
-  return basenameToPath.get(basename5) ?? null;
+  const basename4 = cleaned.split("/").pop()?.toLowerCase();
+  if (!basename4) return null;
+  return basenameToPath.get(basename4) ?? null;
 }
 
 // src/pericodeAgents.ts
 init_scoped_fetch();
 var import_obsidian12 = require("obsidian");
-var import_node_fs19 = require("node:fs");
-var import_node_path24 = require("node:path");
+var import_node_fs18 = require("node:fs");
+var import_node_path23 = require("node:path");
 var ALL_AGENTS = [
   "memory_curator",
   "risk_detection",
   "executive_summary",
   "knowledge_gap"
 ];
-var REPORTS_DIR = (0, import_node_path24.join)(".pericode", "agent-reports");
+var REPORTS_DIR = (0, import_node_path23.join)(".pericode", "agent-reports");
 function todayIso3() {
   return (/* @__PURE__ */ new Date()).toISOString().slice(0, 10);
 }
 async function writeReport(vaultPath, agent, body) {
-  const dir = (0, import_node_path24.join)(vaultPath, REPORTS_DIR);
-  await import_node_fs19.promises.mkdir(dir, { recursive: true });
+  const dir = (0, import_node_path23.join)(vaultPath, REPORTS_DIR);
+  await import_node_fs18.promises.mkdir(dir, { recursive: true });
   const fileName = `${agent}-${todayIso3()}.md`;
-  const path = (0, import_node_path24.join)(dir, fileName);
+  const path = (0, import_node_path23.join)(dir, fileName);
   const header = `---
 agent: ${agent}
 generated: ${(/* @__PURE__ */ new Date()).toISOString()}
@@ -24494,17 +24402,17 @@ type: agent_report
 # ${humanize(agent)} \u2014 ${todayIso3()}
 
 `;
-  await import_node_fs19.promises.writeFile(path, header + body, "utf8");
+  await import_node_fs18.promises.writeFile(path, header + body, "utf8");
   return path;
 }
 function humanize(agent) {
   return agent.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
 }
 async function runMemoryCurator(vaultPath, app) {
-  const memDir = (0, import_node_path24.join)(vaultPath, ".pericode", "memory");
+  const memDir = (0, import_node_path23.join)(vaultPath, ".pericode", "memory");
   let entries = [];
   try {
-    entries = await import_node_fs19.promises.readdir(memDir);
+    entries = await import_node_fs18.promises.readdir(memDir);
   } catch {
     return "No memories yet \u2014 nothing to curate.";
   }
@@ -24512,8 +24420,8 @@ async function runMemoryCurator(vaultPath, app) {
   for (const file of entries) {
     if (!file.endsWith(".md")) continue;
     try {
-      const stat = await import_node_fs19.promises.stat((0, import_node_path24.join)(memDir, file));
-      const raw = await import_node_fs19.promises.readFile((0, import_node_path24.join)(memDir, file), "utf8");
+      const stat = await import_node_fs18.promises.stat((0, import_node_path23.join)(memDir, file));
+      const raw = await import_node_fs18.promises.readFile((0, import_node_path23.join)(memDir, file), "utf8");
       const created = /^created:\s*(\d{4}-\d{2}-\d{2})/m.exec(raw)?.[1] ?? "";
       memories.push({
         name: file.replace(/\.md$/, ""),
@@ -24587,8 +24495,8 @@ async function runRiskDetection(vaultPath, app) {
   if (openDecisions.length > 20) lines.push(`- _\u2026${openDecisions.length - 20} more_`);
   lines.push("");
   try {
-    const auditPath2 = (0, import_node_path24.join)(vaultPath, ".pericode", "audit.jsonl");
-    const raw = await import_node_fs19.promises.readFile(auditPath2, "utf8");
+    const auditPath2 = (0, import_node_path23.join)(vaultPath, ".pericode", "audit.jsonl");
+    const raw = await import_node_fs18.promises.readFile(auditPath2, "utf8");
     const tail = raw.split(/\r?\n/).filter(Boolean).slice(-500);
     const errorCounts = /* @__PURE__ */ new Map();
     for (const line of tail) {
@@ -24619,8 +24527,8 @@ async function runExecutiveSummary(vaultPath, app) {
   const editedWeek = allFiles.filter((f2) => now - (f2.stat?.mtime ?? 0) < 7 * ONE_DAY).length;
   let auditTail = [];
   try {
-    const auditPath2 = (0, import_node_path24.join)(vaultPath, ".pericode", "audit.jsonl");
-    const raw = await import_node_fs19.promises.readFile(auditPath2, "utf8");
+    const auditPath2 = (0, import_node_path23.join)(vaultPath, ".pericode", "audit.jsonl");
+    const raw = await import_node_fs18.promises.readFile(auditPath2, "utf8");
     auditTail = raw.split(/\r?\n/).filter(Boolean).slice(-200);
   } catch {
   }
@@ -24761,10 +24669,10 @@ function listReportsTool(getVaultPath) {
     async execute(input) {
       const vault = getVaultPath();
       if (!vault) return { output: "vault path unknown", isError: true };
-      const dir = (0, import_node_path24.join)(vault, REPORTS_DIR);
+      const dir = (0, import_node_path23.join)(vault, REPORTS_DIR);
       let files;
       try {
-        files = await import_node_fs19.promises.readdir(dir);
+        files = await import_node_fs18.promises.readdir(dir);
       } catch {
         return { output: JSON.stringify({ count: 0, reports: [] }, null, 2), isError: false };
       }
@@ -24792,10 +24700,10 @@ function startAgentScheduler(app, getVaultPath, intervalMs = ONE_DAY_MS) {
     if (cancelled) return;
     const vault = getVaultPath();
     if (!vault) return;
-    const dir = (0, import_node_path24.join)(vault, REPORTS_DIR);
+    const dir = (0, import_node_path23.join)(vault, REPORTS_DIR);
     let files = [];
     try {
-      files = await import_node_fs19.promises.readdir(dir);
+      files = await import_node_fs18.promises.readdir(dir);
     } catch {
     }
     for (const agent of ALL_AGENTS) {
@@ -24803,7 +24711,7 @@ function startAgentScheduler(app, getVaultPath, intervalMs = ONE_DAY_MS) {
       let needsRun = true;
       if (lastReportFile) {
         try {
-          const stat = await import_node_fs19.promises.stat((0, import_node_path24.join)(dir, lastReportFile));
+          const stat = await import_node_fs18.promises.stat((0, import_node_path23.join)(dir, lastReportFile));
           if (Date.now() - stat.mtimeMs < intervalMs) needsRun = false;
         } catch {
         }
@@ -24830,10 +24738,10 @@ function broadcastAgentStartup() {
 }
 var KEEP_REPORTS_PER_AGENT = 30;
 async function pruneOldReports(vaultPath) {
-  const dir = (0, import_node_path24.join)(vaultPath, REPORTS_DIR);
+  const dir = (0, import_node_path23.join)(vaultPath, REPORTS_DIR);
   let files;
   try {
-    files = await import_node_fs19.promises.readdir(dir);
+    files = await import_node_fs18.promises.readdir(dir);
   } catch {
     return;
   }
@@ -24842,7 +24750,7 @@ async function pruneOldReports(vaultPath) {
     const stale = matching.slice(KEEP_REPORTS_PER_AGENT);
     for (const file of stale) {
       try {
-        await import_node_fs19.promises.unlink((0, import_node_path24.join)(dir, file));
+        await import_node_fs18.promises.unlink((0, import_node_path23.join)(dir, file));
       } catch {
       }
     }
@@ -24855,8 +24763,8 @@ init_pericodeSecurity();
 
 // src/auditExportTools.ts
 init_scoped_fetch();
-var import_node_fs20 = require("node:fs");
-var import_node_path25 = require("node:path");
+var import_node_fs19 = require("node:fs");
+var import_node_path24 = require("node:path");
 function createAuditExportTools(ctx) {
   return [exportTool(ctx), reportTool(ctx)];
 }
@@ -24886,11 +24794,11 @@ function escapeCsvCell(value) {
 }
 function defaultExportPath(vaultPath, format) {
   const ts = (/* @__PURE__ */ new Date()).toISOString().replace(/[:.]/g, "-").slice(0, 19);
-  return (0, import_node_path25.join)(vaultPath, "output", `audit-export-${ts}.${format}`);
+  return (0, import_node_path24.join)(vaultPath, "output", `audit-export-${ts}.${format}`);
 }
 function defaultReportPath(vaultPath) {
   const date3 = (/* @__PURE__ */ new Date()).toISOString().slice(0, 10);
-  return (0, import_node_path25.join)(vaultPath, "output", `compliance-report-${date3}.md`);
+  return (0, import_node_path24.join)(vaultPath, "output", `compliance-report-${date3}.md`);
 }
 function exportTool(ctx) {
   return {
@@ -24947,13 +24855,13 @@ function exportTool(ctx) {
         onlyErrors: input.only_errors === true
       };
       const outputPathRaw = typeof input.output_path === "string" && input.output_path.trim() ? input.output_path.trim() : void 0;
-      const outputPath = outputPathRaw ? outputPathRaw.startsWith("/") || outputPathRaw.match(/^[A-Za-z]:[/\\]/) ? outputPathRaw : (0, import_node_path25.join)(vault, outputPathRaw) : defaultExportPath(vault, format);
+      const outputPath = outputPathRaw ? outputPathRaw.startsWith("/") || outputPathRaw.match(/^[A-Za-z]:[/\\]/) ? outputPathRaw : (0, import_node_path24.join)(vault, outputPathRaw) : defaultExportPath(vault, format);
       try {
         const all = await readAuditRange(vault);
         const filtered = all.filter((e) => passesFilters(e, filters));
-        await import_node_fs20.promises.mkdir((0, import_node_path25.dirname)(outputPath), { recursive: true });
+        await import_node_fs19.promises.mkdir((0, import_node_path24.dirname)(outputPath), { recursive: true });
         if (format === "json") {
-          await import_node_fs20.promises.writeFile(
+          await import_node_fs19.promises.writeFile(
             outputPath,
             JSON.stringify(filtered, null, 2),
             "utf8"
@@ -24985,7 +24893,7 @@ function exportTool(ctx) {
               ].map(escapeCsvCell).join(",")
             );
           }
-          await import_node_fs20.promises.writeFile(outputPath, rows.join("\n") + "\n", "utf8");
+          await import_node_fs19.promises.writeFile(outputPath, rows.join("\n") + "\n", "utf8");
         }
         return {
           output: JSON.stringify(
@@ -25044,13 +24952,13 @@ function reportTool(ctx) {
         until: typeof input.until === "string" && input.until.trim() ? input.until.trim() : void 0
       };
       const outputPathRaw = typeof input.output_path === "string" && input.output_path.trim() ? input.output_path.trim() : void 0;
-      const outputPath = outputPathRaw ? outputPathRaw.startsWith("/") || outputPathRaw.match(/^[A-Za-z]:[/\\]/) ? outputPathRaw : (0, import_node_path25.join)(vault, outputPathRaw) : defaultReportPath(vault);
+      const outputPath = outputPathRaw ? outputPathRaw.startsWith("/") || outputPathRaw.match(/^[A-Za-z]:[/\\]/) ? outputPathRaw : (0, import_node_path24.join)(vault, outputPathRaw) : defaultReportPath(vault);
       try {
         const all = await readAuditRange(vault);
         const records = all.filter((e) => passesFilters(e, filters));
         const md = buildComplianceReport(records, filters, all.length);
-        await import_node_fs20.promises.mkdir((0, import_node_path25.dirname)(outputPath), { recursive: true });
-        await import_node_fs20.promises.writeFile(outputPath, md, "utf8");
+        await import_node_fs19.promises.mkdir((0, import_node_path24.dirname)(outputPath), { recursive: true });
+        await import_node_fs19.promises.writeFile(outputPath, md, "utf8");
         return {
           output: JSON.stringify(
             {

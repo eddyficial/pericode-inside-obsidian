@@ -346,6 +346,10 @@
 .pericode-welcome-icon svg { width: 28px; height: 28px; }
 .pericode-welcome-heading { margin: 0 0 8px; font-size: 16px; font-weight: 500; color: var(--text-normal); }
 .pericode-welcome-sub { font-size: 12px; line-height: 1.5; }
+.pericode-starters { display: grid; gap: 8px; margin: 16px 0; }
+.pericode-starters .pericode-starter { width: 100%; height: auto; min-height: 34px; padding: 8px 12px; white-space: normal; text-align: left; }
+.pericode-welcome-card .pericode-setup-link { font-size: 12px; height: auto; padding: 6px 10px; white-space: normal; }
+.pericode-setup-status { color: var(--text-muted); font-size: var(--font-ui-small); line-height: 1.5; }
 
 /* Conversation workspace */
 .pericode-attachments { display: flex; flex-wrap: wrap; gap: 4px; padding: 6px 8px 0; max-height: 80px; overflow: auto; }

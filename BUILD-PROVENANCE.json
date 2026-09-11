@@ -1,19 +1,19 @@
 {
-  "version": "0.3.5",
+  "version": "0.3.6",
   "sourceRepository": "https://github.com/eddyficial/pericode",
-  "sourceCommit": "452a372a56c78cf53e625ac213b584b8c5c80be6",
+  "sourceCommit": "8e66277ac74f3c4fa4033f99af8f1beab3e89085",
   "sourceDirectory": "plugins/obsidian",
   "license": "MIT",
   "build": "npm ci && npm test; cd plugins/obsidian && npm ci && npm run release",
   "validation": {
-    "pluginTests": 81,
+    "pluginTests": 86,
     "schemaTestsWithoutCodeGeneration": 4,
-    "installerAndReleaseChecks": "passed locally and in the GitHub release workflow",
-    "live": "Obsidian 1.13.7 native create, read, stale-write refusal, exact edit and trash passed. Provider/model selection preserved.",
+    "installerAndReleaseChecks": "passed locally; reproducible CI release build required before publication",
+    "live": "Obsidian 1.13.7 setup loaded seven ChatGPT/Codex account models and preserved the selected model. Starter draft, native create/read/stale-write refusal/edit/trash passed.",
     "productionDependencyAudit": "zero known advisories",
     "sdkTests": 352,
-    "communityReview": "Completed for 0.3.5 at ed3ae70; no blocking errors",
-    "nativeCommunityInstall": "Obsidian 1.13.7 downloaded and reinstalled 0.3.5, preserved settings and passed live vault operations"
+    "communityReview": "0.3.6 review pending; prior completed review covers 0.3.5 only",
+    "nativeCommunityInstall": "0.3.5 native reinstall verified previously; 0.3.6 installed with the bundled installer for live QA"
   },
   "releaseWorkflow": ".github/workflows/release.yml",
   "limitations": [
