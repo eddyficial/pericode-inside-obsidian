@@ -40712,8 +40712,11 @@ var PericodeView = class extends import_obsidian8.ItemView {
     root.empty();
     const view = root.createDiv({ cls: "pericode-view" });
     const header = view.createDiv({ cls: "pericode-header" });
+    header.createSpan({ cls: "pericode-brand-mark", text: "PC", attr: { "aria-hidden": "true" } });
+    const identity = header.createDiv({ cls: "pericode-chat-identity" });
+    identity.createSpan({ cls: "pericode-brand-name", text: "PeriCode" });
     this.panelEl = view;
-    this.sessionPicker = header.createEl("select", { cls: "pericode-session-picker", attr: { "aria-label": "Saved conversations", title: "Switch conversation" } });
+    this.sessionPicker = identity.createEl("select", { cls: "pericode-session-picker", attr: { "aria-label": "Saved conversations", title: "Switch conversation" } });
     this.sessionPicker.addEventListener("change", () => void this.switchConversation(this.sessionPicker.value));
     this.iconButton(header, "plus", "New chat", () => void this.startConversation());
     this.expandButtonEl = this.iconButton(header, "maximize-2", "Expand chat", () => this.toggleExpanded());

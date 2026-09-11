@@ -1,3 +1,17 @@
+## 0.3.1 chat branding
+
+The chat header shows the PC logo and PeriCode name above the saved-conversation
+selector. All 69 plugin tests and the installer/release checks pass. Live
+Obsidian 1.13.7 verification confirms version 0.3.1 loads with the existing Codex
+provider and conversation selection preserved. At a 300-pixel sidebar width,
+the 52-pixel header displays the brand, conversation selector and all three
+actions without overflow. The visible sidebar was inspected after upgrade.
+
+The website header and footer logo styles match on all 12 pages, with browser
+checks at desktop and mobile widths. Provider authentication coverage is
+unchanged; the historical verification details below retain their original dates
+and release scope. Community submission remains paused.
+
 ## 0.3.0 open-source release
 
 PeriCode's commercial licensing layer has been removed. All features use the

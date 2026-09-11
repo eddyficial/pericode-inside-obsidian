@@ -11,7 +11,9 @@ Research your notes, keep conversations across sessions, and review suggested
 revisions before changing a note. PeriCode Inside runs its own agent loop in
 Obsidian and connects to the model provider you choose.
 
-**0.3.0 open-source preview · Desktop only · Obsidian 1.13.7 or newer**
+**0.3.1 open-source preview · Desktop only · Obsidian 1.13.7 or newer**
+
+The chat header displays the PC logo and PeriCode name alongside the saved-conversation selector.
 
 ## Settings and providers
 
@@ -132,8 +134,8 @@ npm ci
 npm run release
 ```
 
-The candidate files and checksums are in `dist/community-0.3.0/`; the ZIP is in
-`dist/pericode-inside-0.3.0.zip`. `npm run dev:install` requires an explicit
+The candidate files and checksums are in `dist/community-0.3.1/`; the ZIP is in
+`dist/pericode-inside-0.3.1.zip`. `npm run dev:install` requires an explicit
 `PERICODE_OBSIDIAN_VAULT` environment variable so it never chooses a vault for you.
 
 ## Context and editing

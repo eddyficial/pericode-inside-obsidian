@@ -1,3 +1,13 @@
+# PeriCode Inside 0.3.1 - chat branding
+
+The chat session header now shows the PeriCode name and PC logo alongside the
+saved-conversation selector. New chat, expand and menu controls remain compact.
+The website footer now uses the same logo treatment as its header.
+
+This update preserves provider settings, conversations and permission controls.
+The plugin remains a free MIT-licensed desktop preview. Community submission
+remains paused; existing live-provider verification limits still apply.
+
 # PeriCode Inside 0.3.0 — free and open source
 
 All PeriCode project-owned code is now available under the MIT license.
