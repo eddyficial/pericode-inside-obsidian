@@ -117,8 +117,9 @@ For a manual install or another desktop OS, copy main.js, manifest.json and
 styles.css into `<vault>/.obsidian/plugins/pericode/`, reload Obsidian, and enable
 the plugin. The installer supports the standard `.obsidian` configuration folder.
 
-The plugin is not yet submitted to or accepted by the Community directory. The
-release bundle is self-contained; no SQL Server or npm install is needed.
+PeriCode is published in the [Obsidian Community directory](https://community.obsidian.md/plugins/pericode).
+Choose **Add to Obsidian**, then install and enable it in your vault. The release
+bundle is self-contained; no SQL Server or npm install is needed.
 
 For development, from the PeriCode repository root:
 

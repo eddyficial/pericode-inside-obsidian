@@ -1,3 +1,20 @@
+## Community publication: September 11, 2026
+
+Release 0.3.3 was published at distribution commit 3e6415b and its downloaded
+assets and all 12 ZIP entries matched the intended files. All 70 plugin tests
+and installer/release checks passed. Installation succeeded in all five
+registered vaults; the active vault loaded 0.3.3 with its provider/model preserved.
+
+The Community review completed with no blocking errors and no vulnerable
+dependencies reported. It warned about direct filesystem and process access,
+CSS font compatibility, `!important` and `:has`. Recommendations covered missing
+artifact attestations, additional release assets, vault enumeration, clipboard
+access and dynamic code execution. A separate source build reproduction result
+was not shown. These observations do not establish exhaustive security coverage.
+
+The public listing is https://community.obsidian.md/plugins/pericode and shows
+Add to Obsidian. Earlier paused/pending entries below are historical.
+
 ## 0.3.3 local model verification: September 11, 2026
 
 The installed plugin passed two live turns with the existing
