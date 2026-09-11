@@ -349,3 +349,57 @@
 .pericode-edit-preview del { background: var(--text-selection); text-decoration: line-through; border-bottom: 2px solid var(--text-error); }
 .pericode-edit-preview ins { background: var(--text-selection); text-decoration: none; border-bottom: 2px solid var(--text-success); }
 .pericode-view button:focus-visible, .pericode-view select:focus-visible { outline: 2px solid var(--interactive-accent); outline-offset: 2px; }
+/* Settings: focused sections, native theme colors, narrow-window reflow. */
+.vertical-tab-content.pericode-settings-tab { container-type: inline-size; width: 100%; max-width: 1000px; margin: 0 auto; padding: 32px clamp(20px, 3%, 40px) 48px; box-sizing: border-box; }
+/* Obsidian computes inline horizontal padding for its default narrow settings column. */
+.vertical-tab-content.pericode-settings-tab { padding-inline: clamp(20px, 3%, 40px) !important; }
+.pericode-settings-header { display: flex; align-items: center; justify-content: space-between; gap: 20px; margin-bottom: 26px; }
+.pericode-settings-brand { display: flex; align-items: center; gap: 14px; }
+.pericode-settings-mark { display: grid; place-items: center; width: 44px; height: 44px; border-radius: 13px; color: var(--text-on-accent); background: var(--interactive-accent); flex-shrink: 0; }
+.pericode-settings-header h2 { margin: 0 0 4px; font-size: 22px; letter-spacing: -.4px; }
+.pericode-settings-muted { color: var(--text-muted); font-size: 13px; margin: 0; }
+.pericode-settings-nav { display: flex; gap: 4px; flex-wrap: wrap; padding-bottom: 16px; border-bottom: 1px solid var(--background-modifier-border); margin-bottom: 26px; }
+.pericode-settings-nav .pericode-settings-nav-item { height: auto; min-height: 36px; padding: 8px; display: flex; gap: 6px; box-shadow: none; background: transparent; color: var(--text-muted); font-size: 12px; border-radius: 8px; }
+.pericode-settings-nav-item svg { width: 15px; height: 15px; display: block; }
+.pericode-settings-nav .pericode-settings-nav-item[aria-current="page"] { color: var(--text-accent); background: var(--background-modifier-hover); font-weight: 600; }
+.pericode-settings-tab button:focus-visible, .pericode-settings-tab a:focus-visible { outline: 2px solid var(--interactive-accent); outline-offset: 3px; }
+.pericode-settings-tab .pericode-settings-title { margin: 0 0 8px; font-size: 19px; }
+.pericode-settings-intro { font-size: 13px; color: var(--text-muted); line-height: 1.6; margin: 0 0 22px; }
+.pericode-provider-groups { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 12px; }
+.pericode-provider-groups button { box-shadow: none; color: var(--text-muted); background: transparent; font-size: 12px; height: 30px; padding: 5px 12px; border-radius: 7px; }
+.pericode-provider-groups button[aria-pressed="true"] { color: var(--text-normal); background: var(--background-secondary); font-weight: 600; }
+.pericode-provider-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(155px, 1fr)); gap: 10px; margin-bottom: 22px; }
+.pericode-provider-grid .pericode-provider-card { display: flex; align-items: center; gap: 10px; height: auto; min-height: 74px; padding: 14px 12px; text-align: left; border: 1px solid var(--background-modifier-border); box-shadow: none; border-radius: 10px; background: var(--background-primary); white-space: normal; }
+.pericode-provider-grid .pericode-provider-card:hover { background: var(--background-modifier-hover); }
+.pericode-provider-grid .pericode-provider-card[aria-pressed="true"] { border-color: var(--interactive-accent); background: color-mix(in srgb, var(--interactive-accent) 7%, var(--background-primary)); }
+.pericode-provider-icon { display: grid; place-items: center; width: 30px; height: 30px; flex-shrink: 0; font-size: 13px; font-weight: 700; background: var(--background-secondary); border-radius: 8px; }
+.pericode-provider-card-label { display: flex; flex-direction: column; gap: 5px; flex: 1; }
+.pericode-provider-card-label strong { font-size: 13px; font-weight: 600; }
+.pericode-provider-card-label > span { color: var(--text-muted); font-size: 11px; line-height: 1.4; }
+.pericode-provider-check { color: var(--text-accent); }
+.pericode-provider-check svg { width: 16px; height: 16px; }
+.pericode-connection-card { border: 1px solid var(--background-modifier-border); border-radius: 12px; padding: 0 20px; }
+.pericode-connection-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 18px 0; }
+.pericode-connection-heading h4 { margin: 0; font-size: 15px; }
+.pericode-settings-badge { color: var(--text-muted); background: var(--background-secondary); border: 1px solid var(--background-modifier-border); border-radius: 20px; padding: 4px 9px; font-size: 11px; }
+.pericode-connection-card .setting-item { padding: 18px 0; gap: 18px; border-top: 1px solid var(--background-modifier-border); }
+.pericode-settings-panel .setting-item-control { flex-wrap: wrap; gap: 8px; }
+.pericode-settings-panel .setting-item-info { min-width: 0; }
+.pericode-settings-panel .setting-item-description { line-height: 1.5; overflow-wrap: anywhere; }
+.pericode-settings-panel select, .pericode-settings-panel input, .pericode-settings-panel textarea { max-width: 100%; }
+.pericode-settings-panel .pericode-locked-value { overflow-wrap: anywhere; font-size: 12px; }
+.pericode-settings-callout { margin-top: 16px; padding: 16px 18px; background: var(--background-secondary); border: 1px solid var(--background-modifier-border); border-radius: 10px; font-size: 12px; line-height: 1.6; }
+.pericode-settings-callout p { margin: 6px 0; color: var(--text-muted); }
+.pericode-settings-footnote { color: var(--text-muted); font-size: 11px; line-height: 1.6; margin: 18px 0 0; }
+@container (max-width: 520px) {
+  .pericode-settings-panel .setting-item { flex-direction: column; align-items: stretch; }
+  .pericode-settings-panel .setting-item-info { flex: 0 0 auto; }
+  .pericode-settings-panel .setting-item-control { justify-content: flex-start; width: 100%; }
+  .pericode-settings-panel .setting-item-control select { width: 100%; }
+  .pericode-provider-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@container (max-width: 360px) {
+  .pericode-settings-header { align-items: flex-start; flex-direction: column; }
+  .pericode-provider-grid { grid-template-columns: 1fr; }
+  .pericode-settings-nav .pericode-settings-nav-item { flex: 1 0 40%; }
+}

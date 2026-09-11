@@ -1,138 +1,311 @@
 # PeriCode Inside
 
-An AI sidebar for Obsidian: research notes with sources, resume conversations,
-review revisions, and manage your vault with permission-controlled tools.
+**Free and open source. Every feature included under MIT.**
 
-**0.2.0 community preview · Desktop only · Obsidian 1.13.7 or newer**
+[Full source: CLI, SDK, desktop engine and plugin](https://github.com/eddyficial/pericode).
+This repository hosts the Obsidian release files. The plugin is not yet listed
+in Obsidian Community; use the manual installation instructions below.
 
-This is the public distribution repository. Development source is private.
-The plugin is not yet approved or installable from Obsidian's Community directory.
-Its existing proprietary license permits personal, non-commercial evaluation;
-use beyond that requires a paid subscription. See [LICENSE](LICENSE).
+Research your notes, keep conversations across sessions, and review suggested
+revisions before changing a note. PeriCode Inside runs its own agent loop in
+Obsidian and connects to the model provider you choose.
 
-## Install
+**0.3.0 open-source preview · Desktop only · Obsidian 1.13.7 or newer**
 
-Download the assets from [Releases](https://github.com/eddyficial/pericode-inside-obsidian/releases).
-Copy `main.js`, `manifest.json` and `styles.css` to
-`<vault>/.obsidian/plugins/pericode/`, reload Obsidian, and enable PeriCode Inside
-under Settings → Community plugins. Each vault needs its own installation.
+## Settings and providers
 
-On Windows, you can instead extract the release ZIP and run
-`Install-PeriCode.cmd`. It prompts for a registered vault, preserves your settings
-and notes, and backs up existing plugin files. It does not change Restricted mode.
-For all currently registered vaults, run from the extracted folder:
+Settings now use six focused sections: **AI connection**, **Privacy & safety**,
+**Integrations**, **Vault**, **About**, and **Advanced**. The connection page
+groups subscription providers, API providers, and local/custom servers. Only the
+selected provider's credentials and address appear. Edit a field, then choose
+Save or Cancel; **Load models** fetches the current account catalog.
+
+For Grok, choose **AI connection → API keys → Grok**, save an xAI API key, then
+load and select a model. This connects to `https://api.x.ai/v1` for model lookup
+and streaming chat with tool calls. This API connection uses API credits. Create a key in the [xAI console](https://console.x.ai/).
+Keys remain in this vault's unencrypted plugin `data.json`; request credentials
+are scoped and restored after use. No xAI key is borrowed from another provider.
+See xAI's [API guide](https://docs.x.ai/developers/quickstart).
+
+Grok transport has automated fixture coverage. Live authenticated Grok inference
+still requires connecting an eligible account or adding an API key.
+
+## AI-provider subscription connections
+
+In **AI connection → Subscriptions**, choose Claude, ChatGPT / Codex, GitHub
+Copilot, Grok, or Ollama Cloud. API cards with a matching account connection
+include **Use my subscription**, which resets the model selection without
+moving or deleting API keys. Account limits apply; PeriCode does not silently
+fall back to API billing.
+
+- **Grok:** install [Grok Build](https://docs.x.ai/build/overview), select Grok,
+  and click **Connect Grok → Sign in with Grok**. Grok owns browser sign-in and
+  token refresh in `~/.pericode/grok-build`. Load models after sign-in. This
+  profile is separate from terminal Grok configuration and stores native
+  credentials, session history and logs; prompts and tool results reach Grok.
+  PeriCode disables native file/terminal tools and exposes its guarded vault
+  tools through an authenticated local MCP bridge. Do not add hooks, plugins,
+  skills or custom configuration to this integration profile.
+- **Ollama Cloud:** on your Ollama server, run `ollama signin`, then
+  `ollama pull <cloud-model>`. Enter that server's address and load models.
+  Only configured cloud models appear. The catalog is server inventory, not
+  proof of a paid plan; Ollama checks account access and limits on use. See
+  [Ollama authentication](https://docs.ollama.com/api/authentication).
+- **OpenRouter:** uses its own account credits. External provider subscriptions
+  do not transfer to OpenRouter.
+- **Custom servers:** authentication and billing depend on that server; there
+  is no universal subscription login.
+
+## Everyday workflows
+
+- **Research with sources.** Attach notes, folders or a selected passage. Use an
+  evidence brief or contradiction-check prompt, then follow the source wikilinks.
+- **Resume your work.** Conversations and text drafts save locally. Choose a saved
+  conversation, start a new one, export it as Markdown, or delete it explicitly.
+- **Review revisions.** Select text in a note and run *Revise selection with
+  preview*. Inspect word-level additions and removals before accepting. A changed
+  note invalidates the preview; accepted revisions support the editor's Undo.
+- **Stop a request.** Press Stop or Escape in chat. Pending permission prompts are
+  denied on cancellation. Closing the panel also cancels its active request.
+  Completed actions are not rolled back; an already-running external tool may
+  need to finish before cancellation completes.
+
+## Two chat modes
+
+**Research** is the default. The tool registry exposes an explicit set of built-in
+readers. Shell commands, file writes, subagents, plugin API calls and MCP tools
+are not registered in this mode. Chat persistence and explicit export still write
+PeriCode's own conversation data and your requested export note.
+
+**Agent** enables the configured PeriCode tool surface, subject to its permission
+and security policy. Review actions before allowing them. The custom policy code
+is an additional control, not a sandbox around Node.js, other plugins or a model.
+
+Choose a mode before sending. Mode controls are disabled during an active request.
+
+## Install the candidate
+
+On Windows, extract the release ZIP and double-click **Install-PeriCode.cmd**.
+It detects registered Obsidian vaults and asks you to choose when there is more
+than one. It copies and verifies the plugin, preserves data.json and vault notes,
+and backs up previous plugin files under `.obsidian/pericode-backups/`.
+No administrator access, Node.js or SQL Server is required.
+
+With `-Enable` (included by the Windows launcher), the installer adds PeriCode
+to that vault's enabled plugin list while preserving other entries. If Obsidian
+is running with its CLI enabled, it also attempts to load/reload the plugin.
+Otherwise, the plugin loads when that vault next opens. It does not change
+Restricted mode; turn that off in Obsidian if you want community plugins to run.
+Choose your provider, model and credentials under Settings → PeriCode, then open
+chat from the ribbon or command palette.
+
+To install and enable the same build in **all currently registered vaults**, run
+this command from the extracted release folder:
 
 ```powershell
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Install-PeriCode.ps1 -AllVaults -Enable
 ```
 
-The optional installer runs once and does not watch for future vaults. Node.js,
-SQL Server and a database are not required to install the plugin.
+Each vault gets its own ribbon button, configuration and conversations. Shared
+Claude Code/Codex/Copilot credentials continue to use their existing account
+stores. Optional `-InitialProvider claude-oauth -InitialModel default` seeds only
+the provider/model choice in fresh installations; existing settings are untouched.
+Normal OneDrive Cloud Files folders are supported; configuration symlinks and
+junctions are rejected. This installer runs once and does not install a background
+watcher. Run it again for vaults you register later.
 
-## Start using PeriCode
+For a manual install or another desktop OS, copy main.js, manifest.json and
+styles.css into `<vault>/.obsidian/plugins/pericode/`, reload Obsidian, and enable
+the plugin. The installer supports the standard `.obsidian` configuration folder.
 
-1. Open Settings → PeriCode and choose a provider.
-2. Connect the corresponding account or enter an API key/local endpoint.
-3. Open PeriCode from its ribbon icon or the command palette.
-4. Attach notes or folders with the paperclip; choose a model and send a request.
+The plugin is not yet submitted to or accepted by the Community directory. The
+release bundle is self-contained; no SQL Server or npm install is needed.
 
-Research mode allows note inspection and narrowly scoped UI navigation. Agent
-mode also allows file changes subject to permission. Stop or Escape cancels the
-request; completed changes are not automatically rolled back.
+For development, from the PeriCode repository root:
 
-Conversations and drafts persist locally. Select a passage and run **Revise
-selection with preview** to compare changes before applying them. Stale note
-content prevents a revision from being applied to the wrong text.
+```sh
+npm ci
+npm run build
+cd plugins/obsidian
+npm ci
+npm run release
+```
 
-## Vault tools
+The candidate files and checksums are in `dist/community-0.2.0/`; the ZIP is in
+`dist/pericode-inside-0.2.0.zip`. `npm run dev:install` requires an explicit
+`PERICODE_OBSIDIAN_VAULT` environment variable so it never chooses a vault for you.
 
-- Read, list and search files; discover notes by folder, title or tag.
-- Inspect properties, headings, task lines, tags, links and backlinks.
-- Create notes and folders; append text and update YAML properties.
-- Edit note text, copy individual files, and move/rename notes and folders.
-- Trash individual files and empty folders with confirmation on every deletion.
-- Open notes, global graph, Search, File Explorer and Settings. Separate Settings
-  windows are detected without reading password or other input values.
+## Context and editing
 
-Moves never overwrite destinations and do not automatically rewrite backlinks.
-Related link edits need separate approval. Metadata is bounded and reflects
-Obsidian's current cache. Follow the inventory's pagination for complete results.
+Use **@ Add context**, or type `@` in the composer, to choose a Markdown note or
+folder. Attachments are snapshots shown as removable chips. Limits are 24,000
+characters per attachment, 60,000 total, and 20 items. Larger inputs are refused
+with a message instead of silently losing evidence. Folders include Markdown notes
+only; hidden directories are excluded. Policy exclusions and privacy filtering
+apply. Attachments accompany the next message and are then cleared; unsent
+attachments are not restored after closing or switching conversations.
 
-## Providers, accounts and payment
+To attach a passage reliably, select text in the editor and run **Attach selection
+to chat** from the command palette. To revise it, run **Revise selection with
+preview**. The revision request sends the selected passage and instruction to the
+configured model, with no tools. It does not automatically send the entire note.
 
-Claude subscriptions use your separately installed, unmodified Claude Code
-runtime. PeriCode does not bundle, download or update it. Existing Claude Code
-sign-in is reused; its native tools are disabled for PeriCode requests.
+## Providers and accounts
 
-ChatGPT/Codex and GitHub Copilot have separate subscription sign-in controls.
-The picker loads compatible models from the connected account rather than a
-fixed catalog. API-key providers and compatible local endpoints are separate
-options. Provider accounts, charges, terms and usage limits still apply.
+Provider adapters include Anthropic, OpenAI, OpenRouter, Ollama, compatible local
+endpoints, Copilot and OAuth integrations. Availability depends on the provider,
+account and model. Configure and verify the lane you intend to use; the included
+fixture-provider tests do not establish that every live authentication lane works.
+OAuth credentials can also be read from PeriCode's shared local auth store.
 
-Core chat and vault tools have no paid-plugin gate in the implementation;
-advanced features are license-gated. This does not supersede the proprietary
-evaluation/use terms in [LICENSE](LICENSE). Production commercial activation
-and fresh sign-in with every supported provider have not completed release-wide
-end-to-end QA in this preview.
+**ChatGPT / Codex and GitHub Copilot:** select the subscription provider in
+Settings → PeriCode, then click **Login**. If saved credentials stop working,
+use **Sign in again** from the same basic settings screen. Credentials saved
+does not guarantee account access; an expired or revoked refresh token requires
+a fresh browser sign-in. API-key options use separate provider billing.
 
-## Data, network and access outside the vault
+**Chat workspace:** use the header dropdown for saved chats, **+** for a new
+conversation, and **…** for copying, exporting, workflows, settings and deletion.
+The paperclip adds context; mode and model controls sit beneath the message box.
+**Expand chat** fills the workspace without losing your draft or attachments;
+press Escape or **Restore sidebar** to return. During a request, Escape stops it.
 
-- Prompts, attached content and tool results go to your selected model endpoint.
-  A local endpoint can keep inference traffic on your machine. External providers
-  have their own privacy and retention policies.
-- OAuth contacts the selected identity provider. Claude mode starts the installed
-  Claude Code process and an authenticated temporary HTTP server on 127.0.0.1.
-  System instructions temporarily reside in an OS temporary file, removed when
-  the request finishes. Claude Code uses its own configuration and networking.
-- License activation, validation and optional trial enrollment contact the
-  configured PeriCode licensing service (default `api.pericode.dev`) and, where
-  applicable, Lemon Squeezy. Explicit trial enrollment sends a hashed device
-  identifier for eligibility. Configured administrator-policy URLs and MCP
-  servers may also be contacted.
-- MCP presets use `npx --no --offline` and require separately installed servers.
-  Imported/custom MCP commands remain operator-configured external programs
-  with their own behavior and permissions.
-- API keys and provider settings are currently stored in plugin `data.json`.
-  Conversations, drafts, tool history, audit records and memory are unencrypted
-  under `<vault>/.pericode/`. These may contain sensitive task content.
-- Shared authentication may read `~/.pericode/`; Claude Code uses its own account
-  store. Temporary prompt files and SDK recovery records can be written outside
-  the vault as runtime bookkeeping, not agent-selected paths.
-- The plugin does not send usage telemetry or load dynamic ads. It does not
-  install or update itself or its dependencies.
-- The plugin does not replace global fetch or change the host working directory.
-  Request-scoped environment variables and native plugins share the same process;
-  this is not an isolation boundary between installed plugins.
+**Claude subscriptions:** choose **Claude subscription (Claude Code)** and click
+**Connect Claude Code**. Install the official Claude Code runtime first if it is
+missing. An existing Claude Code sign-in is reused; otherwise the Sign in button
+runs `claude auth login` and Anthropic handles browser authentication. PeriCode
+does not copy subscription tokens. Click the model button beneath the chat box
+to load the models returned by your signed-in Claude Code account, including
+the recommended subscription default and resolved model names. This replaces
+the old direct paste-code flow.
 
-## Permissions and limitations
+Subscription model choices are loaded from the connected account, not a fixed
+list of model names. Claude uses its native runtime initialization catalog;
+ChatGPT/Codex uses the same account credentials as inference; Copilot lists
+enabled chat models supported by the current chat-completions integration
+(responses-only models are excluded). The sidebar picker refreshes on every
+open, and chat/revision requests recheck the selected subscription model before
+sending. A failed lookup or unavailable saved model shows a connection/selection
+error instead of falling back to an unrelated model. Manual model IDs remain
+available for API-key and local endpoints. Provider usage limits still apply.
+The CLI remains a separately installed, unmodified runtime, not bundled or
+automatically downloaded by this community plugin.
 
-Tool requests use one-use authorization bound to the active turn, exact arguments,
-signal and policy. Canonical path checks reject protected paths, traversal and
-links/junctions. Dry-run prevents execution; invalid policy files disable tools.
-Deletions always prompt and use trash. MCP calls require explicit approval;
-MCP servers are separate trusted programs with their own access.
+Subscription requests run through Claude Code with its native tools disabled.
+Only the current PeriCode registry is exposed through an authenticated loopback
+MCP connection. PeriCode handles tool permission prompts, Research restrictions
+and audit entries. Inline revisions expose no tools. Stop terminates the request's
+Claude Code process. Account sign-in and subscription billing remain with Anthropic.
 
-Arbitrary shell commands, plugin API calls, generic command execution and web
-fetch tools are not exposed. Assistant Markdown is display-only: raw HTML stays
-text, code cannot invoke other plugins, and remote images do not load automatically.
-Privacy filtering and injection-pattern checks are additional controls, not
-comprehensive DLP or an OS sandbox.
+All PeriCode features are free under the MIT license. No PeriCode account, trial,
+activation key or paid tier is required. AI providers may charge their own fees.
+See [LICENSE](LICENSE).
 
-See [QA](QA.md) and [release notes](RELEASE-NOTES.md) for tested behavior and remaining
-review gates. Windows has live QA evidence; other desktop operating systems do not.
+## Data, network and filesystem access
 
-## Source and community review
+- Prompts, attached content and tool results are sent to your configured model
+  endpoint. A local endpoint can keep inference traffic on your machine.
+- Claude subscription mode starts the locally installed Claude Code process and
+  an ephemeral authenticated HTTP server bound to 127.0.0.1. System instructions
+  temporarily reside in an OS temporary file, removed at request completion.
+  Claude Code uses its own account configuration; PeriCode requests that it not
+  persist these chat sessions. Its own networking and data policies still apply.
+- OAuth flows contact the selected identity provider. PeriCode has no licensing
+  service, trial enrollment or hardware fingerprinting for activation.
 
-This repository contains readable built artifacts and distribution documentation,
-not the private development history. [BUILD-PROVENANCE.json](BUILD-PROVENANCE.json)
-records the source revision and artifact hashes. Obsidian's private-source GitHub
-App integration and community review remain pending. A public GitHub preview is
-not an accepted Community directory listing.
+- API keys and provider settings are currently stored in the plugin's data.json.
+  Conversations, tool history and drafts are stored unencrypted under
+  `<vault>/.pericode/conversations/sessions.json`; audit and memory files also live
+  below `.pericode`. They may contain sensitive task content. The plugin does not
+  send telemetry, but configured external providers have their own data policies.
+- Shared authentication may read `~/.pericode/`; Claude Code reads its own account
+  configuration. Temporary system-prompt files and SDK recovery records can be
+  written outside the vault. These are runtime bookkeeping, not agent-selected paths.
+- Agent file tools are confined to canonical vault paths. Protected metadata,
+  parent traversal and linked paths are refused. Generic shell, plugin API,
+  arbitrary command execution, and web-fetch are not exposed. MCP servers are
+  separate trusted programs, not an OS sandbox; their policy lane requires explicit
+  approval and may grant their own external access.
+- The plugin never changes the host's global fetch or working directory. Provider
+  credentials still use request-scoped process environment variables, which does
+  not isolate them from other trusted plugins sharing the process.
 
-## License and credits
+- Assistant Markdown is display-only: fences cannot invoke other plugins, raw HTML
+  stays text, and remote images/embeds do not load automatically. HTTP(S) links open
+  only when clicked. Wiki references open vault notes only on an explicit, policy-checked click.
 
-Copyright 2026 Eddy Ogutu. Proprietary; see [LICENSE](LICENSE). Third-party
-components retain their licenses in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
-Claudian inspired the comparison and some integration concepts; this release's
-conversation, context, revision and vault-management implementations were
-independently developed. No claim of complete feature parity is made.
+## Security guardrails
+
+Every tool requires a one-use authorization bound to its exact arguments, active
+turn, cancellation signal and policy. Paths and quarantine are rechecked before
+execution. Lockdown prompts on every call, including reads; MCP calls always
+prompt. Dry-run executes nothing. Invalid policy files disable tools. Search and
+listing filter descendants; search is literal and bounded. Reads are capped at
+2 MB. Deletions require confirmation each time and use trash; only empty folders
+can be trashed, and permanent deletion is unavailable. Flagged tool output is withheld and privacy filtering
+applies before results reach the model. These controls do not isolate native
+plugins or MCP programs at the OS level.
+
+## Vault management tools
+
+The essential vault tools are included without a paid PeriCode license and are
+shared by every provider. Research mode exposes inspection and narrowly scoped
+UI navigation; Agent mode also exposes file changes subject to the permission policy.
+
+| Operation | Tools |
+| --- | --- |
+| Find and read | `list_dir`, `search_files`, `read_file`, `obsidian_list_notes` (folder/title/tag filters and pagination) |
+| Inspect notes | `obsidian_get_note_info` (properties, headings, tags, task lines, resolved links and backlinks) |
+| Create and edit | `obsidian_create_note`, `write_file`, `edit_file`, `obsidian_append_note`, `obsidian_update_properties` |
+| Organize | `obsidian_create_folder`, `obsidian_move`, `obsidian_copy_file` |
+| Trash | `delete_file`, `obsidian_delete_note`, `obsidian_delete_folder` (empty folders only) |
+| Navigate | Open notes, inspect active views, list/close tabs, collapse/expand folders, inspect installed plugins and available commands |
+
+`obsidian_open_view` opens or reveals the global graph, search, file explorer or
+Settings in either mode, subject to permission. It verifies the resulting view;
+it cannot run arbitrary commands. `obsidian_get_settings` detects a separate
+Settings window and reports the selected tab and visible setting labels without
+reading input values or credentials. Active-view inspection distinguishes those
+windows from visible workspace context and ignores hidden historical tabs.
+
+Native creation, appending, property updates, moves, copies and trash operations
+use Obsidian APIs. New destinations never overwrite; create parent folders first.
+Moves validate every descendant (maximum 1000) and **do not rewrite links**:
+inspect backlinks first and approve separate edits to affected notes. Copies
+support individual notes and attachments up to 20 MB. Metadata uses Obsidian's
+cache and may lag current edits; inventories must follow `next_cursor` until null.
+Templates can be read and passed to note creation; task checkboxes and link text
+can be changed with exact `edit_file` edits. Property updates merge top-level keys;
+a JSON null removes that key. Generic plugin API calls and command execution
+remain unavailable to the model.
+
+## Advanced tools
+
+MCP integrations, persistent memory, audit records and heuristic background reports
+remain available. SQL Server connections, queries and schema sync are not included.
+MCP quick-add presets require separately installed servers: `npx --no --offline`
+prevents package installation/downloads. Replace the example filesystem path
+with the directory you explicitly want to expose. Imported/custom MCP commands
+remain operator-configured external programs with their own behavior.
+Legacy connection profiles are ignored and dropped on the next settings save.
+Previously generated notes remain ordinary Markdown files in your vault.
+Real-provider authentication remains a release validation requirement.
+
+## Validation and contribution
+
+Run `npm test`, `npm run build`, and `npm run release:check` in this directory.
+See [QA](QA.md) for recorded functional evidence and [submission preparation](SUBMISSION.md)
+for publication steps and remaining gates. No overall superiority or complete
+feature parity with another plugin is claimed by a passing local test suite.
+
+## Credits and license
+
+Claudian demonstrated useful Obsidian agent integration patterns and inspired the
+comparison that led to this release. Current Claudian supports multiple agent
+runtimes; the old Anthropic-only description was incorrect. The new conversation,
+context and revision code here was independently implemented, without copying
+Claudian's implementation. Earlier project credits for vault working-directory
+and spawn integration patterns are retained here.
+
+Copyright 2026 Eddy Ogutu. MIT-licensed; see [LICENSE](LICENSE). Third-party runtime
+components retain their own licenses and notices in the bundled distribution.
