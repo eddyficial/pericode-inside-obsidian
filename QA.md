@@ -1,3 +1,17 @@
+## Clean-install correction: September 11, 2026
+
+The public listing's Add to Obsidian button opened Obsidian 1.13.7, but its
+catalog returned No results found for pericode. The public GitHub catalog also
+had no pericode entry at this check. A public listing and completed review did
+not establish that in-app installation worked. Catalog availability timing is
+unconfirmed.
+
+The documented manual path passed: download the three 0.3.3 release assets,
+verify their checksums, place them in a clean plugin folder, reload, and enable
+PeriCode. First-run setup completed and the existing ChatGPT account returned
+seven models. Old vault settings and conversations were kept in a separate
+recovery backup. Installation instructions now lead with this verified path.
+
 ## Community publication: September 11, 2026
 
 Release 0.3.3 was published at distribution commit 3e6415b and its downloaded

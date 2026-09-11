@@ -11,6 +11,28 @@ Obsidian and connects to the model provider you choose.
 
 **0.3.3 open-source preview · Desktop only · Obsidian 1.13.7 or newer**
 
+## Install PeriCode
+
+The public Community listing is live, but our September 11, 2026 clean-install
+test returned **No results found** in Obsidian. Installation through **Add to
+Obsidian** is not yet verified. Use the release-file instructions below if
+PeriCode does not appear. We have not confirmed when the in-app catalog will
+include it.
+
+1. Open the [latest GitHub release](https://github.com/eddyficial/pericode-inside-obsidian/releases/latest).
+2. Under **Assets**, download `main.js`, `manifest.json` and `styles.css`.
+   Use these release assets, not the GitHub **Source code** ZIP.
+3. Open your vault folder in your file manager. Show hidden files if needed,
+   then create `.obsidian/plugins/pericode/` inside it.
+4. Put the three downloaded files directly in that folder, with no extra nested folder.
+5. Reload or restart Obsidian. Open **Settings → Community plugins** and enable
+   **PeriCode**. Community plugins require Restricted mode to be off.
+6. Open **Settings → PeriCode → AI connection**, choose a provider, connect it,
+   click **Load models**, and select a model. Open the PeriCode sidebar to start.
+
+Installation is per vault. Repeat these steps for each vault where you want
+PeriCode. Requires Obsidian desktop 1.13.7 or newer.
+
 ## Settings and providers
 
 Settings now use six focused sections: **AI connection**, **Privacy & safety**,
@@ -117,9 +139,9 @@ For a manual install or another desktop OS, copy main.js, manifest.json and
 styles.css into `<vault>/.obsidian/plugins/pericode/`, reload Obsidian, and enable
 the plugin. The installer supports the standard `.obsidian` configuration folder.
 
-PeriCode is published in the [Obsidian Community directory](https://community.obsidian.md/plugins/pericode).
-Choose **Add to Obsidian**, then install and enable it in your vault. The release
-bundle is self-contained; no SQL Server or npm install is needed.
+The [Community listing](https://community.obsidian.md/plugins/pericode) is public,
+but in-app installation returned **No results found** in the September 11 test.
+Use the verified release-file steps above. No SQL Server or npm install is needed.
 
 For development, from the PeriCode repository root:
 
