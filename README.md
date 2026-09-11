@@ -57,11 +57,21 @@ Obsidian and connects to the model provider you choose.
 
 ## Install PeriCode
 
-The public Community listing is live, but our September 11, 2026 clean-install
-test returned **No results found** in Obsidian. Installation through **Add to
-Obsidian** is not yet verified. Use the release-file instructions below if
-PeriCode does not appear. We have not confirmed when the in-app catalog will
-include it.
+PeriCode is available in Obsidian's community catalog. On September 11, 2026,
+version 0.3.5 opened from the public listing and passed a native Obsidian
+reinstallation, with settings preserved and vault operations verified afterward.
+
+1. Open **Settings → Community plugins → Browse** in Obsidian.
+2. Search for **PeriCode**, select it, then choose **Install** and **Enable**.
+3. Open **Settings → PeriCode → AI connection**, connect your provider, load
+   models and choose one. Open the PeriCode sidebar to start.
+
+You can also open the [community listing](https://community.obsidian.md/plugins/pericode)
+and select **Add to Obsidian**. Community plugins require Restricted mode to be off.
+
+### Manual installation
+
+If the catalog is unavailable on your device, use the same signed release files:
 
 1. Open the [latest GitHub release](https://github.com/eddyficial/pericode-inside-obsidian/releases/latest).
 2. Under **Assets**, download `main.js`, `manifest.json` and `styles.css`.

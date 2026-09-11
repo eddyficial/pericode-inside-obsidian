@@ -1,3 +1,25 @@
+## 0.3.5 completed review and native installation
+
+Obsidian's review of distribution commit ed3ae70 completed on September 11,
+2026. The public listing reports version 0.3.5, Health: Excellent and Review:
+Satisfactory. There are no blocking errors. Build verification, artifact
+attestations for main.js and styles.css, dependency checks and unobfuscated
+code checks pass. Remaining findings disclose filesystem/process capabilities,
+vault enumeration and clipboard access. Obsidian's unavailable malware and
+network scans remain outside this verification.
+
+The public Add to Obsidian link now opens the correct catalog entry. Obsidian
+1.13.7's native plugin installer downloaded and reinstalled 0.3.5 in the existing
+Session Portal test installation. Settings were preserved byte for byte. The
+manifest and stylesheet match the release; main.js matches with Obsidian's
+standard nosourcemap marker appended. The enabled plugin then passed create,
+read, stale-write refusal, edit and trash checks. This was a native reinstall,
+not a new empty-vault installation. The earlier catalog failure is historical.
+
+The GitHub release build passed 352 SDK tests and 81 plugin tests, reproduced
+all three assets and signed their attestations. No binary changes were needed
+for this documentation update. Build source remains pinned in BUILD-PROVENANCE.json.
+
 ## Clean-install correction: September 11, 2026
 
 The public listing's Add to Obsidian button opened Obsidian 1.13.7, but its

@@ -8,15 +8,17 @@
   "validation": {
     "pluginTests": 81,
     "schemaTestsWithoutCodeGeneration": 4,
-    "installerAndReleaseChecks": "passed locally; repeated by release workflow",
+    "installerAndReleaseChecks": "passed locally and in the GitHub release workflow",
     "live": "Obsidian 1.13.7 native create, read, stale-write refusal, exact edit and trash passed. Provider/model selection preserved.",
-    "productionDependencyAudit": "zero known advisories"
+    "productionDependencyAudit": "zero known advisories",
+    "sdkTests": 352,
+    "communityReview": "Completed for 0.3.5 at ed3ae70; no blocking errors",
+    "nativeCommunityInstall": "Obsidian 1.13.7 downloaded and reinstalled 0.3.5, preserved settings and passed live vault operations"
   },
   "releaseWorkflow": ".github/workflows/release.yml",
   "limitations": [
     "Capability disclosures remain for filesystem, process, clipboard writes, vault enumeration and network use.",
     "External provider inference was not repeated in this release.",
-    "Community malware and network scans are controlled by the review service.",
-    "In-app catalog installation was previously unavailable; follow the manual installation guide if needed."
+    "Community malware and network scans are controlled by the review service."
   ]
 }
