@@ -1,4 +1,4 @@
-# PeriCode Inside for Obsidian
+# PeriCode for Obsidian
 
 **Free and open source. Every plugin feature included under MIT.**
 
@@ -8,10 +8,10 @@ This repository publishes the Obsidian plugin releases and user documentation.
 The plugin is not yet listed in Obsidian Community; use the installation guide below.
 
 Research your notes, keep conversations across sessions, and review suggested
-revisions before changing a note. PeriCode Inside runs its own agent loop in
+revisions before changing a note. PeriCode runs its own agent loop in
 Obsidian and connects to the model provider you choose.
 
-**0.3.1 open-source preview · Desktop only · Obsidian 1.13.7 or newer**
+**0.3.2 open-source preview · Desktop only · Obsidian 1.13.7 or newer**
 
 The chat header displays the PC logo and PeriCode name alongside the saved-conversation selector.
 
@@ -134,8 +134,8 @@ npm ci
 npm run release
 ```
 
-The candidate files and checksums are in `dist/community-0.3.1/`; the ZIP is in
-`dist/pericode-inside-0.3.1.zip`. `npm run dev:install` requires an explicit
+The candidate files and checksums are in `dist/community-0.3.2/`; the ZIP is in
+`dist/pericode-obsidian-0.3.2.zip`. `npm run dev:install` requires an explicit
 `PERICODE_OBSIDIAN_VAULT` environment variable so it never chooses a vault for you.
 
 ## Context and editing

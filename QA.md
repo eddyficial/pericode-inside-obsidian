@@ -1,3 +1,13 @@
+## 0.3.2 product naming
+
+The installed plugin, settings heading and chat brand all report PeriCode in
+live Obsidian 1.13.7. The existing Codex provider/model and saved-conversation
+selection were preserved during the upgrade. All 69 plugin tests, installer
+fixtures and release checks pass. Website checks cover 12 pages, 192 internal
+link occurrences, matching header/footer logos and desktop/mobile navigation.
+Current website and app surfaces omit the old Inside name; historical release
+notes below retain the names used when those versions shipped.
+
 ## 0.3.1 chat branding
 
 The chat header shows the PC logo and PeriCode name above the saved-conversation

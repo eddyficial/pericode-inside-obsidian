@@ -1,6 +1,6 @@
 # Security remediation and submission checks
 
-Checked on 2026-09-11 for PeriCode Inside (original 0.2.0 review; updated for 0.3.0). This covers the three findings in
+Checked on 2026-09-11 for PeriCode (original 0.2.0 review; updated for 0.3.0). This covers the three findings in
 the local PeriCode/Claudian comparison and the published Obsidian requirements.
 It is not a claim of SOC 2, GDPR, or other independently audited certification.
 

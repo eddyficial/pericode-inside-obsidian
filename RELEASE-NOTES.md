@@ -1,3 +1,13 @@
+# PeriCode 0.3.2 - one clear name
+
+The plugin is now called PeriCode in Obsidian, including settings, onboarding,
+installation messages and report headings. The website describes it as PeriCode
+for Obsidian, with PeriCode CLI remaining a planned separate product.
+
+Existing installations upgrade in place. The plugin ID, saved settings, provider
+connections, conversation storage and permission controls are unchanged.
+Community submission remains paused.
+
 # PeriCode Inside 0.3.1 - chat branding
 
 The chat session header now shows the PeriCode name and PC logo alongside the

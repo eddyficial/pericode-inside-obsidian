@@ -1,15 +1,15 @@
 {
-  "version": "0.3.1",
+  "version": "0.3.2",
   "sourceRepository": "https://github.com/eddyficial/pericode",
-  "sourceCommit": "ff8327c6edf20a379ec4cd752913bb9a29603f88",
+  "sourceCommit": "fe407d20fd4dfb12643f222ef5a7c17a256f7586",
   "sourceDirectory": "plugins/obsidian",
   "license": "MIT",
   "build": "npm ci && npm run build; cd plugins/obsidian && npm ci && npm run release",
   "validation": {
     "pluginTests": 69,
     "installerAndReleaseChecks": "passed",
-    "live": "Obsidian 1.13.7: branded chat header at 300px sidebar width, no header overflow, existing provider and conversation selection preserved",
-    "website": "Header/footer logo computed styles match; 12 pages checked at desktop and mobile widths"
+    "live": "Obsidian 1.13.7: plugin name, settings and chat use PeriCode; existing Codex provider/model and conversation selection preserved",
+    "website": "12 pages checked across four viewport widths; header/footer logos match; planned PeriCode CLI retained"
   },
   "limitations": [
     "Authenticated Grok and Ollama Cloud inference still require verification.",

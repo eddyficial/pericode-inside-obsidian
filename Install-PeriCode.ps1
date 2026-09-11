@@ -31,7 +31,7 @@ try {
     if (!$PackagePath) { $PackagePath = Split-Path -Parent $MyInvocation.MyCommand.Path }
     $packageRoot = (Resolve-Path -LiteralPath $PackagePath).Path
     $manifest = Get-Content -Raw -LiteralPath (Join-Path $packageRoot 'manifest.json') | ConvertFrom-Json
-    if ($manifest.id -ne 'pericode') { throw 'This is not a PeriCode Inside package.' }
+    if ($manifest.id -ne 'pericode') { throw 'This is not a PeriCode package.' }
     $files = @('main.js', 'manifest.json', 'styles.css')
     foreach ($file in $files) {
         $source = Join-Path $packageRoot $file
@@ -40,7 +40,7 @@ try {
         }
     }
 
-    Write-Host "PeriCode Inside $($manifest.version) installer"
+    Write-Host "PeriCode $($manifest.version) installer"
     if ($AllVaults) {
         if ($VaultPath) { throw 'Use either -AllVaults or -VaultPath.' }
         $registered = Get-Content -Raw -LiteralPath $ObsidianConfig | ConvertFrom-Json
@@ -166,14 +166,14 @@ try {
             $activated = @($enabled | Where-Object { $_.ToString().Trim() -eq 'pericode' }).Count -gt 0
             if ($activated) {
                 & $cli.Source plugin:reload $vaultArg 'id=pericode'
-                Write-Host 'PeriCode Inside is enabled in Obsidian.' -ForegroundColor Green
+                Write-Host 'PeriCode is enabled in Obsidian.' -ForegroundColor Green
             }
         }
     }
     if (!$activated -and $Enable) {
         Write-Host 'Open this vault in Obsidian to use the PeriCode ribbon button.'
     } elseif (!$activated) {
-        Write-Host 'Files are installed. Enable PeriCode Inside in Obsidian Settings > Community plugins.'
+        Write-Host 'Files are installed. Enable PeriCode in Obsidian Settings > Community plugins.'
         Write-Host 'If already enabled, reload the plugin or restart Obsidian.'
     }
     Write-Host 'Then choose your model provider in Settings > PeriCode.'
