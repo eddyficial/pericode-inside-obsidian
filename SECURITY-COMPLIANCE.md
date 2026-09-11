@@ -1,5 +1,35 @@
 # Security remediation and submission checks
 
+## 0.3.4 access changes
+
+MCP servers require explicit approval in Settings for each plugin session.
+Reloading PeriCode clears approvals. Approval covers the command, arguments,
+endpoint and environment values; editing any of these requires approval again.
+Old vault approval files are ignored. Invalid policy and dry-run policy prevent
+MCP startup. MCP processes receive the transport's basic OS environment plus
+explicitly configured variables, without inheriting the host's provider tokens
+or execution overrides. Automatic command fallbacks are disabled in the plugin.
+
+The standard read_file, write_file, edit_file and delete_file tools now use
+Obsidian's APIs. Writes refuse stale content when expected_old_content is set;
+text replacements run atomically. Parent folders must exist before creating a
+file. Reads and writes are limited to 2 MB, reads return up to 500 lines, and
+secret-like filenames cannot be read through read_file. Trash stays recoverable;
+there is no permanent-delete option. CLI rollback files and syntax-check
+subprocesses are not used by these tools.
+
+Direct filesystem access remains for canonical path checks, bounded vault
+search, private plugin metadata, auth/runtime bookkeeping and explicit import
+operations. Process access remains for separately installed Claude/Grok
+runtimes and approved MCP servers. These run with the user's OS permissions;
+PeriCode is not an OS sandbox. The removed CLI shell, network-fetch and desktop
+tool implementations are excluded from the shipping bundle.
+
+Obsidian's unavailable malware and network scans remain unavailable. Local
+static checks and dependency audits do not substitute for those scans or an
+independent security audit.
+
+
 Checked on 2026-09-11 for PeriCode (original 0.2.0 review; updated for 0.3.0). This covers the three findings in
 the local PeriCode/Claudian comparison and the published Obsidian requirements.
 It is not a claim of SOC 2, GDPR, or other independently audited certification.

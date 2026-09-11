@@ -1,3 +1,23 @@
+# PeriCode 0.3.4
+
+MCP startup now requires explicit approval for the current plugin session.
+Approval includes environment values; synced approval files and first-load
+configuration cannot approve themselves. Invalid policies and dry run prevent
+startup. MCP connections no longer inherit ambient provider credentials or use
+automatic command fallbacks.
+
+File reads, writes, exact edits and trash now use Obsidian APIs with existing
+vault permission checks. Unused CLI shell, web-fetch, filesystem and desktop
+implementations are excluded from the bundle. The three reported CSS patterns
+were removed: extended system fonts, :has and !important.
+
+MCP users must approve servers again after reloading PeriCode. Creating a file
+requires an existing parent folder. Read/write size limits are 2 MB and reads
+return up to 500 lines. Secret-like filenames remain unavailable to the model.
+Provider runtimes and MCP servers still have OS-level capabilities; this release
+does not claim to eliminate filesystem/process disclosures or replace the
+unavailable malware/network scans. See SECURITY-REVIEW-0.3.4.md for findings.
+
 # PeriCode 0.3.3
 
 Grok subscription sessions now accept the runtime's known generated configuration

@@ -1,18 +1,21 @@
 {
-  "version": "0.3.3",
+  "version": "0.3.4",
   "sourceRepository": "https://github.com/eddyficial/pericode",
-  "sourceCommit": "c76ca33bbe851eea35362df44aed5624eba477ca",
+  "sourceCommit": "d394ea5ca28497584db0ca1273f1da287a519596",
   "sourceDirectory": "plugins/obsidian",
   "license": "MIT",
   "build": "npm ci && npm run build; cd plugins/obsidian && npm ci && npm run release",
   "validation": {
-    "pluginTests": 70,
+    "pluginTests": 77,
+    "sdkTests": 352,
     "installerAndReleaseChecks": "passed",
-    "live": "Obsidian 1.13.7: Grok 4.5 and 4.6 chat and guarded read_file passed; native file canaries blocked. Local Qwen3 Coder 30B chat and guarded read_file passed without cloud inference."
+    "productionDependencyAudits": "zero known advisories",
+    "live": "Obsidian 1.13.7: guarded native create, read, stale-write refusal, exact edit, read-back and trash passed. Settings rendered correctly. Provider selection preserved."
   },
   "limitations": [
-    "Grok long prompts and broad discovery need further verification.",
-    "Ollama Cloud authenticated inference and cross-platform workflows need further verification.",
-    "Obsidian Community review and publication remain pending."
+    "External MCP services and provider inference were not retested for this release.",
+    "Filesystem and process access remain required for documented features; approved processes are not OS sandboxed.",
+    "Community malware and network scans were unavailable; 0.3.4 review has not yet been verified.",
+    "In-app catalog installation previously returned No results found. Use the documented manual installation if unavailable."
   ]
 }

@@ -99,7 +99,7 @@ function makeNodeHttpFetch() {
     if (body && !Object.keys(headers).some((k2) => k2.toLowerCase() === "content-length")) {
       headers["content-length"] = String(body.byteLength);
     }
-    return new Promise((resolve19, reject) => {
+    return new Promise((resolve4, reject) => {
       let bodyController = null;
       let finished = false;
       const cleanup = () => init?.signal?.removeEventListener("abort", abort);
@@ -160,7 +160,7 @@ function makeNodeHttpFetch() {
             status: res.statusCode ?? 0,
             headers: responseHeaders
           });
-          resolve19(response);
+          resolve4(response);
         }
       );
       req.on("error", (err) => {
@@ -804,8 +804,8 @@ async function* agentTurn(args) {
             text: chunk.text
           };
         } else {
-          await new Promise((resolve19) => {
-            progressWaiter = resolve19;
+          await new Promise((resolve4) => {
+            progressWaiter = resolve4;
           });
         }
       }
@@ -879,32 +879,6 @@ var init_agent_loop = __esm({
 });
 
 // ../../dist/src/tools/base.js
-function requireString(input, key) {
-  const v2 = input[key];
-  if (typeof v2 !== "string" || v2.length === 0) {
-    throw new ToolValidationError(`Tool argument '${key}' is required and must be a non-empty string`);
-  }
-  return v2;
-}
-function optionalNumber(input, key, fallback) {
-  const v2 = input[key];
-  if (v2 === void 0 || v2 === null)
-    return fallback;
-  if (typeof v2 === "number" && Number.isFinite(v2))
-    return v2;
-  if (typeof v2 === "string" && /^-?\d+(\.\d+)?$/.test(v2))
-    return Number(v2);
-  throw new ToolValidationError(`Tool argument '${key}' must be a number`);
-}
-function optionalString(input, key) {
-  const v2 = input[key];
-  if (v2 === void 0 || v2 === null)
-    return void 0;
-  if (typeof v2 !== "string") {
-    throw new ToolValidationError(`Tool argument '${key}' must be a string`);
-  }
-  return v2;
-}
 var ToolValidationError;
 var init_base = __esm({
   "../../dist/src/tools/base.js"() {
@@ -919,11124 +893,9 @@ var init_base = __esm({
   }
 });
 
-// ../../dist/src/util/safe-spawn.js
-function safeSpawn(command, args, options = {}) {
-  const { signal, ...rest } = options;
-  const child = (0, import_node_child_process.spawn)(command, args, rest);
-  if (signal) {
-    if (signal.aborted) {
-      try {
-        child.kill();
-      } catch {
-      }
-    } else {
-      const onAbort = () => {
-        try {
-          child.kill();
-        } catch {
-        }
-      };
-      signal.addEventListener("abort", onAbort, { once: true });
-      child.once("close", () => {
-        signal.removeEventListener("abort", onAbort);
-      });
-    }
-  }
-  return child;
-}
-var import_node_child_process;
-var init_safe_spawn = __esm({
-  "../../dist/src/util/safe-spawn.js"() {
-    "use strict";
-    init_scoped_fetch();
-    import_node_child_process = require("node:child_process");
-  }
-});
-
-// ../../dist/src/paths.js
-function pericodeHome() {
-  return process.env[PERICODE_HOME_ENV] ?? (0, import_node_path.join)((0, import_node_os.homedir)(), ".pericode");
-}
-function ownedPath(fileName2) {
-  return (0, import_node_path.join)(pericodeHome(), fileName2);
-}
-function resolveOwnedPath(options) {
-  const ownedOverride = process.env[options.ownedEnv];
-  if (ownedOverride)
-    return { path: ownedOverride, source: "env" };
-  return { path: ownedPath(options.fileName), source: "owned" };
-}
-var import_node_os, import_node_path, PERICODE_HOME_ENV;
-var init_paths = __esm({
-  "../../dist/src/paths.js"() {
-    "use strict";
-    init_scoped_fetch();
-    import_node_os = require("node:os");
-    import_node_path = require("node:path");
-    PERICODE_HOME_ENV = "PERICODE_HOME";
-  }
-});
-
-// ../../dist/src/rollback/store.js
-function rollbackDir() {
-  return process.env[ROLLBACK_DIR_ENV] ?? ownedPath("rollbacks");
-}
-function checkpointPath(id) {
-  return (0, import_node_path2.join)(rollbackDir(), `${id}.json`);
-}
-function sha256(text2) {
-  return (0, import_node_crypto2.createHash)("sha256").update(text2, "utf8").digest("hex");
-}
-function snapshotFromContent(content) {
-  if (content === null) {
-    return { exists: false, content: null, sha256: null, bytes: 0 };
-  }
-  return {
-    exists: true,
-    content,
-    sha256: sha256(content),
-    bytes: Buffer.byteLength(content, "utf8")
-  };
-}
-async function readCurrentSnapshot(path) {
-  try {
-    return snapshotFromContent(await (0, import_promises.readFile)(path, "utf8"));
-  } catch (err) {
-    const code = err?.code;
-    if (code === "ENOENT")
-      return snapshotFromContent(null);
-    throw err;
-  }
-}
-async function recordFileRollbackCheckpoint(args) {
-  const checkpoint = {
-    version: ROLLBACK_VERSION,
-    id: `rb_${(0, import_node_crypto2.randomUUID)().replace(/-/g, "").slice(0, 12)}`,
-    createdAt: (/* @__PURE__ */ new Date()).toISOString(),
-    cwd: args.cwd ?? process.cwd(),
-    tool: args.tool,
-    path: (0, import_node_path2.resolve)(args.path),
-    before: snapshotFromContent(args.before),
-    after: snapshotFromContent(args.after)
-  };
-  await (0, import_promises.mkdir)(rollbackDir(), { recursive: true });
-  await (0, import_promises.writeFile)(checkpointPath(checkpoint.id), JSON.stringify(checkpoint, null, 2), "utf8");
-  return checkpoint;
-}
-function normalizeCheckpoint(value) {
-  if (!value || typeof value !== "object" || Array.isArray(value)) {
-    throw new RollbackStoreError("rollback checkpoint is not an object");
-  }
-  const record2 = value;
-  if (record2.version !== ROLLBACK_VERSION) {
-    throw new RollbackStoreError(`unsupported rollback checkpoint version: ${String(record2.version)}`);
-  }
-  if (!/^rb_[a-f0-9]{12}$/.test(record2.id)) {
-    throw new RollbackStoreError("rollback checkpoint has invalid id");
-  }
-  if (typeof record2.path !== "string" || record2.path.length === 0) {
-    throw new RollbackStoreError("rollback checkpoint has invalid path");
-  }
-  return record2;
-}
-async function loadRollbackCheckpoint(id) {
-  const raw = await (0, import_promises.readFile)(checkpointPath(id), "utf8");
-  return normalizeCheckpoint(JSON.parse(raw));
-}
-async function listRollbackCheckpoints(limit = 20) {
-  try {
-    const names = await (0, import_promises.readdir)(rollbackDir());
-    const checkpoints = await Promise.all(names.filter((name) => /^rb_[a-f0-9]{12}\.json$/.test(name)).map(async (name) => {
-      try {
-        return normalizeCheckpoint(JSON.parse(await (0, import_promises.readFile)((0, import_node_path2.join)(rollbackDir(), name), "utf8")));
-      } catch {
-        return null;
-      }
-    }));
-    return checkpoints.filter((checkpoint) => checkpoint !== null).sort((a, b2) => b2.createdAt.localeCompare(a.createdAt)).slice(0, Math.max(1, Math.min(100, Math.floor(limit))));
-  } catch (err) {
-    const code = err?.code;
-    if (code === "ENOENT")
-      return [];
-    throw err;
-  }
-}
-function matchesExpected(current, expected) {
-  if (!expected.exists)
-    return !current.exists;
-  return current.exists && current.sha256 === expected.sha256;
-}
-async function applyRollbackCheckpoint(args) {
-  const checkpoint = await loadRollbackCheckpoint(args.id);
-  const current = await readCurrentSnapshot(checkpoint.path);
-  if (!args.force && !matchesExpected(current, checkpoint.after)) {
-    throw new RollbackStoreError(`refusing rollback ${checkpoint.id}: current file state for ${checkpoint.path} no longer matches the agent after-state; pass force=true to override`);
-  }
-  const restored = checkpoint.before.exists ? "content" : "deleted";
-  if (!args.dryRun) {
-    if (checkpoint.before.exists) {
-      await (0, import_promises.mkdir)((0, import_node_path2.dirname)(checkpoint.path), { recursive: true });
-      await (0, import_promises.writeFile)(checkpoint.path, checkpoint.before.content ?? "", "utf8");
-    } else {
-      try {
-        await (0, import_promises.unlink)(checkpoint.path);
-      } catch (err) {
-        const code = err?.code;
-        if (code !== "ENOENT")
-          throw err;
-      }
-    }
-  }
-  return {
-    checkpoint,
-    changed: !matchesExpected(current, checkpoint.before),
-    dryRun: Boolean(args.dryRun),
-    forced: Boolean(args.force),
-    restored
-  };
-}
-var import_node_crypto2, import_promises, import_node_path2, ROLLBACK_VERSION, ROLLBACK_DIR_ENV, RollbackStoreError;
-var init_store = __esm({
-  "../../dist/src/rollback/store.js"() {
-    "use strict";
-    init_scoped_fetch();
-    import_node_crypto2 = require("node:crypto");
-    import_promises = require("node:fs/promises");
-    import_node_path2 = require("node:path");
-    init_paths();
-    ROLLBACK_VERSION = 1;
-    ROLLBACK_DIR_ENV = "PERICODE_ROLLBACK_DIR";
-    RollbackStoreError = class extends Error {
-      constructor(message) {
-        super(message);
-        this.name = "RollbackStoreError";
-      }
-    };
-  }
-});
-
-// ../../dist/src/tools/bash.js
-function probeExe(name) {
-  try {
-    const r = (0, import_node_child_process2.spawnSync)(name, ["-NoProfile", "-Command", "$null"], {
-      windowsHide: true,
-      timeout: 3e3
-    });
-    return r.status === 0;
-  } catch {
-    return false;
-  }
-}
-function splitPowerShellChain(command) {
-  const segments = [];
-  const ops = [];
-  let current = "";
-  let quote = null;
-  let escaped = false;
-  for (let i = 0; i < command.length; i++) {
-    const ch = command[i];
-    const next = command[i + 1];
-    if (quote === '"') {
-      current += ch;
-      if (escaped) {
-        escaped = false;
-      } else if (ch === "`") {
-        escaped = true;
-      } else if (ch === '"') {
-        quote = null;
-      }
-      continue;
-    }
-    if (quote === "'") {
-      current += ch;
-      if (ch === "'")
-        quote = null;
-      continue;
-    }
-    if (ch === '"' || ch === "'") {
-      quote = ch;
-      current += ch;
-      continue;
-    }
-    if (ch === "&" && next === "&" || ch === "|" && next === "|") {
-      segments.push(current.trim());
-      ops.push(ch === "&" ? "&&" : "||");
-      current = "";
-      i++;
-      continue;
-    }
-    current += ch;
-  }
-  segments.push(current.trim());
-  return { segments, ops };
-}
-function normalizePowerShell5Command(command) {
-  if (!command.includes("&&") && !command.includes("||"))
-    return command;
-  const { segments, ops } = splitPowerShellChain(command);
-  if (ops.length === 0)
-    return command;
-  const failGuard = "if ((-not $?) -or ($LASTEXITCODE -ne 0)) { if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE } else { exit 1 } }";
-  const successGuard = "if ($? -and ($LASTEXITCODE -eq 0)) { exit 0 }";
-  const parts = [];
-  for (let i = 0; i < segments.length; i++) {
-    const segment = segments[i];
-    if (!segment)
-      continue;
-    parts.push(`$global:LASTEXITCODE = 0; ${segment}`);
-    const op = ops[i];
-    if (op === "&&")
-      parts.push(failGuard);
-    if (op === "||")
-      parts.push(successGuard);
-  }
-  return parts.join("; ");
-}
-function normalizePowerShellListingCommand(command) {
-  return command.replace(/^(\s*)(ls|dir)\s+-la(\s+|$)/i, "$1Get-ChildItem -Force$3").replace(/^(\s*)(ls|dir)\s+-al(\s+|$)/i, "$1Get-ChildItem -Force$3").replace(/^(\s*)(ls|dir)\s+-a(\s+|$)/i, "$1Get-ChildItem -Force$3").replace(/^(\s*)(ls|dir)\s+-l(\s+|$)/i, "$1Get-ChildItem$3");
-}
-function stripWrappingQuotes(value) {
-  if (value.startsWith('"') && value.endsWith('"') || value.startsWith("'") && value.endsWith("'")) {
-    return value.slice(1, -1);
-  }
-  return value;
-}
-function quotePowerShellSingle(value) {
-  return `'${value.replace(/'/g, "''")}'`;
-}
-function normalizePowerShellNullRedirection(command) {
-  return command.replace(/2>\s*\/dev\/null\b/gi, "2>$null");
-}
-function normalizePowerShellHeadTailCommand(command) {
-  return command.replace(/\|\s*head\s+-n\s+(\d+)\b/gi, "| Select-Object -First $1").replace(/\|\s*head\b/gi, "| Select-Object -First 10").replace(/\|\s*tail\s+-n\s+(\d+)\b/gi, "| Select-Object -Last $1").replace(/\|\s*tail\b/gi, "| Select-Object -Last 10");
-}
-function normalizePowerShellFindCommand(command) {
-  const match = command.match(/^\s*find\s+(.+?)\s+-maxdepth\s+(\d+)\s+-iname\s+("[^"]+"|'[^']+'|\S+)\s+-type\s+([df])(\s+2>\$null)?\s*$/i);
-  if (!match)
-    return command;
-  const [, rawRoot, rawDepth, rawName, rawType, nullRedirect = ""] = match;
-  const root = stripWrappingQuotes(rawRoot.trim());
-  const name = stripWrappingQuotes(rawName.trim());
-  const depth = Math.max(0, Number.parseInt(rawDepth, 10) - 1);
-  const typeFlag = rawType.toLowerCase() === "d" ? "-Directory" : "-File";
-  const redirect = nullRedirect.trim();
-  return [
-    "Get-ChildItem",
-    "-Path",
-    quotePowerShellSingle(root),
-    typeFlag,
-    "-Recurse",
-    "-Depth",
-    String(depth),
-    "-Filter",
-    quotePowerShellSingle(name),
-    "-ErrorAction",
-    "SilentlyContinue",
-    redirect
-  ].filter(Boolean).join(" ");
-}
-function normalizeWindowsPowerShellCommand(command) {
-  return normalizePowerShell5Command(normalizePowerShellFindCommand(normalizePowerShellHeadTailCommand(normalizePowerShellListingCommand(normalizePowerShellNullRedirection(command)))));
-}
-function hasUnquotedShellControl(command) {
-  let quote = null;
-  let escaped = false;
-  for (let i = 0; i < command.length; i++) {
-    const ch = command[i];
-    const next = command[i + 1];
-    if (quote === '"') {
-      if (escaped) {
-        escaped = false;
-      } else if (ch === "`") {
-        escaped = true;
-      } else if (ch === '"') {
-        quote = null;
-      }
-      continue;
-    }
-    if (quote === "'") {
-      if (ch === "'")
-        quote = null;
-      continue;
-    }
-    if (ch === '"' || ch === "'") {
-      quote = ch;
-      continue;
-    }
-    if (ch === ";" || ch === "\n" || ch === "\r")
-      return true;
-    if (ch === "&" && next === "&" || ch === "|" && next === "|")
-      return true;
-    if (ch === "|")
-      return true;
-  }
-  return false;
-}
-function isRecoverableDiscoveryCommand(command) {
-  const trimmed = command.trim();
-  if (!trimmed || hasUnquotedShellControl(trimmed))
-    return false;
-  return /^(ls|dir|find|Get-ChildItem)\b/i.test(trimmed);
-}
-function isLikelyFileMutatingCommand(command) {
-  return /(^|[^0-9])>{1,2}(?!&)/.test(command) || /\b(rm|del|erase|mv|move|cp|copy|mkdir|rmdir|touch)\b/i.test(command) || /\b(Set-Content|Add-Content|Out-File|New-Item|Remove-Item|Move-Item|Copy-Item)\b/i.test(command) || /\b(git\s+(apply|checkout|restore|reset|clean)|sed\s+-i)\b/i.test(command) || /\b(writeFileSync|writeFile|appendFileSync|appendFile|unlinkSync|unlink)\b/i.test(command);
-}
-function gitRoot(cwd) {
-  const result = (0, import_node_child_process2.spawnSync)("git", ["rev-parse", "--show-toplevel"], {
-    cwd,
-    encoding: "utf8",
-    windowsHide: true,
-    timeout: 3e3
-  });
-  if (result.status !== 0)
-    return null;
-  const root = result.stdout.trim();
-  return root.length > 0 ? root : null;
-}
-function gitStatusPaths(root) {
-  const result = (0, import_node_child_process2.spawnSync)("git", ["status", "--porcelain"], {
-    cwd: root,
-    encoding: "utf8",
-    windowsHide: true,
-    timeout: 5e3
-  });
-  if (result.status !== 0)
-    return [];
-  const paths = /* @__PURE__ */ new Set();
-  for (const line of result.stdout.split(/\r?\n/)) {
-    if (line.length < 4)
-      continue;
-    const raw = line.slice(3).trim();
-    if (!raw)
-      continue;
-    const renamed = raw.includes(" -> ") ? raw.split(" -> ").pop() : raw;
-    paths.add(renamed.replace(/^"|"$/g, ""));
-  }
-  return [...paths];
-}
-function readTextIfPresent(path) {
-  if (!(0, import_node_fs.existsSync)(path))
-    return null;
-  if (!(0, import_node_fs.statSync)(path).isFile())
-    return null;
-  const text2 = (0, import_node_fs.readFileSync)(path, "utf8");
-  if (text2.includes("\0"))
-    return null;
-  return text2;
-}
-function readGitHeadFile(root, relativePath) {
-  const result = (0, import_node_child_process2.spawnSync)("git", ["show", `HEAD:${relativePath.replace(/\\/g, "/")}`], {
-    cwd: root,
-    encoding: "utf8",
-    windowsHide: true,
-    timeout: 5e3
-  });
-  if (result.status !== 0 || result.stdout.includes("\0"))
-    return null;
-  return result.stdout;
-}
-function createBashRollbackBaseline(command, cwd) {
-  if (!isLikelyFileMutatingCommand(command))
-    return null;
-  const root = gitRoot(cwd);
-  if (!root)
-    return null;
-  const beforePaths = new Set(gitStatusPaths(root));
-  const beforeDirtyContent = /* @__PURE__ */ new Map();
-  for (const relativePath of beforePaths) {
-    beforeDirtyContent.set(relativePath, readTextIfPresent((0, import_node_path3.join)(root, relativePath)));
-  }
-  return { root, beforePaths, beforeDirtyContent };
-}
-async function recordBashRollbackCheckpoints(baseline) {
-  if (!baseline)
-    return [];
-  const afterPaths = new Set(gitStatusPaths(baseline.root));
-  const candidates = /* @__PURE__ */ new Set([...baseline.beforePaths, ...afterPaths]);
-  const ids = [];
-  for (const relativePath of candidates) {
-    const absolutePath = (0, import_node_path3.join)(baseline.root, relativePath);
-    const before = baseline.beforeDirtyContent.has(relativePath) ? baseline.beforeDirtyContent.get(relativePath) : readGitHeadFile(baseline.root, relativePath);
-    const after = readTextIfPresent(absolutePath);
-    if (before === after)
-      continue;
-    const checkpoint = await recordFileRollbackCheckpoint({
-      tool: "bash",
-      path: absolutePath,
-      before,
-      after,
-      cwd: baseline.root
-    });
-    ids.push(checkpoint.id);
-  }
-  return ids;
-}
-function resolveWindowsShell() {
-  if (process.platform !== "win32")
-    return null;
-  if (cachedWindowsShell !== void 0)
-    return cachedWindowsShell;
-  const override = process.env.PERICODE_BASH_SHELL?.toLowerCase();
-  if (override === "cmd") {
-    cachedWindowsShell = null;
-    return null;
-  }
-  const argsOf = (cmd) => [
-    "-NoLogo",
-    "-NoProfile",
-    "-NonInteractive",
-    "-Command",
-    cmd
-  ];
-  const windowsArgsOf = (cmd) => argsOf(normalizeWindowsPowerShellCommand(cmd));
-  if (override === "powershell") {
-    cachedWindowsShell = { command: "powershell.exe", args: windowsArgsOf };
-    return cachedWindowsShell;
-  }
-  if (override === "pwsh") {
-    cachedWindowsShell = { command: "pwsh.exe", args: windowsArgsOf };
-    return cachedWindowsShell;
-  }
-  if (probeExe("pwsh.exe")) {
-    cachedWindowsShell = { command: "pwsh.exe", args: windowsArgsOf };
-  } else {
-    cachedWindowsShell = { command: "powershell.exe", args: windowsArgsOf };
-  }
-  return cachedWindowsShell;
-}
-function newCollector() {
-  return { text: "", bytes: 0, truncated: false };
-}
-function appendChunk(collector, chunk, cap) {
-  if (collector.truncated) {
-    return { overflow: true };
-  }
-  collector.text += chunk;
-  collector.bytes += chunk.length;
-  if (collector.bytes > cap) {
-    collector.truncated = true;
-    return { overflow: true };
-  }
-  return { overflow: false };
-}
-function renderStream(label, collector) {
-  if (!collector.truncated) {
-    return `${label}:
-${collector.text}`;
-  }
-  const head = collector.text.slice(0, TRUNCATION_HEAD);
-  const tail = collector.text.slice(-TRUNCATION_TAIL);
-  const omitted = collector.bytes - head.length - tail.length;
-  return `${label} (truncated; ${omitted} bytes elided between head and tail):
-${head}
-[... ${omitted} bytes ...]
-${tail}`;
-}
-var import_node_child_process2, import_node_fs, import_node_path3, cachedWindowsShell, DEFAULT_TIMEOUT_MS, DEFAULT_MAX_BYTES_PER_STREAM, TRUNCATION_HEAD, TRUNCATION_TAIL, bashTool;
-var init_bash = __esm({
-  "../../dist/src/tools/bash.js"() {
-    "use strict";
-    init_scoped_fetch();
-    import_node_child_process2 = require("node:child_process");
-    import_node_fs = require("node:fs");
-    import_node_path3 = require("node:path");
-    init_safe_spawn();
-    init_base();
-    init_store();
-    DEFAULT_TIMEOUT_MS = 6e5;
-    DEFAULT_MAX_BYTES_PER_STREAM = 3e4;
-    TRUNCATION_HEAD = 12e3;
-    TRUNCATION_TAIL = 6e3;
-    bashTool = {
-      readOnly: false,
-      definition: {
-        name: "bash",
-        description: `Run a shell command. Streams output to the operator UI as it arrives. Returns stdout, stderr, and exit code (head + tail when output exceeds the per-stream cap). Default timeout 10 minutes; default per-stream cap ${DEFAULT_MAX_BYTES_PER_STREAM} bytes. Honors operator cancellation.`,
-        input_schema: {
-          type: "object",
-          properties: {
-            command: { type: "string", description: "Shell command to execute" },
-            timeout_ms: {
-              type: "integer",
-              default: DEFAULT_TIMEOUT_MS,
-              description: "Kill the command after this many ms (default 10 min)"
-            },
-            max_bytes_per_stream: {
-              type: "integer",
-              default: DEFAULT_MAX_BYTES_PER_STREAM,
-              description: "Per-stream byte cap before truncating to head+tail (default 30000)"
-            }
-          },
-          required: ["command"],
-          additionalProperties: false
-        }
-      },
-      async execute(input, context = {}) {
-        const command = requireString(input, "command");
-        const timeoutMs = Math.max(100, optionalNumber(input, "timeout_ms", DEFAULT_TIMEOUT_MS));
-        const maxBytes = Math.max(1e3, optionalNumber(input, "max_bytes_per_stream", DEFAULT_MAX_BYTES_PER_STREAM));
-        const rollbackBaseline = createBashRollbackBaseline(command, process.cwd());
-        return new Promise((resolve19) => {
-          const winShell = resolveWindowsShell();
-          const child = winShell ? safeSpawn(winShell.command, winShell.args(command), {
-            shell: false,
-            windowsHide: true,
-            stdio: ["ignore", "pipe", "pipe"],
-            signal: context.signal
-          }) : safeSpawn(command, [], {
-            shell: true,
-            windowsHide: true,
-            stdio: ["ignore", "pipe", "pipe"],
-            signal: context.signal
-          });
-          const stdout = newCollector();
-          const stderr = newCollector();
-          let timedOut = false;
-          let cancelled = false;
-          let killedByOverflow = false;
-          const killChild = () => {
-            try {
-              child.kill();
-            } catch {
-            }
-          };
-          const timer = setTimeout(() => {
-            timedOut = true;
-            killChild();
-          }, timeoutMs);
-          if (context.signal) {
-            if (context.signal.aborted) {
-              cancelled = true;
-            } else {
-              context.signal.addEventListener("abort", () => {
-                cancelled = true;
-              }, { once: true });
-            }
-          }
-          const handleData = (kind, collector, buf) => {
-            const text2 = buf.toString();
-            context.onProgress?.({ stream: kind, text: text2 });
-            const { overflow } = appendChunk(collector, text2, maxBytes);
-            if (overflow && !killedByOverflow) {
-              killedByOverflow = true;
-              killChild();
-            }
-          };
-          child.stdout.on("data", (d) => handleData("stdout", stdout, d));
-          child.stderr.on("data", (d) => handleData("stderr", stderr, d));
-          child.on("error", (err) => {
-            clearTimeout(timer);
-            resolve19({
-              output: `error spawning shell: ${err.message}`,
-              isError: true
-            });
-          });
-          child.on("close", async (code) => {
-            clearTimeout(timer);
-            const exitCode = code ?? -1;
-            const trailers = [];
-            if (timedOut)
-              trailers.push(`[killed after ${timeoutMs}ms timeout]`);
-            if (killedByOverflow) {
-              trailers.push(`[killed after exceeding ${maxBytes} bytes on stdout or stderr]`);
-            }
-            if (cancelled)
-              trailers.push("[cancelled by operator]");
-            const recoveredDiscoveryOutput = exitCode !== 0 && !timedOut && !cancelled && !killedByOverflow && stdout.text.trim().length > 0 && stderr.text.trim().length === 0 && isRecoverableDiscoveryCommand(command);
-            if (recoveredDiscoveryOutput) {
-              trailers.push(`[warning: ${exitCode} exit from discovery command, but stdout returned usable results; treating as success]`);
-            }
-            if (exitCode === 0 && !timedOut && !cancelled && !killedByOverflow) {
-              try {
-                const rollbackIds = await recordBashRollbackCheckpoints(rollbackBaseline);
-                if (rollbackIds.length > 0) {
-                  trailers.push(`rollback: ${rollbackIds.join(", ")}`);
-                }
-              } catch (err) {
-                trailers.push(`[warning: failed to record bash rollback checkpoints: ${err instanceof Error ? err.message : String(err)}]`);
-              }
-            }
-            const body = `${renderStream("stdout", stdout)}
-
-${renderStream("stderr", stderr)}
-
-exit_code: ${exitCode}` + (trailers.length > 0 ? `
-${trailers.join("\n")}` : "");
-            resolve19({
-              output: body,
-              isError: timedOut || cancelled || killedByOverflow || exitCode !== 0 && !recoveredDiscoveryOutput
-            });
-          });
-        });
-      }
-    };
-  }
-});
-
-// ../../dist/src/tools/secret-guard.js
-function classifySecretPath(path) {
-  const name = (0, import_node_path4.basename)(path);
-  for (const rule of SECRET_RULES) {
-    if (rule.test(name))
-      return { matched: true, reason: rule.reason };
-  }
-  return { matched: false };
-}
-function isConfirmedSecretOverride(input, key = "confirm_secret") {
-  const v2 = input[key];
-  if (v2 === true)
-    return true;
-  if (typeof v2 === "string") {
-    const lower = v2.toLowerCase();
-    return lower === "true" || lower === "yes" || lower === "1";
-  }
-  return false;
-}
-function describeSecretRefusal(path, reason) {
-  return `Refused to read ${path}: ${reason}. If the operator explicitly wants this file in context, re-call with confirm_secret: true (the permission gate will still prompt).`;
-}
-var import_node_path4, lowercased, SECRET_RULES;
-var init_secret_guard = __esm({
-  "../../dist/src/tools/secret-guard.js"() {
-    "use strict";
-    init_scoped_fetch();
-    import_node_path4 = require("node:path");
-    lowercased = (predicate) => (name) => predicate(name.toLowerCase());
-    SECRET_RULES = [
-      {
-        reason: ".env file (environment secrets)",
-        test: lowercased((n) => n === ".env" || n.startsWith(".env.") || n.endsWith(".env"))
-      },
-      {
-        reason: "PEM key material",
-        test: lowercased((n) => n.endsWith(".pem"))
-      },
-      {
-        reason: "PKCS#12 keystore",
-        test: lowercased((n) => n.endsWith(".pfx") || n.endsWith(".p12"))
-      },
-      {
-        reason: "SSH private key",
-        test: lowercased((n) => n === "id_rsa" || n === "id_dsa" || n === "id_ecdsa" || n === "id_ed25519")
-      },
-      {
-        reason: "filename contains 'secret'",
-        test: lowercased((n) => n.includes("secret"))
-      },
-      {
-        reason: "filename contains 'credentials'",
-        test: lowercased((n) => n.includes("credentials"))
-      },
-      {
-        reason: "KeePass database",
-        test: lowercased((n) => n.endsWith(".kdbx") || n.endsWith(".kdb"))
-      }
-    ];
-  }
-});
-
-// ../../dist/src/tools/read-file.js
-function isLikelyBinary(buf) {
-  const slice = buf.subarray(0, Math.min(buf.length, BINARY_DETECTION_BYTES));
-  let nullCount = 0;
-  for (const b2 of slice)
-    if (b2 === 0)
-      nullCount += 1;
-  return nullCount > slice.length * 0.01;
-}
-function withLineNumbers(text2, startLine = 1) {
-  return text2.split("\n").map((line, i) => `${String(startLine + i).padStart(4)} | ${line}`).join("\n");
-}
-var import_promises2, import_node_path5, HEAD_LINES, TAIL_LINES, FULL_LIMIT_LINES, BINARY_DETECTION_BYTES, readFileTool;
-var init_read_file = __esm({
-  "../../dist/src/tools/read-file.js"() {
-    "use strict";
-    init_scoped_fetch();
-    import_promises2 = require("node:fs/promises");
-    import_node_path5 = require("node:path");
-    init_base();
-    init_secret_guard();
-    HEAD_LINES = 200;
-    TAIL_LINES = 50;
-    FULL_LIMIT_LINES = 500;
-    BINARY_DETECTION_BYTES = 8e3;
-    readFileTool = {
-      readOnly: true,
-      definition: {
-        name: "read_file",
-        description: "Read the contents of a file with line numbers. Optionally provide start_line/end_line for a slice. Files over 500 lines are summarized (first 200 + last 50) unless a slice is given. Refuses files whose names match secret patterns (.env*, *.pem, id_rsa, *secret*, *credentials*, *.kdbx) unless confirm_secret is true.",
-        input_schema: {
-          type: "object",
-          properties: {
-            path: { type: "string", description: "Path to the file" },
-            start_line: { type: "integer", description: "1-based start line" },
-            end_line: { type: "integer", description: "1-based end line (inclusive)" },
-            confirm_secret: {
-              type: "boolean",
-              description: "Set true to bypass the filename-based secret guard. The permission gate still prompts."
-            }
-          },
-          required: ["path"],
-          additionalProperties: false
-        }
-      },
-      async execute(input) {
-        const path = (0, import_node_path5.resolve)(requireString(input, "path"));
-        const secret = classifySecretPath(path);
-        if (secret.matched && !isConfirmedSecretOverride(input)) {
-          return {
-            output: describeSecretRefusal(path, secret.reason ?? "secret pattern"),
-            isError: true
-          };
-        }
-        let info;
-        try {
-          info = await (0, import_promises2.stat)(path);
-        } catch (err) {
-          return {
-            output: `error: ${err instanceof Error ? err.message : String(err)}`,
-            isError: true
-          };
-        }
-        if (!info.isFile()) {
-          return { output: `error: ${path} is not a file`, isError: true };
-        }
-        const buf = await (0, import_promises2.readFile)(path);
-        if (isLikelyBinary(buf)) {
-          return {
-            output: `[binary file, ${buf.length} bytes]`,
-            isError: false
-          };
-        }
-        const text2 = buf.toString("utf8");
-        const lines = text2.split("\n");
-        const start = optionalNumber(input, "start_line", 0);
-        const end = optionalNumber(input, "end_line", 0);
-        const hasSlice = start > 0 || end > 0;
-        if (hasSlice) {
-          const s = Math.max(1, start || 1);
-          const e = Math.min(lines.length, end || lines.length);
-          const slice = lines.slice(s - 1, e).join("\n");
-          return { output: withLineNumbers(slice, s), isError: false };
-        }
-        if (lines.length <= FULL_LIMIT_LINES) {
-          return { output: withLineNumbers(text2, 1), isError: false };
-        }
-        const head = lines.slice(0, HEAD_LINES).join("\n");
-        const tail = lines.slice(lines.length - TAIL_LINES).join("\n");
-        const omitted = lines.length - HEAD_LINES - TAIL_LINES;
-        const tailStart = lines.length - TAIL_LINES + 1;
-        return {
-          output: withLineNumbers(head, 1) + `
-
-[... ${omitted} lines omitted ...]
-
-` + withLineNumbers(tail, tailStart),
-          isError: false
-        };
-      }
-    };
-  }
-});
-
-// ../../dist/src/tools/write-file.js
-function optionalBoolean(input, key) {
-  const value = input[key];
-  if (value === void 0 || value === null)
-    return void 0;
-  if (typeof value === "boolean")
-    return value;
-  throw new ToolValidationError(`Tool argument '${key}' must be a boolean`);
-}
-var import_promises3, import_node_path6, writeFileTool;
-var init_write_file = __esm({
-  "../../dist/src/tools/write-file.js"() {
-    "use strict";
-    init_scoped_fetch();
-    import_promises3 = require("node:fs/promises");
-    import_node_path6 = require("node:path");
-    init_base();
-    init_store();
-    writeFileTool = {
-      readOnly: false,
-      definition: {
-        name: "write_file",
-        description: "Create or overwrite a file with the given content. Supports stale-write protection with expected_old_content and create_only. To delete a file, use delete_file instead; write_file rejects empty content.",
-        input_schema: {
-          type: "object",
-          properties: {
-            path: { type: "string" },
-            content: { type: "string" },
-            expected_old_content: {
-              type: "string",
-              description: "Optional stale-write check. If the current file content differs, the write is refused."
-            },
-            create_only: {
-              type: "boolean",
-              description: "When true, refuse to overwrite an existing file."
-            }
-          },
-          required: ["path", "content"],
-          additionalProperties: false
-        }
-      },
-      async execute(input) {
-        try {
-          const path = (0, import_node_path6.resolve)(requireString(input, "path"));
-          const rawContent = input["content"];
-          if (typeof rawContent === "string" && rawContent.length === 0) {
-            return {
-              output: `error: write_file refuses empty content. To delete '${path}', call delete_file({path: "${path}"}) - or in the Obsidian plugin, obsidian_delete_note. Both prompt the operator before deleting.`,
-              isError: true
-            };
-          }
-          const content = requireString(input, "content");
-          const expectedOldContent = optionalString(input, "expected_old_content");
-          const createOnly = optionalBoolean(input, "create_only") ?? false;
-          let before = null;
-          try {
-            before = await (0, import_promises3.readFile)(path, "utf8");
-          } catch (err) {
-            const code = err?.code;
-            if (code !== "ENOENT") {
-              return {
-                output: `error: ${err instanceof Error ? err.message : String(err)}`,
-                isError: true
-              };
-            }
-          }
-          if (createOnly && before !== null) {
-            return {
-              output: `error: write_file refuses to overwrite existing file ${path} because create_only=true`,
-              isError: true
-            };
-          }
-          if (expectedOldContent !== void 0 && before !== expectedOldContent) {
-            return {
-              output: `error: write_file stale-content check failed for ${path}. Read the file again before overwriting it.`,
-              isError: true
-            };
-          }
-          if (before === content) {
-            return {
-              output: `No changes for ${path}`,
-              isError: false
-            };
-          }
-          await (0, import_promises3.mkdir)((0, import_node_path6.dirname)(path), { recursive: true });
-          await (0, import_promises3.writeFile)(path, content, "utf8");
-          const checkpoint = await recordFileRollbackCheckpoint({
-            tool: "write_file",
-            path,
-            before,
-            after: content
-          });
-          const newBytes = Buffer.byteLength(content, "utf8");
-          if (before === null) {
-            return {
-              output: `Wrote ${newBytes} bytes to ${path}
-rollback: ${checkpoint.id}`,
-              isError: false
-            };
-          }
-          const previousBytes = Buffer.byteLength(before, "utf8");
-          return {
-            output: `Updated ${path} (${previousBytes} -> ${newBytes} bytes)
-rollback: ${checkpoint.id}`,
-            isError: false
-          };
-        } catch (err) {
-          if (err instanceof ToolValidationError) {
-            return {
-              output: `error: ${err.message}`,
-              isError: true
-            };
-          }
-          return {
-            output: `error: ${err instanceof Error ? err.message : String(err)}`,
-            isError: true
-          };
-        }
-      }
-    };
-  }
-});
-
-// ../../dist/src/tools/delete-file.js
-var import_promises4, import_node_path7, import_node_os2, deleteFileTool;
-var init_delete_file = __esm({
-  "../../dist/src/tools/delete-file.js"() {
-    "use strict";
-    init_scoped_fetch();
-    import_promises4 = require("node:fs/promises");
-    import_node_path7 = require("node:path");
-    import_node_os2 = require("node:os");
-    init_base();
-    init_store();
-    deleteFileTool = {
-      readOnly: false,
-      definition: {
-        name: "delete_file",
-        description: "Delete a file from the filesystem. By default, files are moved to PeriCode's per-user trash (~/.pericode/.trash/<date>/) so they're recoverable. Pass permanent=true to unlink directly. Files only \u2014 does NOT delete folders. The operator must confirm every call (delete-guard never auto-approves).",
-        input_schema: {
-          type: "object",
-          properties: {
-            path: {
-              type: "string",
-              description: "Absolute or working-directory-relative path to the file to delete."
-            },
-            permanent: {
-              type: "boolean",
-              description: "If true, call fs.unlink directly (no recovery). Default false (soft-delete to ~/.pericode/.trash/)."
-            }
-          },
-          required: ["path"],
-          additionalProperties: false
-        }
-      },
-      async execute(input) {
-        const rawPath = requireString(input, "path");
-        const path = (0, import_node_path7.resolve)(rawPath);
-        const permanent = input.permanent === true;
-        let stats;
-        try {
-          stats = await (0, import_promises4.stat)(path);
-        } catch (err) {
-          const code = err.code;
-          if (code === "ENOENT") {
-            return { output: `error: no file at '${path}'`, isError: true };
-          }
-          return {
-            output: `error: ${err instanceof Error ? err.message : String(err)}`,
-            isError: true
-          };
-        }
-        if (stats.isDirectory()) {
-          return {
-            output: `error: '${path}' is a directory. delete_file only deletes files. For directories, use bash with explicit rm -r (still goes through the delete-guard).`,
-            isError: true
-          };
-        }
-        if (!stats.isFile()) {
-          return {
-            output: `error: '${path}' is not a regular file (symlink/socket/etc. unsupported).`,
-            isError: true
-          };
-        }
-        const before = await (0, import_promises4.readFile)(path, "utf8");
-        if (permanent) {
-          try {
-            await (0, import_promises4.unlink)(path);
-            const checkpoint = await recordFileRollbackCheckpoint({
-              tool: "delete_file",
-              path,
-              before,
-              after: null
-            });
-            return {
-              output: `Permanently deleted '${path}' (${stats.size} bytes).
-rollback: ${checkpoint.id}`,
-              isError: false
-            };
-          } catch (err) {
-            return {
-              output: `error: ${err instanceof Error ? err.message : String(err)}`,
-              isError: true
-            };
-          }
-        }
-        const today = (/* @__PURE__ */ new Date()).toISOString().slice(0, 10);
-        const trashDir = (0, import_node_path7.join)((0, import_node_os2.homedir)(), ".pericode", ".trash", today);
-        const ts = Date.now();
-        const trashPath = (0, import_node_path7.join)(trashDir, `${(0, import_node_path7.basename)(path)}.${ts}`);
-        try {
-          await (0, import_promises4.mkdir)(trashDir, { recursive: true });
-          await (0, import_promises4.rename)(path, trashPath);
-          const checkpoint = await recordFileRollbackCheckpoint({
-            tool: "delete_file",
-            path,
-            before,
-            after: null
-          });
-          return {
-            output: `Moved '${path}' \u2192 '${trashPath}' (${stats.size} bytes). Recover with: mv "${trashPath}" "${path}"
-rollback: ${checkpoint.id}`,
-            isError: false
-          };
-        } catch (err) {
-          const code = err.code;
-          if (code === "EXDEV") {
-            try {
-              const { copyFile } = await Promise.resolve().then(() => __toESM(require("node:fs/promises"), 1));
-              await copyFile(path, trashPath);
-              await (0, import_promises4.unlink)(path);
-              const checkpoint = await recordFileRollbackCheckpoint({
-                tool: "delete_file",
-                path,
-                before,
-                after: null
-              });
-              return {
-                output: `Moved '${path}' \u2192 '${trashPath}' (cross-device copy + unlink, ${stats.size} bytes).
-rollback: ${checkpoint.id}`,
-                isError: false
-              };
-            } catch (err2) {
-              return {
-                output: `error: ${err2 instanceof Error ? err2.message : String(err2)}`,
-                isError: true
-              };
-            }
-          }
-          return {
-            output: `error: ${err instanceof Error ? err.message : String(err)}`,
-            isError: true
-          };
-        }
-      }
-    };
-  }
-});
-
-// ../../dist/src/tools/edit-file.js
-function unifiedDiff(before, after, path) {
-  const beforeLines = before.split("\n");
-  const afterLines = after.split("\n");
-  const out = [`--- ${path}`, `+++ ${path}`];
-  let i = 0;
-  let j2 = 0;
-  const hunkContext = 2;
-  while (i < beforeLines.length || j2 < afterLines.length) {
-    if (i < beforeLines.length && j2 < afterLines.length && beforeLines[i] === afterLines[j2]) {
-      i += 1;
-      j2 += 1;
-      continue;
-    }
-    const hunkStartBefore = Math.max(0, i - hunkContext);
-    const hunkStartAfter = Math.max(0, j2 - hunkContext);
-    out.push(`@@ -${hunkStartBefore + 1},? +${hunkStartAfter + 1},? @@`);
-    for (let k2 = hunkStartBefore; k2 < i; k2 += 1) {
-      out.push(` ${beforeLines[k2] ?? ""}`);
-    }
-    while (i < beforeLines.length && (j2 >= afterLines.length || beforeLines[i] !== afterLines[j2])) {
-      out.push(`-${beforeLines[i] ?? ""}`);
-      i += 1;
-    }
-    while (j2 < afterLines.length && (i >= beforeLines.length || beforeLines[i] !== afterLines[j2])) {
-      out.push(`+${afterLines[j2] ?? ""}`);
-      j2 += 1;
-    }
-    for (let k2 = 0; k2 < hunkContext && i + k2 < beforeLines.length; k2 += 1) {
-      out.push(` ${beforeLines[i + k2] ?? ""}`);
-    }
-    i += hunkContext;
-    j2 += hunkContext;
-  }
-  return out.join("\n");
-}
-function countOccurrences(haystack, needle) {
-  return haystack.split(needle).length - 1;
-}
-function optionalBoolean2(input, key) {
-  const value = input[key];
-  if (value === void 0 || value === null)
-    return void 0;
-  if (typeof value === "boolean")
-    return value;
-  throw new ToolValidationError(`Tool argument '${key}' must be a boolean`);
-}
-function parseEditInstruction(input) {
-  const oldStr = requireString(input, "old_str");
-  const newStr = requireString(input, "new_str");
-  const replaceAll = optionalBoolean2(input, "replace_all") ?? false;
-  const expectedValue = input["expected_replacements"];
-  if (expectedValue !== void 0 && expectedValue !== null) {
-    if (typeof expectedValue !== "number" || !Number.isFinite(expectedValue)) {
-      throw new ToolValidationError("Tool argument 'expected_replacements' must be a number");
-    }
-  }
-  return {
-    oldStr,
-    newStr,
-    replaceAll,
-    expectedReplacements: typeof expectedValue === "number" && Number.isFinite(expectedValue) ? Math.floor(expectedValue) : void 0
-  };
-}
-function parseEditList(input) {
-  const editsValue = input["edits"];
-  if (editsValue === void 0 || editsValue === null) {
-    return [parseEditInstruction(input)];
-  }
-  if (!Array.isArray(editsValue) || editsValue.length === 0) {
-    throw new ToolValidationError("Tool argument 'edits' must be a non-empty array");
-  }
-  return editsValue.map((entry, index) => {
-    if (!entry || typeof entry !== "object" || Array.isArray(entry)) {
-      throw new ToolValidationError(`Tool argument 'edits[${index}]' must be an object`);
-    }
-    return parseEditInstruction(entry);
-  });
-}
-function applyEdit(text2, path, edit, index) {
-  const matches = countOccurrences(text2, edit.oldStr);
-  if (matches === 0) {
-    throw new ToolValidationError(`edit ${index + 1}: old_str not found in ${path}`);
-  }
-  if (edit.expectedReplacements !== void 0 && matches !== edit.expectedReplacements) {
-    throw new ToolValidationError(`edit ${index + 1}: expected ${edit.expectedReplacements} matches in ${path}, found ${matches}`);
-  }
-  if (!edit.replaceAll && edit.expectedReplacements === void 0 && matches !== 1) {
-    throw new ToolValidationError(`edit ${index + 1}: old_str matches ${matches} times in ${path}; refine it to be unique or set replace_all/expected_replacements`);
-  }
-  if (edit.replaceAll) {
-    return text2.split(edit.oldStr).join(edit.newStr);
-  }
-  return text2.replace(edit.oldStr, edit.newStr);
-}
-function syntaxCheck(path, text2) {
-  const ext = (0, import_node_path8.extname)(path).toLowerCase();
-  if (ext === ".json") {
-    try {
-      JSON.parse(text2);
-      return "syntax: ok (json)";
-    } catch (err) {
-      return `syntax: error (json): ${err instanceof Error ? err.message : String(err)}`;
-    }
-  }
-  if (ext === ".js" || ext === ".mjs" || ext === ".cjs") {
-    const result = (0, import_node_child_process3.spawnSync)(process.execPath, ["--check", path], {
-      encoding: "utf8",
-      windowsHide: true,
-      timeout: 1e4
-    });
-    if (result.status === 0)
-      return `syntax: ok (${ext.slice(1)})`;
-    return `syntax: error (${ext.slice(1)}): ${(result.stderr || result.stdout).trim()}`;
-  }
-  if (ext === ".ts" || ext === ".tsx" || ext === ".mts" || ext === ".cts") {
-    return `syntax: skipped (${ext.slice(1)} requires project check; run test_run)`;
-  }
-  return "syntax: skipped (unsupported extension)";
-}
-var import_promises5, import_node_path8, import_node_child_process3, editFileTool;
-var init_edit_file = __esm({
-  "../../dist/src/tools/edit-file.js"() {
-    "use strict";
-    init_scoped_fetch();
-    import_promises5 = require("node:fs/promises");
-    import_node_path8 = require("node:path");
-    import_node_child_process3 = require("node:child_process");
-    init_base();
-    init_store();
-    editFileTool = {
-      readOnly: false,
-      definition: {
-        name: "edit_file",
-        description: "Apply one or more search-and-replace edits to a file and return a unified diff. By default old_str must be unique; use replace_all or expected_replacements when repeated matches are intentional.",
-        input_schema: {
-          type: "object",
-          properties: {
-            path: { type: "string" },
-            old_str: { type: "string" },
-            new_str: { type: "string" },
-            replace_all: { type: "boolean" },
-            expected_replacements: { type: "integer" },
-            edits: {
-              type: "array",
-              items: {
-                type: "object",
-                properties: {
-                  old_str: { type: "string" },
-                  new_str: { type: "string" },
-                  replace_all: { type: "boolean" },
-                  expected_replacements: { type: "integer" }
-                },
-                required: ["old_str", "new_str"],
-                additionalProperties: false
-              }
-            }
-          },
-          required: ["path"],
-          additionalProperties: false
-        }
-      },
-      async execute(input) {
-        try {
-          const path = (0, import_node_path8.resolve)(requireString(input, "path"));
-          const edits = parseEditList(input);
-          let before;
-          try {
-            before = await (0, import_promises5.readFile)(path, "utf8");
-          } catch (err) {
-            return {
-              output: `error: ${err instanceof Error ? err.message : String(err)}`,
-              isError: true
-            };
-          }
-          let after = before;
-          for (const [index, edit] of edits.entries()) {
-            after = applyEdit(after, path, edit, index);
-          }
-          try {
-            await (0, import_promises5.writeFile)(path, after, "utf8");
-          } catch (err) {
-            return {
-              output: `error writing: ${err instanceof Error ? err.message : String(err)}`,
-              isError: true
-            };
-          }
-          const checkpoint = await recordFileRollbackCheckpoint({
-            tool: "edit_file",
-            path,
-            before,
-            after
-          });
-          return {
-            output: `${unifiedDiff(before, after, path)}
-${syntaxCheck(path, after)}
-rollback: ${checkpoint.id}`,
-            isError: false
-          };
-        } catch (err) {
-          if (err instanceof ToolValidationError) {
-            return {
-              output: `error: ${err.message}`,
-              isError: true
-            };
-          }
-          return {
-            output: `error: ${err instanceof Error ? err.message : String(err)}`,
-            isError: true
-          };
-        }
-      }
-    };
-  }
-});
-
-// ../../dist/src/tools/list-dir.js
-async function pathExists(path) {
-  try {
-    await (0, import_promises6.stat)(path);
-    return true;
-  } catch {
-    return false;
-  }
-}
-async function isRepoLike(path) {
-  return await pathExists((0, import_node_path9.join)(path, ".git")) || await pathExists((0, import_node_path9.join)(path, "package.json")) || await pathExists((0, import_node_path9.join)(path, "README.md")) || await pathExists((0, import_node_path9.join)(path, "pyproject.toml"));
-}
-async function collectNameMatches(root, targetName, maxDepth, currentDepth, out) {
-  if (currentDepth > maxDepth || out.size >= 12)
-    return;
-  let entries;
-  try {
-    entries = await (0, import_promises6.readdir)(root);
-  } catch {
-    return;
-  }
-  for (const name of entries) {
-    if (out.size >= 12)
-      return;
-    if (IGNORE.has(name))
-      continue;
-    const full = (0, import_node_path9.join)(root, name);
-    let info;
-    try {
-      info = await (0, import_promises6.stat)(full);
-    } catch {
-      continue;
-    }
-    if (!info.isDirectory())
-      continue;
-    if (name.toLowerCase() === targetName.toLowerCase())
-      out.add(full);
-    await collectNameMatches(full, targetName, maxDepth, currentDepth + 1, out);
-  }
-}
-async function missingPathSuggestions(path) {
-  const targetName = (0, import_node_path9.basename)(path);
-  if (!targetName || targetName === path)
-    return [];
-  const home = (0, import_node_os3.homedir)();
-  const roots = [
-    process.cwd(),
-    (0, import_node_path9.join)(home, "Github"),
-    (0, import_node_path9.join)(home, "OneDrive", "Documents"),
-    (0, import_node_path9.join)(home, "Documents"),
-    (0, import_node_path9.join)(home, "Test")
-  ];
-  const found = /* @__PURE__ */ new Set();
-  for (const root of roots) {
-    if (!await pathExists(root))
-      continue;
-    await collectNameMatches(root, targetName, 4, 0, found);
-    if (found.size >= 12)
-      break;
-  }
-  const candidates = await Promise.all([...found].map(async (candidate) => ({
-    candidate,
-    repoLike: await isRepoLike(candidate)
-  })));
-  return candidates.sort((a, b2) => {
-    if (a.repoLike !== b2.repoLike)
-      return a.repoLike ? -1 : 1;
-    return a.candidate.length - b2.candidate.length;
-  }).slice(0, 6).map((entry) => entry.candidate);
-}
-async function walk(base, maxDepth, currentDepth, out) {
-  if (currentDepth > maxDepth)
-    return;
-  let entries;
-  try {
-    entries = (await (0, import_promises6.readdir)(base)).sort();
-  } catch {
-    return;
-  }
-  for (const name of entries) {
-    if (IGNORE.has(name))
-      continue;
-    const full = (0, import_node_path9.join)(base, name);
-    let info;
-    try {
-      info = await (0, import_promises6.stat)(full);
-    } catch {
-      continue;
-    }
-    out.push({ name, path: full, isDir: info.isDirectory(), depth: currentDepth });
-    if (info.isDirectory()) {
-      await walk(full, maxDepth, currentDepth + 1, out);
-    }
-  }
-}
-function formatTree(entries, rootName) {
-  if (entries.length === 0)
-    return `${rootName}/  (empty)`;
-  const lines = [`${rootName}/`];
-  let fileCount = 0;
-  let dirCount = 0;
-  for (const e of entries) {
-    const indent = "  ".repeat(e.depth);
-    const suffix = e.isDir ? "/" : "";
-    lines.push(`${indent}${e.name}${suffix}`);
-    if (e.isDir)
-      dirCount += 1;
-    else
-      fileCount += 1;
-  }
-  lines.push("");
-  lines.push(`${fileCount} files, ${dirCount} directories`);
-  return lines.join("\n");
-}
-var import_promises6, import_node_os3, import_node_path9, IGNORE, listDirTool;
-var init_list_dir = __esm({
-  "../../dist/src/tools/list-dir.js"() {
-    "use strict";
-    init_scoped_fetch();
-    import_promises6 = require("node:fs/promises");
-    import_node_os3 = require("node:os");
-    import_node_path9 = require("node:path");
-    init_base();
-    IGNORE = /* @__PURE__ */ new Set([
-      ".git",
-      "node_modules",
-      "__pycache__",
-      ".next",
-      "dist",
-      "build",
-      ".cache",
-      ".turbo",
-      ".pytest_cache",
-      ".venv",
-      "venv"
-    ]);
-    listDirTool = {
-      readOnly: true,
-      definition: {
-        name: "list_dir",
-        description: "List files and directories recursively. Skips .git, node_modules, dist, build, and similar caches. Default max_depth is 3.",
-        input_schema: {
-          type: "object",
-          properties: {
-            path: { type: "string" },
-            max_depth: { type: "integer", default: 3 }
-          },
-          required: ["path"],
-          additionalProperties: false
-        }
-      },
-      async execute(input) {
-        const path = (0, import_node_path9.resolve)(requireString(input, "path"));
-        const maxDepth = Math.max(0, optionalNumber(input, "max_depth", 3));
-        try {
-          const info = await (0, import_promises6.stat)(path);
-          if (!info.isDirectory()) {
-            return { output: `error: ${path} is not a directory`, isError: true };
-          }
-        } catch (err) {
-          const suggestions = await missingPathSuggestions(path);
-          const hint = suggestions.length > 0 ? `Path not found: ${path}
-
-Did you mean one of these?
-${suggestions.map((candidate) => `- ${candidate}`).join("\n")}` : "";
-          if (hint) {
-            return {
-              output: hint,
-              isError: false
-            };
-          }
-          return {
-            output: `error: ${err instanceof Error ? err.message : String(err)}`,
-            isError: true
-          };
-        }
-        const entries = [];
-        await walk(path, maxDepth, 0, entries);
-        return { output: formatTree(entries, path), isError: false };
-      }
-    };
-  }
-});
-
-// ../../node_modules/fast-glob/out/utils/array.js
-var require_array = __commonJS({
-  "../../node_modules/fast-glob/out/utils/array.js"(exports2) {
-    "use strict";
-    init_scoped_fetch();
-    Object.defineProperty(exports2, "__esModule", { value: true });
-    exports2.splitWhen = exports2.flatten = void 0;
-    function flatten(items) {
-      return items.reduce((collection, item) => [].concat(collection, item), []);
-    }
-    exports2.flatten = flatten;
-    function splitWhen(items, predicate) {
-      const result = [[]];
-      let groupIndex = 0;
-      for (const item of items) {
-        if (predicate(item)) {
-          groupIndex++;
-          result[groupIndex] = [];
-        } else {
-          result[groupIndex].push(item);
-        }
-      }
-      return result;
-    }
-    exports2.splitWhen = splitWhen;
-  }
-});
-
-// ../../node_modules/fast-glob/out/utils/errno.js
-var require_errno = __commonJS({
-  "../../node_modules/fast-glob/out/utils/errno.js"(exports2) {
-    "use strict";
-    init_scoped_fetch();
-    Object.defineProperty(exports2, "__esModule", { value: true });
-    exports2.isEnoentCodeError = void 0;
-    function isEnoentCodeError(error2) {
-      return error2.code === "ENOENT";
-    }
-    exports2.isEnoentCodeError = isEnoentCodeError;
-  }
-});
-
-// ../../node_modules/fast-glob/out/utils/fs.js
-var require_fs = __commonJS({
-  "../../node_modules/fast-glob/out/utils/fs.js"(exports2) {
-    "use strict";
-    init_scoped_fetch();
-    Object.defineProperty(exports2, "__esModule", { value: true });
-    exports2.createDirentFromStats = void 0;
-    var DirentFromStats = class {
-      constructor(name, stats) {
-        this.name = name;
-        this.isBlockDevice = stats.isBlockDevice.bind(stats);
-        this.isCharacterDevice = stats.isCharacterDevice.bind(stats);
-        this.isDirectory = stats.isDirectory.bind(stats);
-        this.isFIFO = stats.isFIFO.bind(stats);
-        this.isFile = stats.isFile.bind(stats);
-        this.isSocket = stats.isSocket.bind(stats);
-        this.isSymbolicLink = stats.isSymbolicLink.bind(stats);
-      }
-    };
-    function createDirentFromStats(name, stats) {
-      return new DirentFromStats(name, stats);
-    }
-    exports2.createDirentFromStats = createDirentFromStats;
-  }
-});
-
-// ../../node_modules/fast-glob/out/utils/path.js
-var require_path = __commonJS({
-  "../../node_modules/fast-glob/out/utils/path.js"(exports2) {
-    "use strict";
-    init_scoped_fetch();
-    Object.defineProperty(exports2, "__esModule", { value: true });
-    exports2.convertPosixPathToPattern = exports2.convertWindowsPathToPattern = exports2.convertPathToPattern = exports2.escapePosixPath = exports2.escapeWindowsPath = exports2.escape = exports2.removeLeadingDotSegment = exports2.makeAbsolute = exports2.unixify = void 0;
-    var os = require("os");
-    var path = require("path");
-    var IS_WINDOWS_PLATFORM = os.platform() === "win32";
-    var LEADING_DOT_SEGMENT_CHARACTERS_COUNT = 2;
-    var POSIX_UNESCAPED_GLOB_SYMBOLS_RE = /(\\?)([()*?[\]{|}]|^!|[!+@](?=\()|\\(?![!()*+?@[\]{|}]))/g;
-    var WINDOWS_UNESCAPED_GLOB_SYMBOLS_RE = /(\\?)([()[\]{}]|^!|[!+@](?=\())/g;
-    var DOS_DEVICE_PATH_RE = /^\\\\([.?])/;
-    var WINDOWS_BACKSLASHES_RE = /\\(?![!()+@[\]{}])/g;
-    function unixify(filepath) {
-      return filepath.replace(/\\/g, "/");
-    }
-    exports2.unixify = unixify;
-    function makeAbsolute(cwd, filepath) {
-      return path.resolve(cwd, filepath);
-    }
-    exports2.makeAbsolute = makeAbsolute;
-    function removeLeadingDotSegment(entry) {
-      if (entry.charAt(0) === ".") {
-        const secondCharactery = entry.charAt(1);
-        if (secondCharactery === "/" || secondCharactery === "\\") {
-          return entry.slice(LEADING_DOT_SEGMENT_CHARACTERS_COUNT);
-        }
-      }
-      return entry;
-    }
-    exports2.removeLeadingDotSegment = removeLeadingDotSegment;
-    exports2.escape = IS_WINDOWS_PLATFORM ? escapeWindowsPath : escapePosixPath;
-    function escapeWindowsPath(pattern) {
-      return pattern.replace(WINDOWS_UNESCAPED_GLOB_SYMBOLS_RE, "\\$2");
-    }
-    exports2.escapeWindowsPath = escapeWindowsPath;
-    function escapePosixPath(pattern) {
-      return pattern.replace(POSIX_UNESCAPED_GLOB_SYMBOLS_RE, "\\$2");
-    }
-    exports2.escapePosixPath = escapePosixPath;
-    exports2.convertPathToPattern = IS_WINDOWS_PLATFORM ? convertWindowsPathToPattern : convertPosixPathToPattern;
-    function convertWindowsPathToPattern(filepath) {
-      return escapeWindowsPath(filepath).replace(DOS_DEVICE_PATH_RE, "//$1").replace(WINDOWS_BACKSLASHES_RE, "/");
-    }
-    exports2.convertWindowsPathToPattern = convertWindowsPathToPattern;
-    function convertPosixPathToPattern(filepath) {
-      return escapePosixPath(filepath);
-    }
-    exports2.convertPosixPathToPattern = convertPosixPathToPattern;
-  }
-});
-
-// ../../node_modules/is-extglob/index.js
-var require_is_extglob = __commonJS({
-  "../../node_modules/is-extglob/index.js"(exports2, module2) {
-    init_scoped_fetch();
-    module2.exports = function isExtglob(str) {
-      if (typeof str !== "string" || str === "") {
-        return false;
-      }
-      var match;
-      while (match = /(\\).|([@?!+*]\(.*\))/g.exec(str)) {
-        if (match[2]) return true;
-        str = str.slice(match.index + match[0].length);
-      }
-      return false;
-    };
-  }
-});
-
-// ../../node_modules/is-glob/index.js
-var require_is_glob = __commonJS({
-  "../../node_modules/is-glob/index.js"(exports2, module2) {
-    init_scoped_fetch();
-    var isExtglob = require_is_extglob();
-    var chars = { "{": "}", "(": ")", "[": "]" };
-    var strictCheck = function(str) {
-      if (str[0] === "!") {
-        return true;
-      }
-      var index = 0;
-      var pipeIndex = -2;
-      var closeSquareIndex = -2;
-      var closeCurlyIndex = -2;
-      var closeParenIndex = -2;
-      var backSlashIndex = -2;
-      while (index < str.length) {
-        if (str[index] === "*") {
-          return true;
-        }
-        if (str[index + 1] === "?" && /[\].+)]/.test(str[index])) {
-          return true;
-        }
-        if (closeSquareIndex !== -1 && str[index] === "[" && str[index + 1] !== "]") {
-          if (closeSquareIndex < index) {
-            closeSquareIndex = str.indexOf("]", index);
-          }
-          if (closeSquareIndex > index) {
-            if (backSlashIndex === -1 || backSlashIndex > closeSquareIndex) {
-              return true;
-            }
-            backSlashIndex = str.indexOf("\\", index);
-            if (backSlashIndex === -1 || backSlashIndex > closeSquareIndex) {
-              return true;
-            }
-          }
-        }
-        if (closeCurlyIndex !== -1 && str[index] === "{" && str[index + 1] !== "}") {
-          closeCurlyIndex = str.indexOf("}", index);
-          if (closeCurlyIndex > index) {
-            backSlashIndex = str.indexOf("\\", index);
-            if (backSlashIndex === -1 || backSlashIndex > closeCurlyIndex) {
-              return true;
-            }
-          }
-        }
-        if (closeParenIndex !== -1 && str[index] === "(" && str[index + 1] === "?" && /[:!=]/.test(str[index + 2]) && str[index + 3] !== ")") {
-          closeParenIndex = str.indexOf(")", index);
-          if (closeParenIndex > index) {
-            backSlashIndex = str.indexOf("\\", index);
-            if (backSlashIndex === -1 || backSlashIndex > closeParenIndex) {
-              return true;
-            }
-          }
-        }
-        if (pipeIndex !== -1 && str[index] === "(" && str[index + 1] !== "|") {
-          if (pipeIndex < index) {
-            pipeIndex = str.indexOf("|", index);
-          }
-          if (pipeIndex !== -1 && str[pipeIndex + 1] !== ")") {
-            closeParenIndex = str.indexOf(")", pipeIndex);
-            if (closeParenIndex > pipeIndex) {
-              backSlashIndex = str.indexOf("\\", pipeIndex);
-              if (backSlashIndex === -1 || backSlashIndex > closeParenIndex) {
-                return true;
-              }
-            }
-          }
-        }
-        if (str[index] === "\\") {
-          var open = str[index + 1];
-          index += 2;
-          var close = chars[open];
-          if (close) {
-            var n = str.indexOf(close, index);
-            if (n !== -1) {
-              index = n + 1;
-            }
-          }
-          if (str[index] === "!") {
-            return true;
-          }
-        } else {
-          index++;
-        }
-      }
-      return false;
-    };
-    var relaxedCheck = function(str) {
-      if (str[0] === "!") {
-        return true;
-      }
-      var index = 0;
-      while (index < str.length) {
-        if (/[*?{}()[\]]/.test(str[index])) {
-          return true;
-        }
-        if (str[index] === "\\") {
-          var open = str[index + 1];
-          index += 2;
-          var close = chars[open];
-          if (close) {
-            var n = str.indexOf(close, index);
-            if (n !== -1) {
-              index = n + 1;
-            }
-          }
-          if (str[index] === "!") {
-            return true;
-          }
-        } else {
-          index++;
-        }
-      }
-      return false;
-    };
-    module2.exports = function isGlob(str, options) {
-      if (typeof str !== "string" || str === "") {
-        return false;
-      }
-      if (isExtglob(str)) {
-        return true;
-      }
-      var check2 = strictCheck;
-      if (options && options.strict === false) {
-        check2 = relaxedCheck;
-      }
-      return check2(str);
-    };
-  }
-});
-
-// ../../node_modules/glob-parent/index.js
-var require_glob_parent = __commonJS({
-  "../../node_modules/glob-parent/index.js"(exports2, module2) {
-    "use strict";
-    init_scoped_fetch();
-    var isGlob = require_is_glob();
-    var pathPosixDirname = require("path").posix.dirname;
-    var isWin32 = require("os").platform() === "win32";
-    var slash = "/";
-    var backslash = /\\/g;
-    var enclosure = /[\{\[].*[\}\]]$/;
-    var globby = /(^|[^\\])([\{\[]|\([^\)]+$)/;
-    var escaped = /\\([\!\*\?\|\[\]\(\)\{\}])/g;
-    module2.exports = function globParent(str, opts) {
-      var options = Object.assign({ flipBackslashes: true }, opts);
-      if (options.flipBackslashes && isWin32 && str.indexOf(slash) < 0) {
-        str = str.replace(backslash, slash);
-      }
-      if (enclosure.test(str)) {
-        str += slash;
-      }
-      str += "a";
-      do {
-        str = pathPosixDirname(str);
-      } while (isGlob(str) || globby.test(str));
-      return str.replace(escaped, "$1");
-    };
-  }
-});
-
-// ../../node_modules/braces/lib/utils.js
-var require_utils = __commonJS({
-  "../../node_modules/braces/lib/utils.js"(exports2) {
-    "use strict";
-    init_scoped_fetch();
-    exports2.isInteger = (num) => {
-      if (typeof num === "number") {
-        return Number.isInteger(num);
-      }
-      if (typeof num === "string" && num.trim() !== "") {
-        return Number.isInteger(Number(num));
-      }
-      return false;
-    };
-    exports2.find = (node, type) => node.nodes.find((node2) => node2.type === type);
-    exports2.exceedsLimit = (min, max, step = 1, limit) => {
-      if (limit === false) return false;
-      if (!exports2.isInteger(min) || !exports2.isInteger(max)) return false;
-      return (Number(max) - Number(min)) / Number(step) >= limit;
-    };
-    exports2.escapeNode = (block, n = 0, type) => {
-      const node = block.nodes[n];
-      if (!node) return;
-      if (type && node.type === type || node.type === "open" || node.type === "close") {
-        if (node.escaped !== true) {
-          node.value = "\\" + node.value;
-          node.escaped = true;
-        }
-      }
-    };
-    exports2.encloseBrace = (node) => {
-      if (node.type !== "brace") return false;
-      if (node.commas >> 0 + node.ranges >> 0 === 0) {
-        node.invalid = true;
-        return true;
-      }
-      return false;
-    };
-    exports2.isInvalidBrace = (block) => {
-      if (block.type !== "brace") return false;
-      if (block.invalid === true || block.dollar) return true;
-      if (block.commas >> 0 + block.ranges >> 0 === 0) {
-        block.invalid = true;
-        return true;
-      }
-      if (block.open !== true || block.close !== true) {
-        block.invalid = true;
-        return true;
-      }
-      return false;
-    };
-    exports2.isOpenOrClose = (node) => {
-      if (node.type === "open" || node.type === "close") {
-        return true;
-      }
-      return node.open === true || node.close === true;
-    };
-    exports2.reduce = (nodes) => nodes.reduce((acc, node) => {
-      if (node.type === "text") acc.push(node.value);
-      if (node.type === "range") node.type = "text";
-      return acc;
-    }, []);
-    exports2.flatten = (...args) => {
-      const result = [];
-      const flat = (arr) => {
-        for (let i = 0; i < arr.length; i++) {
-          const ele = arr[i];
-          if (Array.isArray(ele)) {
-            flat(ele);
-            continue;
-          }
-          if (ele !== void 0) {
-            result.push(ele);
-          }
-        }
-        return result;
-      };
-      flat(args);
-      return result;
-    };
-  }
-});
-
-// ../../node_modules/braces/lib/stringify.js
-var require_stringify = __commonJS({
-  "../../node_modules/braces/lib/stringify.js"(exports2, module2) {
-    "use strict";
-    init_scoped_fetch();
-    var utils = require_utils();
-    module2.exports = (ast, options = {}) => {
-      const stringify = (node, parent = {}) => {
-        const invalidBlock = options.escapeInvalid && utils.isInvalidBrace(parent);
-        const invalidNode = node.invalid === true && options.escapeInvalid === true;
-        let output = "";
-        if (node.value) {
-          if ((invalidBlock || invalidNode) && utils.isOpenOrClose(node)) {
-            return "\\" + node.value;
-          }
-          return node.value;
-        }
-        if (node.value) {
-          return node.value;
-        }
-        if (node.nodes) {
-          for (const child of node.nodes) {
-            output += stringify(child);
-          }
-        }
-        return output;
-      };
-      return stringify(ast);
-    };
-  }
-});
-
-// ../../node_modules/is-number/index.js
-var require_is_number = __commonJS({
-  "../../node_modules/is-number/index.js"(exports2, module2) {
-    "use strict";
-    init_scoped_fetch();
-    module2.exports = function(num) {
-      if (typeof num === "number") {
-        return num - num === 0;
-      }
-      if (typeof num === "string" && num.trim() !== "") {
-        return Number.isFinite ? Number.isFinite(+num) : isFinite(+num);
-      }
-      return false;
-    };
-  }
-});
-
-// ../../node_modules/to-regex-range/index.js
-var require_to_regex_range = __commonJS({
-  "../../node_modules/to-regex-range/index.js"(exports2, module2) {
-    "use strict";
-    init_scoped_fetch();
-    var isNumber = require_is_number();
-    var toRegexRange = (min, max, options) => {
-      if (isNumber(min) === false) {
-        throw new TypeError("toRegexRange: expected the first argument to be a number");
-      }
-      if (max === void 0 || min === max) {
-        return String(min);
-      }
-      if (isNumber(max) === false) {
-        throw new TypeError("toRegexRange: expected the second argument to be a number.");
-      }
-      let opts = { relaxZeros: true, ...options };
-      if (typeof opts.strictZeros === "boolean") {
-        opts.relaxZeros = opts.strictZeros === false;
-      }
-      let relax = String(opts.relaxZeros);
-      let shorthand = String(opts.shorthand);
-      let capture = String(opts.capture);
-      let wrap = String(opts.wrap);
-      let cacheKey = min + ":" + max + "=" + relax + shorthand + capture + wrap;
-      if (toRegexRange.cache.hasOwnProperty(cacheKey)) {
-        return toRegexRange.cache[cacheKey].result;
-      }
-      let a = Math.min(min, max);
-      let b2 = Math.max(min, max);
-      if (Math.abs(a - b2) === 1) {
-        let result = min + "|" + max;
-        if (opts.capture) {
-          return `(${result})`;
-        }
-        if (opts.wrap === false) {
-          return result;
-        }
-        return `(?:${result})`;
-      }
-      let isPadded = hasPadding(min) || hasPadding(max);
-      let state = { min, max, a, b: b2 };
-      let positives = [];
-      let negatives = [];
-      if (isPadded) {
-        state.isPadded = isPadded;
-        state.maxLen = String(state.max).length;
-      }
-      if (a < 0) {
-        let newMin = b2 < 0 ? Math.abs(b2) : 1;
-        negatives = splitToPatterns(newMin, Math.abs(a), state, opts);
-        a = state.a = 0;
-      }
-      if (b2 >= 0) {
-        positives = splitToPatterns(a, b2, state, opts);
-      }
-      state.negatives = negatives;
-      state.positives = positives;
-      state.result = collatePatterns(negatives, positives, opts);
-      if (opts.capture === true) {
-        state.result = `(${state.result})`;
-      } else if (opts.wrap !== false && positives.length + negatives.length > 1) {
-        state.result = `(?:${state.result})`;
-      }
-      toRegexRange.cache[cacheKey] = state;
-      return state.result;
-    };
-    function collatePatterns(neg, pos, options) {
-      let onlyNegative = filterPatterns(neg, pos, "-", false, options) || [];
-      let onlyPositive = filterPatterns(pos, neg, "", false, options) || [];
-      let intersected = filterPatterns(neg, pos, "-?", true, options) || [];
-      let subpatterns = onlyNegative.concat(intersected).concat(onlyPositive);
-      return subpatterns.join("|");
-    }
-    function splitToRanges(min, max) {
-      let nines = 1;
-      let zeros = 1;
-      let stop = countNines(min, nines);
-      let stops = /* @__PURE__ */ new Set([max]);
-      while (min <= stop && stop <= max) {
-        stops.add(stop);
-        nines += 1;
-        stop = countNines(min, nines);
-      }
-      stop = countZeros(max + 1, zeros) - 1;
-      while (min < stop && stop <= max) {
-        stops.add(stop);
-        zeros += 1;
-        stop = countZeros(max + 1, zeros) - 1;
-      }
-      stops = [...stops];
-      stops.sort(compare);
-      return stops;
-    }
-    function rangeToPattern(start, stop, options) {
-      if (start === stop) {
-        return { pattern: start, count: [], digits: 0 };
-      }
-      let zipped = zip(start, stop);
-      let digits = zipped.length;
-      let pattern = "";
-      let count = 0;
-      for (let i = 0; i < digits; i++) {
-        let [startDigit, stopDigit] = zipped[i];
-        if (startDigit === stopDigit) {
-          pattern += startDigit;
-        } else if (startDigit !== "0" || stopDigit !== "9") {
-          pattern += toCharacterClass(startDigit, stopDigit, options);
-        } else {
-          count++;
-        }
-      }
-      if (count) {
-        pattern += options.shorthand === true ? "\\d" : "[0-9]";
-      }
-      return { pattern, count: [count], digits };
-    }
-    function splitToPatterns(min, max, tok, options) {
-      let ranges = splitToRanges(min, max);
-      let tokens = [];
-      let start = min;
-      let prev;
-      for (let i = 0; i < ranges.length; i++) {
-        let max2 = ranges[i];
-        let obj = rangeToPattern(String(start), String(max2), options);
-        let zeros = "";
-        if (!tok.isPadded && prev && prev.pattern === obj.pattern) {
-          if (prev.count.length > 1) {
-            prev.count.pop();
-          }
-          prev.count.push(obj.count[0]);
-          prev.string = prev.pattern + toQuantifier(prev.count);
-          start = max2 + 1;
-          continue;
-        }
-        if (tok.isPadded) {
-          zeros = padZeros(max2, tok, options);
-        }
-        obj.string = zeros + obj.pattern + toQuantifier(obj.count);
-        tokens.push(obj);
-        start = max2 + 1;
-        prev = obj;
-      }
-      return tokens;
-    }
-    function filterPatterns(arr, comparison, prefix, intersection2, options) {
-      let result = [];
-      for (let ele of arr) {
-        let { string: string3 } = ele;
-        if (!intersection2 && !contains(comparison, "string", string3)) {
-          result.push(prefix + string3);
-        }
-        if (intersection2 && contains(comparison, "string", string3)) {
-          result.push(prefix + string3);
-        }
-      }
-      return result;
-    }
-    function zip(a, b2) {
-      let arr = [];
-      for (let i = 0; i < a.length; i++) arr.push([a[i], b2[i]]);
-      return arr;
-    }
-    function compare(a, b2) {
-      return a > b2 ? 1 : b2 > a ? -1 : 0;
-    }
-    function contains(arr, key, val) {
-      return arr.some((ele) => ele[key] === val);
-    }
-    function countNines(min, len) {
-      return Number(String(min).slice(0, -len) + "9".repeat(len));
-    }
-    function countZeros(integer2, zeros) {
-      return integer2 - integer2 % Math.pow(10, zeros);
-    }
-    function toQuantifier(digits) {
-      let [start = 0, stop = ""] = digits;
-      if (stop || start > 1) {
-        return `{${start + (stop ? "," + stop : "")}}`;
-      }
-      return "";
-    }
-    function toCharacterClass(a, b2, options) {
-      return `[${a}${b2 - a === 1 ? "" : "-"}${b2}]`;
-    }
-    function hasPadding(str) {
-      return /^-?(0+)\d/.test(str);
-    }
-    function padZeros(value, tok, options) {
-      if (!tok.isPadded) {
-        return value;
-      }
-      let diff = Math.abs(tok.maxLen - String(value).length);
-      let relax = options.relaxZeros !== false;
-      switch (diff) {
-        case 0:
-          return "";
-        case 1:
-          return relax ? "0?" : "0";
-        case 2:
-          return relax ? "0{0,2}" : "00";
-        default: {
-          return relax ? `0{0,${diff}}` : `0{${diff}}`;
-        }
-      }
-    }
-    toRegexRange.cache = {};
-    toRegexRange.clearCache = () => toRegexRange.cache = {};
-    module2.exports = toRegexRange;
-  }
-});
-
-// ../../node_modules/fill-range/index.js
-var require_fill_range = __commonJS({
-  "../../node_modules/fill-range/index.js"(exports2, module2) {
-    "use strict";
-    init_scoped_fetch();
-    var util = require("util");
-    var toRegexRange = require_to_regex_range();
-    var isObject7 = (val) => val !== null && typeof val === "object" && !Array.isArray(val);
-    var transform2 = (toNumber) => {
-      return (value) => toNumber === true ? Number(value) : String(value);
-    };
-    var isValidValue = (value) => {
-      return typeof value === "number" || typeof value === "string" && value !== "";
-    };
-    var isNumber = (num) => Number.isInteger(+num);
-    var zeros = (input) => {
-      let value = `${input}`;
-      let index = -1;
-      if (value[0] === "-") value = value.slice(1);
-      if (value === "0") return false;
-      while (value[++index] === "0") ;
-      return index > 0;
-    };
-    var stringify = (start, end, options) => {
-      if (typeof start === "string" || typeof end === "string") {
-        return true;
-      }
-      return options.stringify === true;
-    };
-    var pad = (input, maxLength, toNumber) => {
-      if (maxLength > 0) {
-        let dash = input[0] === "-" ? "-" : "";
-        if (dash) input = input.slice(1);
-        input = dash + input.padStart(dash ? maxLength - 1 : maxLength, "0");
-      }
-      if (toNumber === false) {
-        return String(input);
-      }
-      return input;
-    };
-    var toMaxLen = (input, maxLength) => {
-      let negative = input[0] === "-" ? "-" : "";
-      if (negative) {
-        input = input.slice(1);
-        maxLength--;
-      }
-      while (input.length < maxLength) input = "0" + input;
-      return negative ? "-" + input : input;
-    };
-    var toSequence = (parts, options, maxLen) => {
-      parts.negatives.sort((a, b2) => a < b2 ? -1 : a > b2 ? 1 : 0);
-      parts.positives.sort((a, b2) => a < b2 ? -1 : a > b2 ? 1 : 0);
-      let prefix = options.capture ? "" : "?:";
-      let positives = "";
-      let negatives = "";
-      let result;
-      if (parts.positives.length) {
-        positives = parts.positives.map((v2) => toMaxLen(String(v2), maxLen)).join("|");
-      }
-      if (parts.negatives.length) {
-        negatives = `-(${prefix}${parts.negatives.map((v2) => toMaxLen(String(v2), maxLen)).join("|")})`;
-      }
-      if (positives && negatives) {
-        result = `${positives}|${negatives}`;
-      } else {
-        result = positives || negatives;
-      }
-      if (options.wrap) {
-        return `(${prefix}${result})`;
-      }
-      return result;
-    };
-    var toRange = (a, b2, isNumbers, options) => {
-      if (isNumbers) {
-        return toRegexRange(a, b2, { wrap: false, ...options });
-      }
-      let start = String.fromCharCode(a);
-      if (a === b2) return start;
-      let stop = String.fromCharCode(b2);
-      return `[${start}-${stop}]`;
-    };
-    var toRegex = (start, end, options) => {
-      if (Array.isArray(start)) {
-        let wrap = options.wrap === true;
-        let prefix = options.capture ? "" : "?:";
-        return wrap ? `(${prefix}${start.join("|")})` : start.join("|");
-      }
-      return toRegexRange(start, end, options);
-    };
-    var rangeError = (...args) => {
-      return new RangeError("Invalid range arguments: " + util.inspect(...args));
-    };
-    var invalidRange = (start, end, options) => {
-      if (options.strictRanges === true) throw rangeError([start, end]);
-      return [];
-    };
-    var invalidStep = (step, options) => {
-      if (options.strictRanges === true) {
-        throw new TypeError(`Expected step "${step}" to be a number`);
-      }
-      return [];
-    };
-    var fillNumbers = (start, end, step = 1, options = {}) => {
-      let a = Number(start);
-      let b2 = Number(end);
-      if (!Number.isInteger(a) || !Number.isInteger(b2)) {
-        if (options.strictRanges === true) throw rangeError([start, end]);
-        return [];
-      }
-      if (a === 0) a = 0;
-      if (b2 === 0) b2 = 0;
-      let descending = a > b2;
-      let startString = String(start);
-      let endString = String(end);
-      let stepString = String(step);
-      step = Math.max(Math.abs(step), 1);
-      let padded = zeros(startString) || zeros(endString) || zeros(stepString);
-      let maxLen = padded ? Math.max(startString.length, endString.length, stepString.length) : 0;
-      let toNumber = padded === false && stringify(start, end, options) === false;
-      let format = options.transform || transform2(toNumber);
-      if (options.toRegex && step === 1) {
-        return toRange(toMaxLen(start, maxLen), toMaxLen(end, maxLen), true, options);
-      }
-      let parts = { negatives: [], positives: [] };
-      let push = (num) => parts[num < 0 ? "negatives" : "positives"].push(Math.abs(num));
-      let range = [];
-      let index = 0;
-      while (descending ? a >= b2 : a <= b2) {
-        if (options.toRegex === true && step > 1) {
-          push(a);
-        } else {
-          range.push(pad(format(a, index), maxLen, toNumber));
-        }
-        a = descending ? a - step : a + step;
-        index++;
-      }
-      if (options.toRegex === true) {
-        return step > 1 ? toSequence(parts, options, maxLen) : toRegex(range, null, { wrap: false, ...options });
-      }
-      return range;
-    };
-    var fillLetters = (start, end, step = 1, options = {}) => {
-      if (!isNumber(start) && start.length > 1 || !isNumber(end) && end.length > 1) {
-        return invalidRange(start, end, options);
-      }
-      let format = options.transform || ((val) => String.fromCharCode(val));
-      let a = `${start}`.charCodeAt(0);
-      let b2 = `${end}`.charCodeAt(0);
-      let descending = a > b2;
-      let min = Math.min(a, b2);
-      let max = Math.max(a, b2);
-      if (options.toRegex && step === 1) {
-        return toRange(min, max, false, options);
-      }
-      let range = [];
-      let index = 0;
-      while (descending ? a >= b2 : a <= b2) {
-        range.push(format(a, index));
-        a = descending ? a - step : a + step;
-        index++;
-      }
-      if (options.toRegex === true) {
-        return toRegex(range, null, { wrap: false, options });
-      }
-      return range;
-    };
-    var fill = (start, end, step, options = {}) => {
-      if (end == null && isValidValue(start)) {
-        return [start];
-      }
-      if (!isValidValue(start) || !isValidValue(end)) {
-        return invalidRange(start, end, options);
-      }
-      if (typeof step === "function") {
-        return fill(start, end, 1, { transform: step });
-      }
-      if (isObject7(step)) {
-        return fill(start, end, 0, step);
-      }
-      let opts = { ...options };
-      if (opts.capture === true) opts.wrap = true;
-      step = step || opts.step || 1;
-      if (!isNumber(step)) {
-        if (step != null && !isObject7(step)) return invalidStep(step, opts);
-        return fill(start, end, 1, step);
-      }
-      if (isNumber(start) && isNumber(end)) {
-        return fillNumbers(start, end, step, opts);
-      }
-      return fillLetters(start, end, Math.max(Math.abs(step), 1), opts);
-    };
-    module2.exports = fill;
-  }
-});
-
-// ../../node_modules/braces/lib/compile.js
-var require_compile = __commonJS({
-  "../../node_modules/braces/lib/compile.js"(exports2, module2) {
-    "use strict";
-    init_scoped_fetch();
-    var fill = require_fill_range();
-    var utils = require_utils();
-    var compile = (ast, options = {}) => {
-      const walk2 = (node, parent = {}) => {
-        const invalidBlock = utils.isInvalidBrace(parent);
-        const invalidNode = node.invalid === true && options.escapeInvalid === true;
-        const invalid = invalidBlock === true || invalidNode === true;
-        const prefix = options.escapeInvalid === true ? "\\" : "";
-        let output = "";
-        if (node.isOpen === true) {
-          return prefix + node.value;
-        }
-        if (node.isClose === true) {
-          console.log("node.isClose", prefix, node.value);
-          return prefix + node.value;
-        }
-        if (node.type === "open") {
-          return invalid ? prefix + node.value : "(";
-        }
-        if (node.type === "close") {
-          return invalid ? prefix + node.value : ")";
-        }
-        if (node.type === "comma") {
-          return node.prev.type === "comma" ? "" : invalid ? node.value : "|";
-        }
-        if (node.value) {
-          return node.value;
-        }
-        if (node.nodes && node.ranges > 0) {
-          const args = utils.reduce(node.nodes);
-          const range = fill(...args, { ...options, wrap: false, toRegex: true, strictZeros: true });
-          if (range.length !== 0) {
-            return args.length > 1 && range.length > 1 ? `(${range})` : range;
-          }
-        }
-        if (node.nodes) {
-          for (const child of node.nodes) {
-            output += walk2(child, node);
-          }
-        }
-        return output;
-      };
-      return walk2(ast);
-    };
-    module2.exports = compile;
-  }
-});
-
-// ../../node_modules/braces/lib/expand.js
-var require_expand = __commonJS({
-  "../../node_modules/braces/lib/expand.js"(exports2, module2) {
-    "use strict";
-    init_scoped_fetch();
-    var fill = require_fill_range();
-    var stringify = require_stringify();
-    var utils = require_utils();
-    var append = (queue = "", stash = "", enclose = false) => {
-      const result = [];
-      queue = [].concat(queue);
-      stash = [].concat(stash);
-      if (!stash.length) return queue;
-      if (!queue.length) {
-        return enclose ? utils.flatten(stash).map((ele) => `{${ele}}`) : stash;
-      }
-      for (const item of queue) {
-        if (Array.isArray(item)) {
-          for (const value of item) {
-            result.push(append(value, stash, enclose));
-          }
-        } else {
-          for (let ele of stash) {
-            if (enclose === true && typeof ele === "string") ele = `{${ele}}`;
-            result.push(Array.isArray(ele) ? append(item, ele, enclose) : item + ele);
-          }
-        }
-      }
-      return utils.flatten(result);
-    };
-    var expand = (ast, options = {}) => {
-      const rangeLimit = options.rangeLimit === void 0 ? 1e3 : options.rangeLimit;
-      const walk2 = (node, parent = {}) => {
-        node.queue = [];
-        let p = parent;
-        let q2 = parent.queue;
-        while (p.type !== "brace" && p.type !== "root" && p.parent) {
-          p = p.parent;
-          q2 = p.queue;
-        }
-        if (node.invalid || node.dollar) {
-          q2.push(append(q2.pop(), stringify(node, options)));
-          return;
-        }
-        if (node.type === "brace" && node.invalid !== true && node.nodes.length === 2) {
-          q2.push(append(q2.pop(), ["{}"]));
-          return;
-        }
-        if (node.nodes && node.ranges > 0) {
-          const args = utils.reduce(node.nodes);
-          if (utils.exceedsLimit(...args, options.step, rangeLimit)) {
-            throw new RangeError("expanded array length exceeds range limit. Use options.rangeLimit to increase or disable the limit.");
-          }
-          let range = fill(...args, options);
-          if (range.length === 0) {
-            range = stringify(node, options);
-          }
-          q2.push(append(q2.pop(), range));
-          node.nodes = [];
-          return;
-        }
-        const enclose = utils.encloseBrace(node);
-        let queue = node.queue;
-        let block = node;
-        while (block.type !== "brace" && block.type !== "root" && block.parent) {
-          block = block.parent;
-          queue = block.queue;
-        }
-        for (let i = 0; i < node.nodes.length; i++) {
-          const child = node.nodes[i];
-          if (child.type === "comma" && node.type === "brace") {
-            if (i === 1) queue.push("");
-            queue.push("");
-            continue;
-          }
-          if (child.type === "close") {
-            q2.push(append(q2.pop(), queue, enclose));
-            continue;
-          }
-          if (child.value && child.type !== "open") {
-            queue.push(append(queue.pop(), child.value));
-            continue;
-          }
-          if (child.nodes) {
-            walk2(child, node);
-          }
-        }
-        return queue;
-      };
-      return utils.flatten(walk2(ast));
-    };
-    module2.exports = expand;
-  }
-});
-
-// ../../node_modules/braces/lib/constants.js
-var require_constants = __commonJS({
-  "../../node_modules/braces/lib/constants.js"(exports2, module2) {
-    "use strict";
-    init_scoped_fetch();
-    module2.exports = {
-      MAX_LENGTH: 1e4,
-      // Digits
-      CHAR_0: "0",
-      /* 0 */
-      CHAR_9: "9",
-      /* 9 */
-      // Alphabet chars.
-      CHAR_UPPERCASE_A: "A",
-      /* A */
-      CHAR_LOWERCASE_A: "a",
-      /* a */
-      CHAR_UPPERCASE_Z: "Z",
-      /* Z */
-      CHAR_LOWERCASE_Z: "z",
-      /* z */
-      CHAR_LEFT_PARENTHESES: "(",
-      /* ( */
-      CHAR_RIGHT_PARENTHESES: ")",
-      /* ) */
-      CHAR_ASTERISK: "*",
-      /* * */
-      // Non-alphabetic chars.
-      CHAR_AMPERSAND: "&",
-      /* & */
-      CHAR_AT: "@",
-      /* @ */
-      CHAR_BACKSLASH: "\\",
-      /* \ */
-      CHAR_BACKTICK: "`",
-      /* ` */
-      CHAR_CARRIAGE_RETURN: "\r",
-      /* \r */
-      CHAR_CIRCUMFLEX_ACCENT: "^",
-      /* ^ */
-      CHAR_COLON: ":",
-      /* : */
-      CHAR_COMMA: ",",
-      /* , */
-      CHAR_DOLLAR: "$",
-      /* . */
-      CHAR_DOT: ".",
-      /* . */
-      CHAR_DOUBLE_QUOTE: '"',
-      /* " */
-      CHAR_EQUAL: "=",
-      /* = */
-      CHAR_EXCLAMATION_MARK: "!",
-      /* ! */
-      CHAR_FORM_FEED: "\f",
-      /* \f */
-      CHAR_FORWARD_SLASH: "/",
-      /* / */
-      CHAR_HASH: "#",
-      /* # */
-      CHAR_HYPHEN_MINUS: "-",
-      /* - */
-      CHAR_LEFT_ANGLE_BRACKET: "<",
-      /* < */
-      CHAR_LEFT_CURLY_BRACE: "{",
-      /* { */
-      CHAR_LEFT_SQUARE_BRACKET: "[",
-      /* [ */
-      CHAR_LINE_FEED: "\n",
-      /* \n */
-      CHAR_NO_BREAK_SPACE: "\xA0",
-      /* \u00A0 */
-      CHAR_PERCENT: "%",
-      /* % */
-      CHAR_PLUS: "+",
-      /* + */
-      CHAR_QUESTION_MARK: "?",
-      /* ? */
-      CHAR_RIGHT_ANGLE_BRACKET: ">",
-      /* > */
-      CHAR_RIGHT_CURLY_BRACE: "}",
-      /* } */
-      CHAR_RIGHT_SQUARE_BRACKET: "]",
-      /* ] */
-      CHAR_SEMICOLON: ";",
-      /* ; */
-      CHAR_SINGLE_QUOTE: "'",
-      /* ' */
-      CHAR_SPACE: " ",
-      /*   */
-      CHAR_TAB: "	",
-      /* \t */
-      CHAR_UNDERSCORE: "_",
-      /* _ */
-      CHAR_VERTICAL_LINE: "|",
-      /* | */
-      CHAR_ZERO_WIDTH_NOBREAK_SPACE: "\uFEFF"
-      /* \uFEFF */
-    };
-  }
-});
-
-// ../../node_modules/braces/lib/parse.js
-var require_parse = __commonJS({
-  "../../node_modules/braces/lib/parse.js"(exports2, module2) {
-    "use strict";
-    init_scoped_fetch();
-    var stringify = require_stringify();
-    var {
-      MAX_LENGTH,
-      CHAR_BACKSLASH,
-      /* \ */
-      CHAR_BACKTICK,
-      /* ` */
-      CHAR_COMMA,
-      /* , */
-      CHAR_DOT,
-      /* . */
-      CHAR_LEFT_PARENTHESES,
-      /* ( */
-      CHAR_RIGHT_PARENTHESES,
-      /* ) */
-      CHAR_LEFT_CURLY_BRACE,
-      /* { */
-      CHAR_RIGHT_CURLY_BRACE,
-      /* } */
-      CHAR_LEFT_SQUARE_BRACKET,
-      /* [ */
-      CHAR_RIGHT_SQUARE_BRACKET,
-      /* ] */
-      CHAR_DOUBLE_QUOTE,
-      /* " */
-      CHAR_SINGLE_QUOTE,
-      /* ' */
-      CHAR_NO_BREAK_SPACE,
-      CHAR_ZERO_WIDTH_NOBREAK_SPACE
-    } = require_constants();
-    var parse4 = (input, options = {}) => {
-      if (typeof input !== "string") {
-        throw new TypeError("Expected a string");
-      }
-      const opts = options || {};
-      const max = typeof opts.maxLength === "number" ? Math.min(MAX_LENGTH, opts.maxLength) : MAX_LENGTH;
-      if (input.length > max) {
-        throw new SyntaxError(`Input length (${input.length}), exceeds max characters (${max})`);
-      }
-      const ast = { type: "root", input, nodes: [] };
-      const stack = [ast];
-      let block = ast;
-      let prev = ast;
-      let brackets = 0;
-      const length = input.length;
-      let index = 0;
-      let depth = 0;
-      let value;
-      const advance = () => input[index++];
-      const push = (node) => {
-        if (node.type === "text" && prev.type === "dot") {
-          prev.type = "text";
-        }
-        if (prev && prev.type === "text" && node.type === "text") {
-          prev.value += node.value;
-          return;
-        }
-        block.nodes.push(node);
-        node.parent = block;
-        node.prev = prev;
-        prev = node;
-        return node;
-      };
-      push({ type: "bos" });
-      while (index < length) {
-        block = stack[stack.length - 1];
-        value = advance();
-        if (value === CHAR_ZERO_WIDTH_NOBREAK_SPACE || value === CHAR_NO_BREAK_SPACE) {
-          continue;
-        }
-        if (value === CHAR_BACKSLASH) {
-          push({ type: "text", value: (options.keepEscaping ? value : "") + advance() });
-          continue;
-        }
-        if (value === CHAR_RIGHT_SQUARE_BRACKET) {
-          push({ type: "text", value: "\\" + value });
-          continue;
-        }
-        if (value === CHAR_LEFT_SQUARE_BRACKET) {
-          brackets++;
-          let next;
-          while (index < length && (next = advance())) {
-            value += next;
-            if (next === CHAR_LEFT_SQUARE_BRACKET) {
-              brackets++;
-              continue;
-            }
-            if (next === CHAR_BACKSLASH) {
-              value += advance();
-              continue;
-            }
-            if (next === CHAR_RIGHT_SQUARE_BRACKET) {
-              brackets--;
-              if (brackets === 0) {
-                break;
-              }
-            }
-          }
-          push({ type: "text", value });
-          continue;
-        }
-        if (value === CHAR_LEFT_PARENTHESES) {
-          block = push({ type: "paren", nodes: [] });
-          stack.push(block);
-          push({ type: "text", value });
-          continue;
-        }
-        if (value === CHAR_RIGHT_PARENTHESES) {
-          if (block.type !== "paren") {
-            push({ type: "text", value });
-            continue;
-          }
-          block = stack.pop();
-          push({ type: "text", value });
-          block = stack[stack.length - 1];
-          continue;
-        }
-        if (value === CHAR_DOUBLE_QUOTE || value === CHAR_SINGLE_QUOTE || value === CHAR_BACKTICK) {
-          const open = value;
-          let next;
-          if (options.keepQuotes !== true) {
-            value = "";
-          }
-          while (index < length && (next = advance())) {
-            if (next === CHAR_BACKSLASH) {
-              value += next + advance();
-              continue;
-            }
-            if (next === open) {
-              if (options.keepQuotes === true) value += next;
-              break;
-            }
-            value += next;
-          }
-          push({ type: "text", value });
-          continue;
-        }
-        if (value === CHAR_LEFT_CURLY_BRACE) {
-          depth++;
-          const dollar = prev.value && prev.value.slice(-1) === "$" || block.dollar === true;
-          const brace = {
-            type: "brace",
-            open: true,
-            close: false,
-            dollar,
-            depth,
-            commas: 0,
-            ranges: 0,
-            nodes: []
-          };
-          block = push(brace);
-          stack.push(block);
-          push({ type: "open", value });
-          continue;
-        }
-        if (value === CHAR_RIGHT_CURLY_BRACE) {
-          if (block.type !== "brace") {
-            push({ type: "text", value });
-            continue;
-          }
-          const type = "close";
-          block = stack.pop();
-          block.close = true;
-          push({ type, value });
-          depth--;
-          block = stack[stack.length - 1];
-          continue;
-        }
-        if (value === CHAR_COMMA && depth > 0) {
-          if (block.ranges > 0) {
-            block.ranges = 0;
-            const open = block.nodes.shift();
-            block.nodes = [open, { type: "text", value: stringify(block) }];
-          }
-          push({ type: "comma", value });
-          block.commas++;
-          continue;
-        }
-        if (value === CHAR_DOT && depth > 0 && block.commas === 0) {
-          const siblings = block.nodes;
-          if (depth === 0 || siblings.length === 0) {
-            push({ type: "text", value });
-            continue;
-          }
-          if (prev.type === "dot") {
-            block.range = [];
-            prev.value += value;
-            prev.type = "range";
-            if (block.nodes.length !== 3 && block.nodes.length !== 5) {
-              block.invalid = true;
-              block.ranges = 0;
-              prev.type = "text";
-              continue;
-            }
-            block.ranges++;
-            block.args = [];
-            continue;
-          }
-          if (prev.type === "range") {
-            siblings.pop();
-            const before = siblings[siblings.length - 1];
-            before.value += prev.value + value;
-            prev = before;
-            block.ranges--;
-            continue;
-          }
-          push({ type: "dot", value });
-          continue;
-        }
-        push({ type: "text", value });
-      }
-      do {
-        block = stack.pop();
-        if (block.type !== "root") {
-          block.nodes.forEach((node) => {
-            if (!node.nodes) {
-              if (node.type === "open") node.isOpen = true;
-              if (node.type === "close") node.isClose = true;
-              if (!node.nodes) node.type = "text";
-              node.invalid = true;
-            }
-          });
-          const parent = stack[stack.length - 1];
-          const index2 = parent.nodes.indexOf(block);
-          parent.nodes.splice(index2, 1, ...block.nodes);
-        }
-      } while (stack.length > 0);
-      push({ type: "eos" });
-      return ast;
-    };
-    module2.exports = parse4;
-  }
-});
-
-// ../../node_modules/braces/index.js
-var require_braces = __commonJS({
-  "../../node_modules/braces/index.js"(exports2, module2) {
-    "use strict";
-    init_scoped_fetch();
-    var stringify = require_stringify();
-    var compile = require_compile();
-    var expand = require_expand();
-    var parse4 = require_parse();
-    var braces = (input, options = {}) => {
-      let output = [];
-      if (Array.isArray(input)) {
-        for (const pattern of input) {
-          const result = braces.create(pattern, options);
-          if (Array.isArray(result)) {
-            output.push(...result);
-          } else {
-            output.push(result);
-          }
-        }
-      } else {
-        output = [].concat(braces.create(input, options));
-      }
-      if (options && options.expand === true && options.nodupes === true) {
-        output = [...new Set(output)];
-      }
-      return output;
-    };
-    braces.parse = (input, options = {}) => parse4(input, options);
-    braces.stringify = (input, options = {}) => {
-      if (typeof input === "string") {
-        return stringify(braces.parse(input, options), options);
-      }
-      return stringify(input, options);
-    };
-    braces.compile = (input, options = {}) => {
-      if (typeof input === "string") {
-        input = braces.parse(input, options);
-      }
-      return compile(input, options);
-    };
-    braces.expand = (input, options = {}) => {
-      if (typeof input === "string") {
-        input = braces.parse(input, options);
-      }
-      let result = expand(input, options);
-      if (options.noempty === true) {
-        result = result.filter(Boolean);
-      }
-      if (options.nodupes === true) {
-        result = [...new Set(result)];
-      }
-      return result;
-    };
-    braces.create = (input, options = {}) => {
-      if (input === "" || input.length < 3) {
-        return [input];
-      }
-      return options.expand !== true ? braces.compile(input, options) : braces.expand(input, options);
-    };
-    module2.exports = braces;
-  }
-});
-
-// ../../node_modules/picomatch/lib/constants.js
-var require_constants2 = __commonJS({
-  "../../node_modules/picomatch/lib/constants.js"(exports2, module2) {
-    "use strict";
-    init_scoped_fetch();
-    var path = require("path");
-    var WIN_SLASH = "\\\\/";
-    var WIN_NO_SLASH = `[^${WIN_SLASH}]`;
-    var DEFAULT_MAX_EXTGLOB_RECURSION = 0;
-    var DOT_LITERAL = "\\.";
-    var PLUS_LITERAL = "\\+";
-    var QMARK_LITERAL = "\\?";
-    var SLASH_LITERAL = "\\/";
-    var ONE_CHAR = "(?=.)";
-    var QMARK = "[^/]";
-    var END_ANCHOR = `(?:${SLASH_LITERAL}|$)`;
-    var START_ANCHOR = `(?:^|${SLASH_LITERAL})`;
-    var DOTS_SLASH = `${DOT_LITERAL}{1,2}${END_ANCHOR}`;
-    var NO_DOT = `(?!${DOT_LITERAL})`;
-    var NO_DOTS = `(?!${START_ANCHOR}${DOTS_SLASH})`;
-    var NO_DOT_SLASH = `(?!${DOT_LITERAL}{0,1}${END_ANCHOR})`;
-    var NO_DOTS_SLASH = `(?!${DOTS_SLASH})`;
-    var QMARK_NO_DOT = `[^.${SLASH_LITERAL}]`;
-    var STAR = `${QMARK}*?`;
-    var POSIX_CHARS = {
-      DOT_LITERAL,
-      PLUS_LITERAL,
-      QMARK_LITERAL,
-      SLASH_LITERAL,
-      ONE_CHAR,
-      QMARK,
-      END_ANCHOR,
-      DOTS_SLASH,
-      NO_DOT,
-      NO_DOTS,
-      NO_DOT_SLASH,
-      NO_DOTS_SLASH,
-      QMARK_NO_DOT,
-      STAR,
-      START_ANCHOR
-    };
-    var WINDOWS_CHARS = {
-      ...POSIX_CHARS,
-      SLASH_LITERAL: `[${WIN_SLASH}]`,
-      QMARK: WIN_NO_SLASH,
-      STAR: `${WIN_NO_SLASH}*?`,
-      DOTS_SLASH: `${DOT_LITERAL}{1,2}(?:[${WIN_SLASH}]|$)`,
-      NO_DOT: `(?!${DOT_LITERAL})`,
-      NO_DOTS: `(?!(?:^|[${WIN_SLASH}])${DOT_LITERAL}{1,2}(?:[${WIN_SLASH}]|$))`,
-      NO_DOT_SLASH: `(?!${DOT_LITERAL}{0,1}(?:[${WIN_SLASH}]|$))`,
-      NO_DOTS_SLASH: `(?!${DOT_LITERAL}{1,2}(?:[${WIN_SLASH}]|$))`,
-      QMARK_NO_DOT: `[^.${WIN_SLASH}]`,
-      START_ANCHOR: `(?:^|[${WIN_SLASH}])`,
-      END_ANCHOR: `(?:[${WIN_SLASH}]|$)`
-    };
-    var POSIX_REGEX_SOURCE = {
-      __proto__: null,
-      alnum: "a-zA-Z0-9",
-      alpha: "a-zA-Z",
-      ascii: "\\x00-\\x7F",
-      blank: " \\t",
-      cntrl: "\\x00-\\x1F\\x7F",
-      digit: "0-9",
-      graph: "\\x21-\\x7E",
-      lower: "a-z",
-      print: "\\x20-\\x7E ",
-      punct: "\\-!\"#$%&'()\\*+,./:;<=>?@[\\]^_`{|}~",
-      space: " \\t\\r\\n\\v\\f",
-      upper: "A-Z",
-      word: "A-Za-z0-9_",
-      xdigit: "A-Fa-f0-9"
-    };
-    module2.exports = {
-      DEFAULT_MAX_EXTGLOB_RECURSION,
-      MAX_LENGTH: 1024 * 64,
-      POSIX_REGEX_SOURCE,
-      // regular expressions
-      REGEX_BACKSLASH: /\\(?![*+?^${}(|)[\]])/g,
-      REGEX_NON_SPECIAL_CHARS: /^[^@![\].,$*+?^{}()|\\/]+/,
-      REGEX_SPECIAL_CHARS: /[-*+?.^${}(|)[\]]/,
-      REGEX_SPECIAL_CHARS_BACKREF: /(\\?)((\W)(\3*))/g,
-      REGEX_SPECIAL_CHARS_GLOBAL: /([-*+?.^${}(|)[\]])/g,
-      REGEX_REMOVE_BACKSLASH: /(?:\[.*?[^\\]\]|\\(?=.))/g,
-      // Replace globs with equivalent patterns to reduce parsing time.
-      REPLACEMENTS: {
-        __proto__: null,
-        "***": "*",
-        "**/**": "**",
-        "**/**/**": "**"
-      },
-      // Digits
-      CHAR_0: 48,
-      /* 0 */
-      CHAR_9: 57,
-      /* 9 */
-      // Alphabet chars.
-      CHAR_UPPERCASE_A: 65,
-      /* A */
-      CHAR_LOWERCASE_A: 97,
-      /* a */
-      CHAR_UPPERCASE_Z: 90,
-      /* Z */
-      CHAR_LOWERCASE_Z: 122,
-      /* z */
-      CHAR_LEFT_PARENTHESES: 40,
-      /* ( */
-      CHAR_RIGHT_PARENTHESES: 41,
-      /* ) */
-      CHAR_ASTERISK: 42,
-      /* * */
-      // Non-alphabetic chars.
-      CHAR_AMPERSAND: 38,
-      /* & */
-      CHAR_AT: 64,
-      /* @ */
-      CHAR_BACKWARD_SLASH: 92,
-      /* \ */
-      CHAR_CARRIAGE_RETURN: 13,
-      /* \r */
-      CHAR_CIRCUMFLEX_ACCENT: 94,
-      /* ^ */
-      CHAR_COLON: 58,
-      /* : */
-      CHAR_COMMA: 44,
-      /* , */
-      CHAR_DOT: 46,
-      /* . */
-      CHAR_DOUBLE_QUOTE: 34,
-      /* " */
-      CHAR_EQUAL: 61,
-      /* = */
-      CHAR_EXCLAMATION_MARK: 33,
-      /* ! */
-      CHAR_FORM_FEED: 12,
-      /* \f */
-      CHAR_FORWARD_SLASH: 47,
-      /* / */
-      CHAR_GRAVE_ACCENT: 96,
-      /* ` */
-      CHAR_HASH: 35,
-      /* # */
-      CHAR_HYPHEN_MINUS: 45,
-      /* - */
-      CHAR_LEFT_ANGLE_BRACKET: 60,
-      /* < */
-      CHAR_LEFT_CURLY_BRACE: 123,
-      /* { */
-      CHAR_LEFT_SQUARE_BRACKET: 91,
-      /* [ */
-      CHAR_LINE_FEED: 10,
-      /* \n */
-      CHAR_NO_BREAK_SPACE: 160,
-      /* \u00A0 */
-      CHAR_PERCENT: 37,
-      /* % */
-      CHAR_PLUS: 43,
-      /* + */
-      CHAR_QUESTION_MARK: 63,
-      /* ? */
-      CHAR_RIGHT_ANGLE_BRACKET: 62,
-      /* > */
-      CHAR_RIGHT_CURLY_BRACE: 125,
-      /* } */
-      CHAR_RIGHT_SQUARE_BRACKET: 93,
-      /* ] */
-      CHAR_SEMICOLON: 59,
-      /* ; */
-      CHAR_SINGLE_QUOTE: 39,
-      /* ' */
-      CHAR_SPACE: 32,
-      /*   */
-      CHAR_TAB: 9,
-      /* \t */
-      CHAR_UNDERSCORE: 95,
-      /* _ */
-      CHAR_VERTICAL_LINE: 124,
-      /* | */
-      CHAR_ZERO_WIDTH_NOBREAK_SPACE: 65279,
-      /* \uFEFF */
-      SEP: path.sep,
-      /**
-       * Create EXTGLOB_CHARS
-       */
-      extglobChars(chars) {
-        return {
-          "!": { type: "negate", open: "(?:(?!(?:", close: `))${chars.STAR})` },
-          "?": { type: "qmark", open: "(?:", close: ")?" },
-          "+": { type: "plus", open: "(?:", close: ")+" },
-          "*": { type: "star", open: "(?:", close: ")*" },
-          "@": { type: "at", open: "(?:", close: ")" }
-        };
-      },
-      /**
-       * Create GLOB_CHARS
-       */
-      globChars(win32) {
-        return win32 === true ? WINDOWS_CHARS : POSIX_CHARS;
-      }
-    };
-  }
-});
-
-// ../../node_modules/picomatch/lib/utils.js
-var require_utils2 = __commonJS({
-  "../../node_modules/picomatch/lib/utils.js"(exports2) {
-    "use strict";
-    init_scoped_fetch();
-    var path = require("path");
-    var win32 = process.platform === "win32";
-    var {
-      REGEX_BACKSLASH,
-      REGEX_REMOVE_BACKSLASH,
-      REGEX_SPECIAL_CHARS,
-      REGEX_SPECIAL_CHARS_GLOBAL
-    } = require_constants2();
-    exports2.isObject = (val) => val !== null && typeof val === "object" && !Array.isArray(val);
-    exports2.hasRegexChars = (str) => REGEX_SPECIAL_CHARS.test(str);
-    exports2.isRegexChar = (str) => str.length === 1 && exports2.hasRegexChars(str);
-    exports2.escapeRegex = (str) => str.replace(REGEX_SPECIAL_CHARS_GLOBAL, "\\$1");
-    exports2.toPosixSlashes = (str) => str.replace(REGEX_BACKSLASH, "/");
-    exports2.removeBackslashes = (str) => {
-      return str.replace(REGEX_REMOVE_BACKSLASH, (match) => {
-        return match === "\\" ? "" : match;
-      });
-    };
-    exports2.supportsLookbehinds = () => {
-      const segs = process.version.slice(1).split(".").map(Number);
-      if (segs.length === 3 && segs[0] >= 9 || segs[0] === 8 && segs[1] >= 10) {
-        return true;
-      }
-      return false;
-    };
-    exports2.isWindows = (options) => {
-      if (options && typeof options.windows === "boolean") {
-        return options.windows;
-      }
-      return win32 === true || path.sep === "\\";
-    };
-    exports2.escapeLast = (input, char, lastIdx) => {
-      const idx = input.lastIndexOf(char, lastIdx);
-      if (idx === -1) return input;
-      if (input[idx - 1] === "\\") return exports2.escapeLast(input, char, idx - 1);
-      return `${input.slice(0, idx)}\\${input.slice(idx)}`;
-    };
-    exports2.removePrefix = (input, state = {}) => {
-      let output = input;
-      if (output.startsWith("./")) {
-        output = output.slice(2);
-        state.prefix = "./";
-      }
-      return output;
-    };
-    exports2.wrapOutput = (input, state = {}, options = {}) => {
-      const prepend = options.contains ? "" : "^";
-      const append = options.contains ? "" : "$";
-      let output = `${prepend}(?:${input})${append}`;
-      if (state.negated === true) {
-        output = `(?:^(?!${output}).*$)`;
-      }
-      return output;
-    };
-  }
-});
-
-// ../../node_modules/picomatch/lib/scan.js
-var require_scan = __commonJS({
-  "../../node_modules/picomatch/lib/scan.js"(exports2, module2) {
-    "use strict";
-    init_scoped_fetch();
-    var utils = require_utils2();
-    var {
-      CHAR_ASTERISK,
-      /* * */
-      CHAR_AT,
-      /* @ */
-      CHAR_BACKWARD_SLASH,
-      /* \ */
-      CHAR_COMMA,
-      /* , */
-      CHAR_DOT,
-      /* . */
-      CHAR_EXCLAMATION_MARK,
-      /* ! */
-      CHAR_FORWARD_SLASH,
-      /* / */
-      CHAR_LEFT_CURLY_BRACE,
-      /* { */
-      CHAR_LEFT_PARENTHESES,
-      /* ( */
-      CHAR_LEFT_SQUARE_BRACKET,
-      /* [ */
-      CHAR_PLUS,
-      /* + */
-      CHAR_QUESTION_MARK,
-      /* ? */
-      CHAR_RIGHT_CURLY_BRACE,
-      /* } */
-      CHAR_RIGHT_PARENTHESES,
-      /* ) */
-      CHAR_RIGHT_SQUARE_BRACKET
-      /* ] */
-    } = require_constants2();
-    var isPathSeparator = (code) => {
-      return code === CHAR_FORWARD_SLASH || code === CHAR_BACKWARD_SLASH;
-    };
-    var depth = (token) => {
-      if (token.isPrefix !== true) {
-        token.depth = token.isGlobstar ? Infinity : 1;
-      }
-    };
-    var scan = (input, options) => {
-      const opts = options || {};
-      const length = input.length - 1;
-      const scanToEnd = opts.parts === true || opts.scanToEnd === true;
-      const slashes = [];
-      const tokens = [];
-      const parts = [];
-      let str = input;
-      let index = -1;
-      let start = 0;
-      let lastIndex = 0;
-      let isBrace = false;
-      let isBracket = false;
-      let isGlob = false;
-      let isExtglob = false;
-      let isGlobstar = false;
-      let braceEscaped = false;
-      let backslashes = false;
-      let negated = false;
-      let negatedExtglob = false;
-      let finished = false;
-      let braces = 0;
-      let prev;
-      let code;
-      let token = { value: "", depth: 0, isGlob: false };
-      const eos = () => index >= length;
-      const peek = () => str.charCodeAt(index + 1);
-      const advance = () => {
-        prev = code;
-        return str.charCodeAt(++index);
-      };
-      while (index < length) {
-        code = advance();
-        let next;
-        if (code === CHAR_BACKWARD_SLASH) {
-          backslashes = token.backslashes = true;
-          code = advance();
-          if (code === CHAR_LEFT_CURLY_BRACE) {
-            braceEscaped = true;
-          }
-          continue;
-        }
-        if (braceEscaped === true || code === CHAR_LEFT_CURLY_BRACE) {
-          braces++;
-          while (eos() !== true && (code = advance())) {
-            if (code === CHAR_BACKWARD_SLASH) {
-              backslashes = token.backslashes = true;
-              advance();
-              continue;
-            }
-            if (code === CHAR_LEFT_CURLY_BRACE) {
-              braces++;
-              continue;
-            }
-            if (braceEscaped !== true && code === CHAR_DOT && (code = advance()) === CHAR_DOT) {
-              isBrace = token.isBrace = true;
-              isGlob = token.isGlob = true;
-              finished = true;
-              if (scanToEnd === true) {
-                continue;
-              }
-              break;
-            }
-            if (braceEscaped !== true && code === CHAR_COMMA) {
-              isBrace = token.isBrace = true;
-              isGlob = token.isGlob = true;
-              finished = true;
-              if (scanToEnd === true) {
-                continue;
-              }
-              break;
-            }
-            if (code === CHAR_RIGHT_CURLY_BRACE) {
-              braces--;
-              if (braces === 0) {
-                braceEscaped = false;
-                isBrace = token.isBrace = true;
-                finished = true;
-                break;
-              }
-            }
-          }
-          if (scanToEnd === true) {
-            continue;
-          }
-          break;
-        }
-        if (code === CHAR_FORWARD_SLASH) {
-          slashes.push(index);
-          tokens.push(token);
-          token = { value: "", depth: 0, isGlob: false };
-          if (finished === true) continue;
-          if (prev === CHAR_DOT && index === start + 1) {
-            start += 2;
-            continue;
-          }
-          lastIndex = index + 1;
-          continue;
-        }
-        if (opts.noext !== true) {
-          const isExtglobChar = code === CHAR_PLUS || code === CHAR_AT || code === CHAR_ASTERISK || code === CHAR_QUESTION_MARK || code === CHAR_EXCLAMATION_MARK;
-          if (isExtglobChar === true && peek() === CHAR_LEFT_PARENTHESES) {
-            isGlob = token.isGlob = true;
-            isExtglob = token.isExtglob = true;
-            finished = true;
-            if (code === CHAR_EXCLAMATION_MARK && index === start) {
-              negatedExtglob = true;
-            }
-            if (scanToEnd === true) {
-              while (eos() !== true && (code = advance())) {
-                if (code === CHAR_BACKWARD_SLASH) {
-                  backslashes = token.backslashes = true;
-                  code = advance();
-                  continue;
-                }
-                if (code === CHAR_RIGHT_PARENTHESES) {
-                  isGlob = token.isGlob = true;
-                  finished = true;
-                  break;
-                }
-              }
-              continue;
-            }
-            break;
-          }
-        }
-        if (code === CHAR_ASTERISK) {
-          if (prev === CHAR_ASTERISK) isGlobstar = token.isGlobstar = true;
-          isGlob = token.isGlob = true;
-          finished = true;
-          if (scanToEnd === true) {
-            continue;
-          }
-          break;
-        }
-        if (code === CHAR_QUESTION_MARK) {
-          isGlob = token.isGlob = true;
-          finished = true;
-          if (scanToEnd === true) {
-            continue;
-          }
-          break;
-        }
-        if (code === CHAR_LEFT_SQUARE_BRACKET) {
-          while (eos() !== true && (next = advance())) {
-            if (next === CHAR_BACKWARD_SLASH) {
-              backslashes = token.backslashes = true;
-              advance();
-              continue;
-            }
-            if (next === CHAR_RIGHT_SQUARE_BRACKET) {
-              isBracket = token.isBracket = true;
-              isGlob = token.isGlob = true;
-              finished = true;
-              break;
-            }
-          }
-          if (scanToEnd === true) {
-            continue;
-          }
-          break;
-        }
-        if (opts.nonegate !== true && code === CHAR_EXCLAMATION_MARK && index === start) {
-          negated = token.negated = true;
-          start++;
-          continue;
-        }
-        if (opts.noparen !== true && code === CHAR_LEFT_PARENTHESES) {
-          isGlob = token.isGlob = true;
-          if (scanToEnd === true) {
-            while (eos() !== true && (code = advance())) {
-              if (code === CHAR_LEFT_PARENTHESES) {
-                backslashes = token.backslashes = true;
-                code = advance();
-                continue;
-              }
-              if (code === CHAR_RIGHT_PARENTHESES) {
-                finished = true;
-                break;
-              }
-            }
-            continue;
-          }
-          break;
-        }
-        if (isGlob === true) {
-          finished = true;
-          if (scanToEnd === true) {
-            continue;
-          }
-          break;
-        }
-      }
-      if (opts.noext === true) {
-        isExtglob = false;
-        isGlob = false;
-      }
-      let base = str;
-      let prefix = "";
-      let glob = "";
-      if (start > 0) {
-        prefix = str.slice(0, start);
-        str = str.slice(start);
-        lastIndex -= start;
-      }
-      if (base && isGlob === true && lastIndex > 0) {
-        base = str.slice(0, lastIndex);
-        glob = str.slice(lastIndex);
-      } else if (isGlob === true) {
-        base = "";
-        glob = str;
-      } else {
-        base = str;
-      }
-      if (base && base !== "" && base !== "/" && base !== str) {
-        if (isPathSeparator(base.charCodeAt(base.length - 1))) {
-          base = base.slice(0, -1);
-        }
-      }
-      if (opts.unescape === true) {
-        if (glob) glob = utils.removeBackslashes(glob);
-        if (base && backslashes === true) {
-          base = utils.removeBackslashes(base);
-        }
-      }
-      const state = {
-        prefix,
-        input,
-        start,
-        base,
-        glob,
-        isBrace,
-        isBracket,
-        isGlob,
-        isExtglob,
-        isGlobstar,
-        negated,
-        negatedExtglob
-      };
-      if (opts.tokens === true) {
-        state.maxDepth = 0;
-        if (!isPathSeparator(code)) {
-          tokens.push(token);
-        }
-        state.tokens = tokens;
-      }
-      if (opts.parts === true || opts.tokens === true) {
-        let prevIndex;
-        for (let idx = 0; idx < slashes.length; idx++) {
-          const n = prevIndex ? prevIndex + 1 : start;
-          const i = slashes[idx];
-          const value = input.slice(n, i);
-          if (opts.tokens) {
-            if (idx === 0 && start !== 0) {
-              tokens[idx].isPrefix = true;
-              tokens[idx].value = prefix;
-            } else {
-              tokens[idx].value = value;
-            }
-            depth(tokens[idx]);
-            state.maxDepth += tokens[idx].depth;
-          }
-          if (idx !== 0 || value !== "") {
-            parts.push(value);
-          }
-          prevIndex = i;
-        }
-        if (prevIndex && prevIndex + 1 < input.length) {
-          const value = input.slice(prevIndex + 1);
-          parts.push(value);
-          if (opts.tokens) {
-            tokens[tokens.length - 1].value = value;
-            depth(tokens[tokens.length - 1]);
-            state.maxDepth += tokens[tokens.length - 1].depth;
-          }
-        }
-        state.slashes = slashes;
-        state.parts = parts;
-      }
-      return state;
-    };
-    module2.exports = scan;
-  }
-});
-
-// ../../node_modules/picomatch/lib/parse.js
-var require_parse2 = __commonJS({
-  "../../node_modules/picomatch/lib/parse.js"(exports2, module2) {
-    "use strict";
-    init_scoped_fetch();
-    var constants = require_constants2();
-    var utils = require_utils2();
-    var {
-      MAX_LENGTH,
-      POSIX_REGEX_SOURCE,
-      REGEX_NON_SPECIAL_CHARS,
-      REGEX_SPECIAL_CHARS_BACKREF,
-      REPLACEMENTS
-    } = constants;
-    var expandRange = (args, options) => {
-      if (typeof options.expandRange === "function") {
-        return options.expandRange(...args, options);
-      }
-      args.sort();
-      const value = `[${args.join("-")}]`;
-      try {
-        new RegExp(value);
-      } catch (ex) {
-        return args.map((v2) => utils.escapeRegex(v2)).join("..");
-      }
-      return value;
-    };
-    var syntaxError = (type, char) => {
-      return `Missing ${type}: "${char}" - use "\\\\${char}" to match literal characters`;
-    };
-    var splitTopLevel = (input) => {
-      const parts = [];
-      let bracket = 0;
-      let paren = 0;
-      let quote = 0;
-      let value = "";
-      let escaped = false;
-      for (const ch of input) {
-        if (escaped === true) {
-          value += ch;
-          escaped = false;
-          continue;
-        }
-        if (ch === "\\") {
-          value += ch;
-          escaped = true;
-          continue;
-        }
-        if (ch === '"') {
-          quote = quote === 1 ? 0 : 1;
-          value += ch;
-          continue;
-        }
-        if (quote === 0) {
-          if (ch === "[") {
-            bracket++;
-          } else if (ch === "]" && bracket > 0) {
-            bracket--;
-          } else if (bracket === 0) {
-            if (ch === "(") {
-              paren++;
-            } else if (ch === ")" && paren > 0) {
-              paren--;
-            } else if (ch === "|" && paren === 0) {
-              parts.push(value);
-              value = "";
-              continue;
-            }
-          }
-        }
-        value += ch;
-      }
-      parts.push(value);
-      return parts;
-    };
-    var isPlainBranch = (branch) => {
-      let escaped = false;
-      for (const ch of branch) {
-        if (escaped === true) {
-          escaped = false;
-          continue;
-        }
-        if (ch === "\\") {
-          escaped = true;
-          continue;
-        }
-        if (/[?*+@!()[\]{}]/.test(ch)) {
-          return false;
-        }
-      }
-      return true;
-    };
-    var normalizeSimpleBranch = (branch) => {
-      let value = branch.trim();
-      let changed = true;
-      while (changed === true) {
-        changed = false;
-        if (/^@\([^\\()[\]{}|]+\)$/.test(value)) {
-          value = value.slice(2, -1);
-          changed = true;
-        }
-      }
-      if (!isPlainBranch(value)) {
-        return;
-      }
-      return value.replace(/\\(.)/g, "$1");
-    };
-    var hasRepeatedCharPrefixOverlap = (branches) => {
-      const values = branches.map(normalizeSimpleBranch).filter(Boolean);
-      for (let i = 0; i < values.length; i++) {
-        for (let j2 = i + 1; j2 < values.length; j2++) {
-          const a = values[i];
-          const b2 = values[j2];
-          const char = a[0];
-          if (!char || a !== char.repeat(a.length) || b2 !== char.repeat(b2.length)) {
-            continue;
-          }
-          if (a === b2 || a.startsWith(b2) || b2.startsWith(a)) {
-            return true;
-          }
-        }
-      }
-      return false;
-    };
-    var parseRepeatedExtglob = (pattern, requireEnd = true) => {
-      if (pattern[0] !== "+" && pattern[0] !== "*" || pattern[1] !== "(") {
-        return;
-      }
-      let bracket = 0;
-      let paren = 0;
-      let quote = 0;
-      let escaped = false;
-      for (let i = 1; i < pattern.length; i++) {
-        const ch = pattern[i];
-        if (escaped === true) {
-          escaped = false;
-          continue;
-        }
-        if (ch === "\\") {
-          escaped = true;
-          continue;
-        }
-        if (ch === '"') {
-          quote = quote === 1 ? 0 : 1;
-          continue;
-        }
-        if (quote === 1) {
-          continue;
-        }
-        if (ch === "[") {
-          bracket++;
-          continue;
-        }
-        if (ch === "]" && bracket > 0) {
-          bracket--;
-          continue;
-        }
-        if (bracket > 0) {
-          continue;
-        }
-        if (ch === "(") {
-          paren++;
-          continue;
-        }
-        if (ch === ")") {
-          paren--;
-          if (paren === 0) {
-            if (requireEnd === true && i !== pattern.length - 1) {
-              return;
-            }
-            return {
-              type: pattern[0],
-              body: pattern.slice(2, i),
-              end: i
-            };
-          }
-        }
-      }
-    };
-    var getStarExtglobSequenceOutput = (pattern) => {
-      let index = 0;
-      const chars = [];
-      while (index < pattern.length) {
-        const match = parseRepeatedExtglob(pattern.slice(index), false);
-        if (!match || match.type !== "*") {
-          return;
-        }
-        const branches = splitTopLevel(match.body).map((branch2) => branch2.trim());
-        if (branches.length !== 1) {
-          return;
-        }
-        const branch = normalizeSimpleBranch(branches[0]);
-        if (!branch || branch.length !== 1) {
-          return;
-        }
-        chars.push(branch);
-        index += match.end + 1;
-      }
-      if (chars.length < 1) {
-        return;
-      }
-      const source = chars.length === 1 ? utils.escapeRegex(chars[0]) : `[${chars.map((ch) => utils.escapeRegex(ch)).join("")}]`;
-      return `${source}*`;
-    };
-    var repeatedExtglobRecursion = (pattern) => {
-      let depth = 0;
-      let value = pattern.trim();
-      let match = parseRepeatedExtglob(value);
-      while (match) {
-        depth++;
-        value = match.body.trim();
-        match = parseRepeatedExtglob(value);
-      }
-      return depth;
-    };
-    var analyzeRepeatedExtglob = (body, options) => {
-      if (options.maxExtglobRecursion === false) {
-        return { risky: false };
-      }
-      const max = typeof options.maxExtglobRecursion === "number" ? options.maxExtglobRecursion : constants.DEFAULT_MAX_EXTGLOB_RECURSION;
-      const branches = splitTopLevel(body).map((branch) => branch.trim());
-      if (branches.length > 1) {
-        if (branches.some((branch) => branch === "") || branches.some((branch) => /^[*?]+$/.test(branch)) || hasRepeatedCharPrefixOverlap(branches)) {
-          return { risky: true };
-        }
-      }
-      for (const branch of branches) {
-        const safeOutput = getStarExtglobSequenceOutput(branch);
-        if (safeOutput) {
-          return { risky: true, safeOutput };
-        }
-        if (repeatedExtglobRecursion(branch) > max) {
-          return { risky: true };
-        }
-      }
-      return { risky: false };
-    };
-    var parse4 = (input, options) => {
-      if (typeof input !== "string") {
-        throw new TypeError("Expected a string");
-      }
-      input = REPLACEMENTS[input] || input;
-      const opts = { ...options };
-      const max = typeof opts.maxLength === "number" ? Math.min(MAX_LENGTH, opts.maxLength) : MAX_LENGTH;
-      let len = input.length;
-      if (len > max) {
-        throw new SyntaxError(`Input length: ${len}, exceeds maximum allowed length: ${max}`);
-      }
-      const bos = { type: "bos", value: "", output: opts.prepend || "" };
-      const tokens = [bos];
-      const capture = opts.capture ? "" : "?:";
-      const win32 = utils.isWindows(options);
-      const PLATFORM_CHARS = constants.globChars(win32);
-      const EXTGLOB_CHARS = constants.extglobChars(PLATFORM_CHARS);
-      const {
-        DOT_LITERAL,
-        PLUS_LITERAL,
-        SLASH_LITERAL,
-        ONE_CHAR,
-        DOTS_SLASH,
-        NO_DOT,
-        NO_DOT_SLASH,
-        NO_DOTS_SLASH,
-        QMARK,
-        QMARK_NO_DOT,
-        STAR,
-        START_ANCHOR
-      } = PLATFORM_CHARS;
-      const globstar = (opts2) => {
-        return `(${capture}(?:(?!${START_ANCHOR}${opts2.dot ? DOTS_SLASH : DOT_LITERAL}).)*?)`;
-      };
-      const nodot = opts.dot ? "" : NO_DOT;
-      const qmarkNoDot = opts.dot ? QMARK : QMARK_NO_DOT;
-      let star = opts.bash === true ? globstar(opts) : STAR;
-      if (opts.capture) {
-        star = `(${star})`;
-      }
-      if (typeof opts.noext === "boolean") {
-        opts.noextglob = opts.noext;
-      }
-      const state = {
-        input,
-        index: -1,
-        start: 0,
-        dot: opts.dot === true,
-        consumed: "",
-        output: "",
-        prefix: "",
-        backtrack: false,
-        negated: false,
-        brackets: 0,
-        braces: 0,
-        parens: 0,
-        quotes: 0,
-        globstar: false,
-        tokens
-      };
-      input = utils.removePrefix(input, state);
-      len = input.length;
-      const extglobs = [];
-      const braces = [];
-      const stack = [];
-      let prev = bos;
-      let value;
-      const eos = () => state.index === len - 1;
-      const peek = state.peek = (n = 1) => input[state.index + n];
-      const advance = state.advance = () => input[++state.index] || "";
-      const remaining = () => input.slice(state.index + 1);
-      const consume = (value2 = "", num = 0) => {
-        state.consumed += value2;
-        state.index += num;
-      };
-      const append = (token) => {
-        state.output += token.output != null ? token.output : token.value;
-        consume(token.value);
-      };
-      const negate = () => {
-        let count = 1;
-        while (peek() === "!" && (peek(2) !== "(" || peek(3) === "?")) {
-          advance();
-          state.start++;
-          count++;
-        }
-        if (count % 2 === 0) {
-          return false;
-        }
-        state.negated = true;
-        state.start++;
-        return true;
-      };
-      const increment = (type) => {
-        state[type]++;
-        stack.push(type);
-      };
-      const decrement = (type) => {
-        state[type]--;
-        stack.pop();
-      };
-      const push = (tok) => {
-        if (prev.type === "globstar") {
-          const isBrace = state.braces > 0 && (tok.type === "comma" || tok.type === "brace");
-          const isExtglob = tok.extglob === true || extglobs.length && (tok.type === "pipe" || tok.type === "paren");
-          if (tok.type !== "slash" && tok.type !== "paren" && !isBrace && !isExtglob) {
-            state.output = state.output.slice(0, -prev.output.length);
-            prev.type = "star";
-            prev.value = "*";
-            prev.output = star;
-            state.output += prev.output;
-          }
-        }
-        if (extglobs.length && tok.type !== "paren") {
-          extglobs[extglobs.length - 1].inner += tok.value;
-        }
-        if (tok.value || tok.output) append(tok);
-        if (prev && prev.type === "text" && tok.type === "text") {
-          prev.value += tok.value;
-          prev.output = (prev.output || "") + tok.value;
-          return;
-        }
-        tok.prev = prev;
-        tokens.push(tok);
-        prev = tok;
-      };
-      const extglobOpen = (type, value2) => {
-        const token = { ...EXTGLOB_CHARS[value2], conditions: 1, inner: "" };
-        token.prev = prev;
-        token.parens = state.parens;
-        token.output = state.output;
-        token.startIndex = state.index;
-        token.tokensIndex = tokens.length;
-        const output = (opts.capture ? "(" : "") + token.open;
-        increment("parens");
-        push({ type, value: value2, output: state.output ? "" : ONE_CHAR });
-        push({ type: "paren", extglob: true, value: advance(), output });
-        extglobs.push(token);
-      };
-      const extglobClose = (token) => {
-        const literal2 = input.slice(token.startIndex, state.index + 1);
-        const body = input.slice(token.startIndex + 2, state.index);
-        const analysis = analyzeRepeatedExtglob(body, opts);
-        if ((token.type === "plus" || token.type === "star") && analysis.risky) {
-          const safeOutput = analysis.safeOutput ? (token.output ? "" : ONE_CHAR) + (opts.capture ? `(${analysis.safeOutput})` : analysis.safeOutput) : void 0;
-          const open = tokens[token.tokensIndex];
-          open.type = "text";
-          open.value = literal2;
-          open.output = safeOutput || utils.escapeRegex(literal2);
-          for (let i = token.tokensIndex + 1; i < tokens.length; i++) {
-            tokens[i].value = "";
-            tokens[i].output = "";
-            delete tokens[i].suffix;
-          }
-          state.output = token.output + open.output;
-          state.backtrack = true;
-          push({ type: "paren", extglob: true, value, output: "" });
-          decrement("parens");
-          return;
-        }
-        let output = token.close + (opts.capture ? ")" : "");
-        let rest;
-        if (token.type === "negate") {
-          let extglobStar = star;
-          if (token.inner && token.inner.length > 1 && token.inner.includes("/")) {
-            extglobStar = globstar(opts);
-          }
-          if (extglobStar !== star || eos() || /^\)+$/.test(remaining())) {
-            output = token.close = `)$))${extglobStar}`;
-          }
-          if (token.inner.includes("*") && (rest = remaining()) && /^\.[^\\/.]+$/.test(rest)) {
-            const expression = parse4(rest, { ...options, fastpaths: false }).output;
-            output = token.close = `)${expression})${extglobStar})`;
-          }
-          if (token.prev.type === "bos") {
-            state.negatedExtglob = true;
-          }
-        }
-        push({ type: "paren", extglob: true, value, output });
-        decrement("parens");
-      };
-      if (opts.fastpaths !== false && !/(^[*!]|[/()[\]{}"])/.test(input)) {
-        let backslashes = false;
-        let output = input.replace(REGEX_SPECIAL_CHARS_BACKREF, (m2, esc2, chars, first, rest, index) => {
-          if (first === "\\") {
-            backslashes = true;
-            return m2;
-          }
-          if (first === "?") {
-            if (esc2) {
-              return esc2 + first + (rest ? QMARK.repeat(rest.length) : "");
-            }
-            if (index === 0) {
-              return qmarkNoDot + (rest ? QMARK.repeat(rest.length) : "");
-            }
-            return QMARK.repeat(chars.length);
-          }
-          if (first === ".") {
-            return DOT_LITERAL.repeat(chars.length);
-          }
-          if (first === "*") {
-            if (esc2) {
-              return esc2 + first + (rest ? star : "");
-            }
-            return star;
-          }
-          return esc2 ? m2 : `\\${m2}`;
-        });
-        if (backslashes === true) {
-          if (opts.unescape === true) {
-            output = output.replace(/\\/g, "");
-          } else {
-            output = output.replace(/\\+/g, (m2) => {
-              return m2.length % 2 === 0 ? "\\\\" : m2 ? "\\" : "";
-            });
-          }
-        }
-        if (output === input && opts.contains === true) {
-          state.output = input;
-          return state;
-        }
-        state.output = utils.wrapOutput(output, state, options);
-        return state;
-      }
-      while (!eos()) {
-        value = advance();
-        if (value === "\0") {
-          continue;
-        }
-        if (value === "\\") {
-          const next = peek();
-          if (next === "/" && opts.bash !== true) {
-            continue;
-          }
-          if (next === "." || next === ";") {
-            continue;
-          }
-          if (!next) {
-            value += "\\";
-            push({ type: "text", value });
-            continue;
-          }
-          const match = /^\\+/.exec(remaining());
-          let slashes = 0;
-          if (match && match[0].length > 2) {
-            slashes = match[0].length;
-            state.index += slashes;
-            if (slashes % 2 !== 0) {
-              value += "\\";
-            }
-          }
-          if (opts.unescape === true) {
-            value = advance();
-          } else {
-            value += advance();
-          }
-          if (state.brackets === 0) {
-            push({ type: "text", value });
-            continue;
-          }
-        }
-        if (state.brackets > 0 && (value !== "]" || prev.value === "[" || prev.value === "[^")) {
-          if (opts.posix !== false && value === ":") {
-            const inner = prev.value.slice(1);
-            if (inner.includes("[")) {
-              prev.posix = true;
-              if (inner.includes(":")) {
-                const idx = prev.value.lastIndexOf("[");
-                const pre = prev.value.slice(0, idx);
-                const rest2 = prev.value.slice(idx + 2);
-                const posix2 = POSIX_REGEX_SOURCE[rest2];
-                if (posix2) {
-                  prev.value = pre + posix2;
-                  state.backtrack = true;
-                  advance();
-                  if (!bos.output && tokens.indexOf(prev) === 1) {
-                    bos.output = ONE_CHAR;
-                  }
-                  continue;
-                }
-              }
-            }
-          }
-          if (value === "[" && peek() !== ":" || value === "-" && peek() === "]") {
-            value = `\\${value}`;
-          }
-          if (value === "]" && (prev.value === "[" || prev.value === "[^")) {
-            value = `\\${value}`;
-          }
-          if (opts.posix === true && value === "!" && prev.value === "[") {
-            value = "^";
-          }
-          prev.value += value;
-          append({ value });
-          continue;
-        }
-        if (state.quotes === 1 && value !== '"') {
-          value = utils.escapeRegex(value);
-          prev.value += value;
-          append({ value });
-          continue;
-        }
-        if (value === '"') {
-          state.quotes = state.quotes === 1 ? 0 : 1;
-          if (opts.keepQuotes === true) {
-            push({ type: "text", value });
-          }
-          continue;
-        }
-        if (value === "(") {
-          increment("parens");
-          push({ type: "paren", value });
-          continue;
-        }
-        if (value === ")") {
-          if (state.parens === 0 && opts.strictBrackets === true) {
-            throw new SyntaxError(syntaxError("opening", "("));
-          }
-          const extglob = extglobs[extglobs.length - 1];
-          if (extglob && state.parens === extglob.parens + 1) {
-            extglobClose(extglobs.pop());
-            continue;
-          }
-          push({ type: "paren", value, output: state.parens ? ")" : "\\)" });
-          decrement("parens");
-          continue;
-        }
-        if (value === "[") {
-          if (opts.nobracket === true || !remaining().includes("]")) {
-            if (opts.nobracket !== true && opts.strictBrackets === true) {
-              throw new SyntaxError(syntaxError("closing", "]"));
-            }
-            value = `\\${value}`;
-          } else {
-            increment("brackets");
-          }
-          push({ type: "bracket", value });
-          continue;
-        }
-        if (value === "]") {
-          if (opts.nobracket === true || prev && prev.type === "bracket" && prev.value.length === 1) {
-            push({ type: "text", value, output: `\\${value}` });
-            continue;
-          }
-          if (state.brackets === 0) {
-            if (opts.strictBrackets === true) {
-              throw new SyntaxError(syntaxError("opening", "["));
-            }
-            push({ type: "text", value, output: `\\${value}` });
-            continue;
-          }
-          decrement("brackets");
-          const prevValue = prev.value.slice(1);
-          if (prev.posix !== true && prevValue[0] === "^" && !prevValue.includes("/")) {
-            value = `/${value}`;
-          }
-          prev.value += value;
-          append({ value });
-          if (opts.literalBrackets === false || utils.hasRegexChars(prevValue)) {
-            continue;
-          }
-          const escaped = utils.escapeRegex(prev.value);
-          state.output = state.output.slice(0, -prev.value.length);
-          if (opts.literalBrackets === true) {
-            state.output += escaped;
-            prev.value = escaped;
-            continue;
-          }
-          prev.value = `(${capture}${escaped}|${prev.value})`;
-          state.output += prev.value;
-          continue;
-        }
-        if (value === "{" && opts.nobrace !== true) {
-          increment("braces");
-          const open = {
-            type: "brace",
-            value,
-            output: "(",
-            outputIndex: state.output.length,
-            tokensIndex: state.tokens.length
-          };
-          braces.push(open);
-          push(open);
-          continue;
-        }
-        if (value === "}") {
-          const brace = braces[braces.length - 1];
-          if (opts.nobrace === true || !brace) {
-            push({ type: "text", value, output: value });
-            continue;
-          }
-          let output = ")";
-          if (brace.dots === true) {
-            const arr = tokens.slice();
-            const range = [];
-            for (let i = arr.length - 1; i >= 0; i--) {
-              tokens.pop();
-              if (arr[i].type === "brace") {
-                break;
-              }
-              if (arr[i].type !== "dots") {
-                range.unshift(arr[i].value);
-              }
-            }
-            output = expandRange(range, opts);
-            state.backtrack = true;
-          }
-          if (brace.comma !== true && brace.dots !== true) {
-            const out = state.output.slice(0, brace.outputIndex);
-            const toks = state.tokens.slice(brace.tokensIndex);
-            brace.value = brace.output = "\\{";
-            value = output = "\\}";
-            state.output = out;
-            for (const t of toks) {
-              state.output += t.output || t.value;
-            }
-          }
-          push({ type: "brace", value, output });
-          decrement("braces");
-          braces.pop();
-          continue;
-        }
-        if (value === "|") {
-          if (extglobs.length > 0) {
-            extglobs[extglobs.length - 1].conditions++;
-          }
-          push({ type: "text", value });
-          continue;
-        }
-        if (value === ",") {
-          let output = value;
-          const brace = braces[braces.length - 1];
-          if (brace && stack[stack.length - 1] === "braces") {
-            brace.comma = true;
-            output = "|";
-          }
-          push({ type: "comma", value, output });
-          continue;
-        }
-        if (value === "/") {
-          if (prev.type === "dot" && state.index === state.start + 1) {
-            state.start = state.index + 1;
-            state.consumed = "";
-            state.output = "";
-            tokens.pop();
-            prev = bos;
-            continue;
-          }
-          push({ type: "slash", value, output: SLASH_LITERAL });
-          continue;
-        }
-        if (value === ".") {
-          if (state.braces > 0 && prev.type === "dot") {
-            if (prev.value === ".") prev.output = DOT_LITERAL;
-            const brace = braces[braces.length - 1];
-            prev.type = "dots";
-            prev.output += value;
-            prev.value += value;
-            brace.dots = true;
-            continue;
-          }
-          if (state.braces + state.parens === 0 && prev.type !== "bos" && prev.type !== "slash") {
-            push({ type: "text", value, output: DOT_LITERAL });
-            continue;
-          }
-          push({ type: "dot", value, output: DOT_LITERAL });
-          continue;
-        }
-        if (value === "?") {
-          const isGroup = prev && prev.value === "(";
-          if (!isGroup && opts.noextglob !== true && peek() === "(" && peek(2) !== "?") {
-            extglobOpen("qmark", value);
-            continue;
-          }
-          if (prev && prev.type === "paren") {
-            const next = peek();
-            let output = value;
-            if (next === "<" && !utils.supportsLookbehinds()) {
-              throw new Error("Node.js v10 or higher is required for regex lookbehinds");
-            }
-            if (prev.value === "(" && !/[!=<:]/.test(next) || next === "<" && !/<([!=]|\w+>)/.test(remaining())) {
-              output = `\\${value}`;
-            }
-            push({ type: "text", value, output });
-            continue;
-          }
-          if (opts.dot !== true && (prev.type === "slash" || prev.type === "bos")) {
-            push({ type: "qmark", value, output: QMARK_NO_DOT });
-            continue;
-          }
-          push({ type: "qmark", value, output: QMARK });
-          continue;
-        }
-        if (value === "!") {
-          if (opts.noextglob !== true && peek() === "(") {
-            if (peek(2) !== "?" || !/[!=<:]/.test(peek(3))) {
-              extglobOpen("negate", value);
-              continue;
-            }
-          }
-          if (opts.nonegate !== true && state.index === 0) {
-            negate();
-            continue;
-          }
-        }
-        if (value === "+") {
-          if (opts.noextglob !== true && peek() === "(" && peek(2) !== "?") {
-            extglobOpen("plus", value);
-            continue;
-          }
-          if (prev && prev.value === "(" || opts.regex === false) {
-            push({ type: "plus", value, output: PLUS_LITERAL });
-            continue;
-          }
-          if (prev && (prev.type === "bracket" || prev.type === "paren" || prev.type === "brace") || state.parens > 0) {
-            push({ type: "plus", value });
-            continue;
-          }
-          push({ type: "plus", value: PLUS_LITERAL });
-          continue;
-        }
-        if (value === "@") {
-          if (opts.noextglob !== true && peek() === "(" && peek(2) !== "?") {
-            push({ type: "at", extglob: true, value, output: "" });
-            continue;
-          }
-          push({ type: "text", value });
-          continue;
-        }
-        if (value !== "*") {
-          if (value === "$" || value === "^") {
-            value = `\\${value}`;
-          }
-          const match = REGEX_NON_SPECIAL_CHARS.exec(remaining());
-          if (match) {
-            value += match[0];
-            state.index += match[0].length;
-          }
-          push({ type: "text", value });
-          continue;
-        }
-        if (prev && (prev.type === "globstar" || prev.star === true)) {
-          prev.type = "star";
-          prev.star = true;
-          prev.value += value;
-          prev.output = star;
-          state.backtrack = true;
-          state.globstar = true;
-          consume(value);
-          continue;
-        }
-        let rest = remaining();
-        if (opts.noextglob !== true && /^\([^?]/.test(rest)) {
-          extglobOpen("star", value);
-          continue;
-        }
-        if (prev.type === "star") {
-          if (opts.noglobstar === true) {
-            consume(value);
-            continue;
-          }
-          const prior = prev.prev;
-          const before = prior.prev;
-          const isStart = prior.type === "slash" || prior.type === "bos";
-          const afterStar = before && (before.type === "star" || before.type === "globstar");
-          if (opts.bash === true && (!isStart || rest[0] && rest[0] !== "/")) {
-            push({ type: "star", value, output: "" });
-            continue;
-          }
-          const isBrace = state.braces > 0 && (prior.type === "comma" || prior.type === "brace");
-          const isExtglob = extglobs.length && (prior.type === "pipe" || prior.type === "paren");
-          if (!isStart && prior.type !== "paren" && !isBrace && !isExtglob) {
-            push({ type: "star", value, output: "" });
-            continue;
-          }
-          while (rest.slice(0, 3) === "/**") {
-            const after = input[state.index + 4];
-            if (after && after !== "/") {
-              break;
-            }
-            rest = rest.slice(3);
-            consume("/**", 3);
-          }
-          if (prior.type === "bos" && eos()) {
-            prev.type = "globstar";
-            prev.value += value;
-            prev.output = globstar(opts);
-            state.output = prev.output;
-            state.globstar = true;
-            consume(value);
-            continue;
-          }
-          if (prior.type === "slash" && prior.prev.type !== "bos" && !afterStar && eos()) {
-            state.output = state.output.slice(0, -(prior.output + prev.output).length);
-            prior.output = `(?:${prior.output}`;
-            prev.type = "globstar";
-            prev.output = globstar(opts) + (opts.strictSlashes ? ")" : "|$)");
-            prev.value += value;
-            state.globstar = true;
-            state.output += prior.output + prev.output;
-            consume(value);
-            continue;
-          }
-          if (prior.type === "slash" && prior.prev.type !== "bos" && rest[0] === "/") {
-            const end = rest[1] !== void 0 ? "|$" : "";
-            state.output = state.output.slice(0, -(prior.output + prev.output).length);
-            prior.output = `(?:${prior.output}`;
-            prev.type = "globstar";
-            prev.output = `${globstar(opts)}${SLASH_LITERAL}|${SLASH_LITERAL}${end})`;
-            prev.value += value;
-            state.output += prior.output + prev.output;
-            state.globstar = true;
-            consume(value + advance());
-            push({ type: "slash", value: "/", output: "" });
-            continue;
-          }
-          if (prior.type === "bos" && rest[0] === "/") {
-            prev.type = "globstar";
-            prev.value += value;
-            prev.output = `(?:^|${SLASH_LITERAL}|${globstar(opts)}${SLASH_LITERAL})`;
-            state.output = prev.output;
-            state.globstar = true;
-            consume(value + advance());
-            push({ type: "slash", value: "/", output: "" });
-            continue;
-          }
-          state.output = state.output.slice(0, -prev.output.length);
-          prev.type = "globstar";
-          prev.output = globstar(opts);
-          prev.value += value;
-          state.output += prev.output;
-          state.globstar = true;
-          consume(value);
-          continue;
-        }
-        const token = { type: "star", value, output: star };
-        if (opts.bash === true) {
-          token.output = ".*?";
-          if (prev.type === "bos" || prev.type === "slash") {
-            token.output = nodot + token.output;
-          }
-          push(token);
-          continue;
-        }
-        if (prev && (prev.type === "bracket" || prev.type === "paren") && opts.regex === true) {
-          token.output = value;
-          push(token);
-          continue;
-        }
-        if (state.index === state.start || prev.type === "slash" || prev.type === "dot") {
-          if (prev.type === "dot") {
-            state.output += NO_DOT_SLASH;
-            prev.output += NO_DOT_SLASH;
-          } else if (opts.dot === true) {
-            state.output += NO_DOTS_SLASH;
-            prev.output += NO_DOTS_SLASH;
-          } else {
-            state.output += nodot;
-            prev.output += nodot;
-          }
-          if (peek() !== "*") {
-            state.output += ONE_CHAR;
-            prev.output += ONE_CHAR;
-          }
-        }
-        push(token);
-      }
-      while (state.brackets > 0) {
-        if (opts.strictBrackets === true) throw new SyntaxError(syntaxError("closing", "]"));
-        state.output = utils.escapeLast(state.output, "[");
-        decrement("brackets");
-      }
-      while (state.parens > 0) {
-        if (opts.strictBrackets === true) throw new SyntaxError(syntaxError("closing", ")"));
-        state.output = utils.escapeLast(state.output, "(");
-        decrement("parens");
-      }
-      while (state.braces > 0) {
-        if (opts.strictBrackets === true) throw new SyntaxError(syntaxError("closing", "}"));
-        state.output = utils.escapeLast(state.output, "{");
-        decrement("braces");
-      }
-      if (opts.strictSlashes !== true && (prev.type === "star" || prev.type === "bracket")) {
-        push({ type: "maybe_slash", value: "", output: `${SLASH_LITERAL}?` });
-      }
-      if (state.backtrack === true) {
-        state.output = "";
-        for (const token of state.tokens) {
-          state.output += token.output != null ? token.output : token.value;
-          if (token.suffix) {
-            state.output += token.suffix;
-          }
-        }
-      }
-      return state;
-    };
-    parse4.fastpaths = (input, options) => {
-      const opts = { ...options };
-      const max = typeof opts.maxLength === "number" ? Math.min(MAX_LENGTH, opts.maxLength) : MAX_LENGTH;
-      const len = input.length;
-      if (len > max) {
-        throw new SyntaxError(`Input length: ${len}, exceeds maximum allowed length: ${max}`);
-      }
-      input = REPLACEMENTS[input] || input;
-      const win32 = utils.isWindows(options);
-      const {
-        DOT_LITERAL,
-        SLASH_LITERAL,
-        ONE_CHAR,
-        DOTS_SLASH,
-        NO_DOT,
-        NO_DOTS,
-        NO_DOTS_SLASH,
-        STAR,
-        START_ANCHOR
-      } = constants.globChars(win32);
-      const nodot = opts.dot ? NO_DOTS : NO_DOT;
-      const slashDot = opts.dot ? NO_DOTS_SLASH : NO_DOT;
-      const capture = opts.capture ? "" : "?:";
-      const state = { negated: false, prefix: "" };
-      let star = opts.bash === true ? ".*?" : STAR;
-      if (opts.capture) {
-        star = `(${star})`;
-      }
-      const globstar = (opts2) => {
-        if (opts2.noglobstar === true) return star;
-        return `(${capture}(?:(?!${START_ANCHOR}${opts2.dot ? DOTS_SLASH : DOT_LITERAL}).)*?)`;
-      };
-      const create = (str) => {
-        switch (str) {
-          case "*":
-            return `${nodot}${ONE_CHAR}${star}`;
-          case ".*":
-            return `${DOT_LITERAL}${ONE_CHAR}${star}`;
-          case "*.*":
-            return `${nodot}${star}${DOT_LITERAL}${ONE_CHAR}${star}`;
-          case "*/*":
-            return `${nodot}${star}${SLASH_LITERAL}${ONE_CHAR}${slashDot}${star}`;
-          case "**":
-            return nodot + globstar(opts);
-          case "**/*":
-            return `(?:${nodot}${globstar(opts)}${SLASH_LITERAL})?${slashDot}${ONE_CHAR}${star}`;
-          case "**/*.*":
-            return `(?:${nodot}${globstar(opts)}${SLASH_LITERAL})?${slashDot}${star}${DOT_LITERAL}${ONE_CHAR}${star}`;
-          case "**/.*":
-            return `(?:${nodot}${globstar(opts)}${SLASH_LITERAL})?${DOT_LITERAL}${ONE_CHAR}${star}`;
-          default: {
-            const match = /^(.*?)\.(\w+)$/.exec(str);
-            if (!match) return;
-            const source2 = create(match[1]);
-            if (!source2) return;
-            return source2 + DOT_LITERAL + match[2];
-          }
-        }
-      };
-      const output = utils.removePrefix(input, state);
-      let source = create(output);
-      if (source && opts.strictSlashes !== true) {
-        source += `${SLASH_LITERAL}?`;
-      }
-      return source;
-    };
-    module2.exports = parse4;
-  }
-});
-
-// ../../node_modules/picomatch/lib/picomatch.js
-var require_picomatch = __commonJS({
-  "../../node_modules/picomatch/lib/picomatch.js"(exports2, module2) {
-    "use strict";
-    init_scoped_fetch();
-    var path = require("path");
-    var scan = require_scan();
-    var parse4 = require_parse2();
-    var utils = require_utils2();
-    var constants = require_constants2();
-    var isObject7 = (val) => val && typeof val === "object" && !Array.isArray(val);
-    var picomatch = (glob, options, returnState = false) => {
-      if (Array.isArray(glob)) {
-        const fns = glob.map((input) => picomatch(input, options, returnState));
-        const arrayMatcher = (str) => {
-          for (const isMatch of fns) {
-            const state2 = isMatch(str);
-            if (state2) return state2;
-          }
-          return false;
-        };
-        return arrayMatcher;
-      }
-      const isState = isObject7(glob) && glob.tokens && glob.input;
-      if (glob === "" || typeof glob !== "string" && !isState) {
-        throw new TypeError("Expected pattern to be a non-empty string");
-      }
-      const opts = options || {};
-      const posix2 = utils.isWindows(options);
-      const regex = isState ? picomatch.compileRe(glob, options) : picomatch.makeRe(glob, options, false, true);
-      const state = regex.state;
-      delete regex.state;
-      let isIgnored = () => false;
-      if (opts.ignore) {
-        const ignoreOpts = { ...options, ignore: null, onMatch: null, onResult: null };
-        isIgnored = picomatch(opts.ignore, ignoreOpts, returnState);
-      }
-      const matcher = (input, returnObject = false) => {
-        const { isMatch, match, output } = picomatch.test(input, regex, options, { glob, posix: posix2 });
-        const result = { glob, state, regex, posix: posix2, input, output, match, isMatch };
-        if (typeof opts.onResult === "function") {
-          opts.onResult(result);
-        }
-        if (isMatch === false) {
-          result.isMatch = false;
-          return returnObject ? result : false;
-        }
-        if (isIgnored(input)) {
-          if (typeof opts.onIgnore === "function") {
-            opts.onIgnore(result);
-          }
-          result.isMatch = false;
-          return returnObject ? result : false;
-        }
-        if (typeof opts.onMatch === "function") {
-          opts.onMatch(result);
-        }
-        return returnObject ? result : true;
-      };
-      if (returnState) {
-        matcher.state = state;
-      }
-      return matcher;
-    };
-    picomatch.test = (input, regex, options, { glob, posix: posix2 } = {}) => {
-      if (typeof input !== "string") {
-        throw new TypeError("Expected input to be a string");
-      }
-      if (input === "") {
-        return { isMatch: false, output: "" };
-      }
-      const opts = options || {};
-      const format = opts.format || (posix2 ? utils.toPosixSlashes : null);
-      let match = input === glob;
-      let output = match && format ? format(input) : input;
-      if (match === false) {
-        output = format ? format(input) : input;
-        match = output === glob;
-      }
-      if (match === false || opts.capture === true) {
-        if (opts.matchBase === true || opts.basename === true) {
-          match = picomatch.matchBase(input, regex, options, posix2);
-        } else {
-          match = regex.exec(output);
-        }
-      }
-      return { isMatch: Boolean(match), match, output };
-    };
-    picomatch.matchBase = (input, glob, options, posix2 = utils.isWindows(options)) => {
-      const regex = glob instanceof RegExp ? glob : picomatch.makeRe(glob, options);
-      return regex.test(path.basename(input));
-    };
-    picomatch.isMatch = (str, patterns, options) => picomatch(patterns, options)(str);
-    picomatch.parse = (pattern, options) => {
-      if (Array.isArray(pattern)) return pattern.map((p) => picomatch.parse(p, options));
-      return parse4(pattern, { ...options, fastpaths: false });
-    };
-    picomatch.scan = (input, options) => scan(input, options);
-    picomatch.compileRe = (state, options, returnOutput = false, returnState = false) => {
-      if (returnOutput === true) {
-        return state.output;
-      }
-      const opts = options || {};
-      const prepend = opts.contains ? "" : "^";
-      const append = opts.contains ? "" : "$";
-      let source = `${prepend}(?:${state.output})${append}`;
-      if (state && state.negated === true) {
-        source = `^(?!${source}).*$`;
-      }
-      const regex = picomatch.toRegex(source, options);
-      if (returnState === true) {
-        regex.state = state;
-      }
-      return regex;
-    };
-    picomatch.makeRe = (input, options = {}, returnOutput = false, returnState = false) => {
-      if (!input || typeof input !== "string") {
-        throw new TypeError("Expected a non-empty string");
-      }
-      let parsed = { negated: false, fastpaths: true };
-      if (options.fastpaths !== false && (input[0] === "." || input[0] === "*")) {
-        parsed.output = parse4.fastpaths(input, options);
-      }
-      if (!parsed.output) {
-        parsed = parse4(input, options);
-      }
-      return picomatch.compileRe(parsed, options, returnOutput, returnState);
-    };
-    picomatch.toRegex = (source, options) => {
-      try {
-        const opts = options || {};
-        return new RegExp(source, opts.flags || (opts.nocase ? "i" : ""));
-      } catch (err) {
-        if (options && options.debug === true) throw err;
-        return /$^/;
-      }
-    };
-    picomatch.constants = constants;
-    module2.exports = picomatch;
-  }
-});
-
-// ../../node_modules/picomatch/index.js
-var require_picomatch2 = __commonJS({
-  "../../node_modules/picomatch/index.js"(exports2, module2) {
-    "use strict";
-    init_scoped_fetch();
-    module2.exports = require_picomatch();
-  }
-});
-
-// ../../node_modules/micromatch/index.js
-var require_micromatch = __commonJS({
-  "../../node_modules/micromatch/index.js"(exports2, module2) {
-    "use strict";
-    init_scoped_fetch();
-    var util = require("util");
-    var braces = require_braces();
-    var picomatch = require_picomatch2();
-    var utils = require_utils2();
-    var isEmptyString = (v2) => v2 === "" || v2 === "./";
-    var hasBraces = (v2) => {
-      const index = v2.indexOf("{");
-      return index > -1 && v2.indexOf("}", index) > -1;
-    };
-    var micromatch = (list, patterns, options) => {
-      patterns = [].concat(patterns);
-      list = [].concat(list);
-      let omit2 = /* @__PURE__ */ new Set();
-      let keep = /* @__PURE__ */ new Set();
-      let items = /* @__PURE__ */ new Set();
-      let negatives = 0;
-      let onResult = (state) => {
-        items.add(state.output);
-        if (options && options.onResult) {
-          options.onResult(state);
-        }
-      };
-      for (let i = 0; i < patterns.length; i++) {
-        let isMatch = picomatch(String(patterns[i]), { ...options, onResult }, true);
-        let negated = isMatch.state.negated || isMatch.state.negatedExtglob;
-        if (negated) negatives++;
-        for (let item of list) {
-          let matched = isMatch(item, true);
-          let match = negated ? !matched.isMatch : matched.isMatch;
-          if (!match) continue;
-          if (negated) {
-            omit2.add(matched.output);
-          } else {
-            omit2.delete(matched.output);
-            keep.add(matched.output);
-          }
-        }
-      }
-      let result = negatives === patterns.length ? [...items] : [...keep];
-      let matches = result.filter((item) => !omit2.has(item));
-      if (options && matches.length === 0) {
-        if (options.failglob === true) {
-          throw new Error(`No matches found for "${patterns.join(", ")}"`);
-        }
-        if (options.nonull === true || options.nullglob === true) {
-          return options.unescape ? patterns.map((p) => p.replace(/\\/g, "")) : patterns;
-        }
-      }
-      return matches;
-    };
-    micromatch.match = micromatch;
-    micromatch.matcher = (pattern, options) => picomatch(pattern, options);
-    micromatch.isMatch = (str, patterns, options) => picomatch(patterns, options)(str);
-    micromatch.any = micromatch.isMatch;
-    micromatch.not = (list, patterns, options = {}) => {
-      patterns = [].concat(patterns).map(String);
-      let result = /* @__PURE__ */ new Set();
-      let items = [];
-      let onResult = (state) => {
-        if (options.onResult) options.onResult(state);
-        items.push(state.output);
-      };
-      let matches = new Set(micromatch(list, patterns, { ...options, onResult }));
-      for (let item of items) {
-        if (!matches.has(item)) {
-          result.add(item);
-        }
-      }
-      return [...result];
-    };
-    micromatch.contains = (str, pattern, options) => {
-      if (typeof str !== "string") {
-        throw new TypeError(`Expected a string: "${util.inspect(str)}"`);
-      }
-      if (Array.isArray(pattern)) {
-        return pattern.some((p) => micromatch.contains(str, p, options));
-      }
-      if (typeof pattern === "string") {
-        if (isEmptyString(str) || isEmptyString(pattern)) {
-          return false;
-        }
-        if (str.includes(pattern) || str.startsWith("./") && str.slice(2).includes(pattern)) {
-          return true;
-        }
-      }
-      return micromatch.isMatch(str, pattern, { ...options, contains: true });
-    };
-    micromatch.matchKeys = (obj, patterns, options) => {
-      if (!utils.isObject(obj)) {
-        throw new TypeError("Expected the first argument to be an object");
-      }
-      let keys = micromatch(Object.keys(obj), patterns, options);
-      let res = {};
-      for (let key of keys) res[key] = obj[key];
-      return res;
-    };
-    micromatch.some = (list, patterns, options) => {
-      let items = [].concat(list);
-      for (let pattern of [].concat(patterns)) {
-        let isMatch = picomatch(String(pattern), options);
-        if (items.some((item) => isMatch(item))) {
-          return true;
-        }
-      }
-      return false;
-    };
-    micromatch.every = (list, patterns, options) => {
-      let items = [].concat(list);
-      for (let pattern of [].concat(patterns)) {
-        let isMatch = picomatch(String(pattern), options);
-        if (!items.every((item) => isMatch(item))) {
-          return false;
-        }
-      }
-      return true;
-    };
-    micromatch.all = (str, patterns, options) => {
-      if (typeof str !== "string") {
-        throw new TypeError(`Expected a string: "${util.inspect(str)}"`);
-      }
-      return [].concat(patterns).every((p) => picomatch(p, options)(str));
-    };
-    micromatch.capture = (glob, input, options) => {
-      let posix2 = utils.isWindows(options);
-      let regex = picomatch.makeRe(String(glob), { ...options, capture: true });
-      let match = regex.exec(posix2 ? utils.toPosixSlashes(input) : input);
-      if (match) {
-        return match.slice(1).map((v2) => v2 === void 0 ? "" : v2);
-      }
-    };
-    micromatch.makeRe = (...args) => picomatch.makeRe(...args);
-    micromatch.scan = (...args) => picomatch.scan(...args);
-    micromatch.parse = (patterns, options) => {
-      let res = [];
-      for (let pattern of [].concat(patterns || [])) {
-        for (let str of braces(String(pattern), options)) {
-          res.push(picomatch.parse(str, options));
-        }
-      }
-      return res;
-    };
-    micromatch.braces = (pattern, options) => {
-      if (typeof pattern !== "string") throw new TypeError("Expected a string");
-      if (options && options.nobrace === true || !hasBraces(pattern)) {
-        return [pattern];
-      }
-      return braces(pattern, options);
-    };
-    micromatch.braceExpand = (pattern, options) => {
-      if (typeof pattern !== "string") throw new TypeError("Expected a string");
-      return micromatch.braces(pattern, { ...options, expand: true });
-    };
-    micromatch.hasBraces = hasBraces;
-    module2.exports = micromatch;
-  }
-});
-
-// ../../node_modules/fast-glob/out/utils/pattern.js
-var require_pattern = __commonJS({
-  "../../node_modules/fast-glob/out/utils/pattern.js"(exports2) {
-    "use strict";
-    init_scoped_fetch();
-    Object.defineProperty(exports2, "__esModule", { value: true });
-    exports2.isAbsolute = exports2.partitionAbsoluteAndRelative = exports2.removeDuplicateSlashes = exports2.matchAny = exports2.convertPatternsToRe = exports2.makeRe = exports2.getPatternParts = exports2.expandBraceExpansion = exports2.expandPatternsWithBraceExpansion = exports2.isAffectDepthOfReadingPattern = exports2.endsWithSlashGlobStar = exports2.hasGlobStar = exports2.getBaseDirectory = exports2.isPatternRelatedToParentDirectory = exports2.getPatternsOutsideCurrentDirectory = exports2.getPatternsInsideCurrentDirectory = exports2.getPositivePatterns = exports2.getNegativePatterns = exports2.isPositivePattern = exports2.isNegativePattern = exports2.convertToNegativePattern = exports2.convertToPositivePattern = exports2.isDynamicPattern = exports2.isStaticPattern = void 0;
-    var path = require("path");
-    var globParent = require_glob_parent();
-    var micromatch = require_micromatch();
-    var GLOBSTAR = "**";
-    var ESCAPE_SYMBOL = "\\";
-    var COMMON_GLOB_SYMBOLS_RE = /[*?]|^!/;
-    var REGEX_CHARACTER_CLASS_SYMBOLS_RE = /\[[^[]*]/;
-    var REGEX_GROUP_SYMBOLS_RE = /(?:^|[^!*+?@])\([^(]*\|[^|]*\)/;
-    var GLOB_EXTENSION_SYMBOLS_RE = /[!*+?@]\([^(]*\)/;
-    var BRACE_EXPANSION_SEPARATORS_RE = /,|\.\./;
-    var DOUBLE_SLASH_RE = /(?!^)\/{2,}/g;
-    function isStaticPattern(pattern, options = {}) {
-      return !isDynamicPattern(pattern, options);
-    }
-    exports2.isStaticPattern = isStaticPattern;
-    function isDynamicPattern(pattern, options = {}) {
-      if (pattern === "") {
-        return false;
-      }
-      if (options.caseSensitiveMatch === false || pattern.includes(ESCAPE_SYMBOL)) {
-        return true;
-      }
-      if (COMMON_GLOB_SYMBOLS_RE.test(pattern) || REGEX_CHARACTER_CLASS_SYMBOLS_RE.test(pattern) || REGEX_GROUP_SYMBOLS_RE.test(pattern)) {
-        return true;
-      }
-      if (options.extglob !== false && GLOB_EXTENSION_SYMBOLS_RE.test(pattern)) {
-        return true;
-      }
-      if (options.braceExpansion !== false && hasBraceExpansion(pattern)) {
-        return true;
-      }
-      return false;
-    }
-    exports2.isDynamicPattern = isDynamicPattern;
-    function hasBraceExpansion(pattern) {
-      const openingBraceIndex = pattern.indexOf("{");
-      if (openingBraceIndex === -1) {
-        return false;
-      }
-      const closingBraceIndex = pattern.indexOf("}", openingBraceIndex + 1);
-      if (closingBraceIndex === -1) {
-        return false;
-      }
-      const braceContent = pattern.slice(openingBraceIndex, closingBraceIndex);
-      return BRACE_EXPANSION_SEPARATORS_RE.test(braceContent);
-    }
-    function convertToPositivePattern(pattern) {
-      return isNegativePattern(pattern) ? pattern.slice(1) : pattern;
-    }
-    exports2.convertToPositivePattern = convertToPositivePattern;
-    function convertToNegativePattern(pattern) {
-      return "!" + pattern;
-    }
-    exports2.convertToNegativePattern = convertToNegativePattern;
-    function isNegativePattern(pattern) {
-      return pattern.startsWith("!") && pattern[1] !== "(";
-    }
-    exports2.isNegativePattern = isNegativePattern;
-    function isPositivePattern(pattern) {
-      return !isNegativePattern(pattern);
-    }
-    exports2.isPositivePattern = isPositivePattern;
-    function getNegativePatterns(patterns) {
-      return patterns.filter(isNegativePattern);
-    }
-    exports2.getNegativePatterns = getNegativePatterns;
-    function getPositivePatterns(patterns) {
-      return patterns.filter(isPositivePattern);
-    }
-    exports2.getPositivePatterns = getPositivePatterns;
-    function getPatternsInsideCurrentDirectory(patterns) {
-      return patterns.filter((pattern) => !isPatternRelatedToParentDirectory(pattern));
-    }
-    exports2.getPatternsInsideCurrentDirectory = getPatternsInsideCurrentDirectory;
-    function getPatternsOutsideCurrentDirectory(patterns) {
-      return patterns.filter(isPatternRelatedToParentDirectory);
-    }
-    exports2.getPatternsOutsideCurrentDirectory = getPatternsOutsideCurrentDirectory;
-    function isPatternRelatedToParentDirectory(pattern) {
-      return pattern.startsWith("..") || pattern.startsWith("./..");
-    }
-    exports2.isPatternRelatedToParentDirectory = isPatternRelatedToParentDirectory;
-    function getBaseDirectory(pattern) {
-      return globParent(pattern, { flipBackslashes: false });
-    }
-    exports2.getBaseDirectory = getBaseDirectory;
-    function hasGlobStar(pattern) {
-      return pattern.includes(GLOBSTAR);
-    }
-    exports2.hasGlobStar = hasGlobStar;
-    function endsWithSlashGlobStar(pattern) {
-      return pattern.endsWith("/" + GLOBSTAR);
-    }
-    exports2.endsWithSlashGlobStar = endsWithSlashGlobStar;
-    function isAffectDepthOfReadingPattern(pattern) {
-      const basename9 = path.basename(pattern);
-      return endsWithSlashGlobStar(pattern) || isStaticPattern(basename9);
-    }
-    exports2.isAffectDepthOfReadingPattern = isAffectDepthOfReadingPattern;
-    function expandPatternsWithBraceExpansion(patterns) {
-      return patterns.reduce((collection, pattern) => {
-        return collection.concat(expandBraceExpansion(pattern));
-      }, []);
-    }
-    exports2.expandPatternsWithBraceExpansion = expandPatternsWithBraceExpansion;
-    function expandBraceExpansion(pattern) {
-      const patterns = micromatch.braces(pattern, { expand: true, nodupes: true, keepEscaping: true });
-      patterns.sort((a, b2) => a.length - b2.length);
-      return patterns.filter((pattern2) => pattern2 !== "");
-    }
-    exports2.expandBraceExpansion = expandBraceExpansion;
-    function getPatternParts(pattern, options) {
-      let { parts } = micromatch.scan(pattern, Object.assign(Object.assign({}, options), { parts: true }));
-      if (parts.length === 0) {
-        parts = [pattern];
-      }
-      if (parts[0].startsWith("/")) {
-        parts[0] = parts[0].slice(1);
-        parts.unshift("");
-      }
-      return parts;
-    }
-    exports2.getPatternParts = getPatternParts;
-    function makeRe(pattern, options) {
-      return micromatch.makeRe(pattern, options);
-    }
-    exports2.makeRe = makeRe;
-    function convertPatternsToRe(patterns, options) {
-      return patterns.map((pattern) => makeRe(pattern, options));
-    }
-    exports2.convertPatternsToRe = convertPatternsToRe;
-    function matchAny(entry, patternsRe) {
-      return patternsRe.some((patternRe) => patternRe.test(entry));
-    }
-    exports2.matchAny = matchAny;
-    function removeDuplicateSlashes(pattern) {
-      return pattern.replace(DOUBLE_SLASH_RE, "/");
-    }
-    exports2.removeDuplicateSlashes = removeDuplicateSlashes;
-    function partitionAbsoluteAndRelative(patterns) {
-      const absolute = [];
-      const relative6 = [];
-      for (const pattern of patterns) {
-        if (isAbsolute4(pattern)) {
-          absolute.push(pattern);
-        } else {
-          relative6.push(pattern);
-        }
-      }
-      return [absolute, relative6];
-    }
-    exports2.partitionAbsoluteAndRelative = partitionAbsoluteAndRelative;
-    function isAbsolute4(pattern) {
-      return path.isAbsolute(pattern);
-    }
-    exports2.isAbsolute = isAbsolute4;
-  }
-});
-
-// ../../node_modules/merge2/index.js
-var require_merge2 = __commonJS({
-  "../../node_modules/merge2/index.js"(exports2, module2) {
-    "use strict";
-    init_scoped_fetch();
-    var Stream = require("stream");
-    var PassThrough2 = Stream.PassThrough;
-    var slice = Array.prototype.slice;
-    module2.exports = merge2;
-    function merge2() {
-      const streamsQueue = [];
-      const args = slice.call(arguments);
-      let merging = false;
-      let options = args[args.length - 1];
-      if (options && !Array.isArray(options) && options.pipe == null) {
-        args.pop();
-      } else {
-        options = {};
-      }
-      const doEnd = options.end !== false;
-      const doPipeError = options.pipeError === true;
-      if (options.objectMode == null) {
-        options.objectMode = true;
-      }
-      if (options.highWaterMark == null) {
-        options.highWaterMark = 64 * 1024;
-      }
-      const mergedStream = PassThrough2(options);
-      function addStream() {
-        for (let i = 0, len = arguments.length; i < len; i++) {
-          streamsQueue.push(pauseStreams(arguments[i], options));
-        }
-        mergeStream();
-        return this;
-      }
-      function mergeStream() {
-        if (merging) {
-          return;
-        }
-        merging = true;
-        let streams = streamsQueue.shift();
-        if (!streams) {
-          process.nextTick(endStream);
-          return;
-        }
-        if (!Array.isArray(streams)) {
-          streams = [streams];
-        }
-        let pipesCount = streams.length + 1;
-        function next() {
-          if (--pipesCount > 0) {
-            return;
-          }
-          merging = false;
-          mergeStream();
-        }
-        function pipe2(stream) {
-          function onend() {
-            stream.removeListener("merge2UnpipeEnd", onend);
-            stream.removeListener("end", onend);
-            if (doPipeError) {
-              stream.removeListener("error", onerror);
-            }
-            next();
-          }
-          function onerror(err) {
-            mergedStream.emit("error", err);
-          }
-          if (stream._readableState.endEmitted) {
-            return next();
-          }
-          stream.on("merge2UnpipeEnd", onend);
-          stream.on("end", onend);
-          if (doPipeError) {
-            stream.on("error", onerror);
-          }
-          stream.pipe(mergedStream, { end: false });
-          stream.resume();
-        }
-        for (let i = 0; i < streams.length; i++) {
-          pipe2(streams[i]);
-        }
-        next();
-      }
-      function endStream() {
-        merging = false;
-        mergedStream.emit("queueDrain");
-        if (doEnd) {
-          mergedStream.end();
-        }
-      }
-      mergedStream.setMaxListeners(0);
-      mergedStream.add = addStream;
-      mergedStream.on("unpipe", function(stream) {
-        stream.emit("merge2UnpipeEnd");
-      });
-      if (args.length) {
-        addStream.apply(null, args);
-      }
-      return mergedStream;
-    }
-    function pauseStreams(streams, options) {
-      if (!Array.isArray(streams)) {
-        if (!streams._readableState && streams.pipe) {
-          streams = streams.pipe(PassThrough2(options));
-        }
-        if (!streams._readableState || !streams.pause || !streams.pipe) {
-          throw new Error("Only readable stream can be merged.");
-        }
-        streams.pause();
-      } else {
-        for (let i = 0, len = streams.length; i < len; i++) {
-          streams[i] = pauseStreams(streams[i], options);
-        }
-      }
-      return streams;
-    }
-  }
-});
-
-// ../../node_modules/fast-glob/out/utils/stream.js
-var require_stream = __commonJS({
-  "../../node_modules/fast-glob/out/utils/stream.js"(exports2) {
-    "use strict";
-    init_scoped_fetch();
-    Object.defineProperty(exports2, "__esModule", { value: true });
-    exports2.merge = void 0;
-    var merge2 = require_merge2();
-    function merge3(streams) {
-      const mergedStream = merge2(streams);
-      streams.forEach((stream) => {
-        stream.once("error", (error2) => mergedStream.emit("error", error2));
-      });
-      mergedStream.once("close", () => propagateCloseEventToSources(streams));
-      mergedStream.once("end", () => propagateCloseEventToSources(streams));
-      return mergedStream;
-    }
-    exports2.merge = merge3;
-    function propagateCloseEventToSources(streams) {
-      streams.forEach((stream) => stream.emit("close"));
-    }
-  }
-});
-
-// ../../node_modules/fast-glob/out/utils/string.js
-var require_string = __commonJS({
-  "../../node_modules/fast-glob/out/utils/string.js"(exports2) {
-    "use strict";
-    init_scoped_fetch();
-    Object.defineProperty(exports2, "__esModule", { value: true });
-    exports2.isEmpty = exports2.isString = void 0;
-    function isString(input) {
-      return typeof input === "string";
-    }
-    exports2.isString = isString;
-    function isEmpty(input) {
-      return input === "";
-    }
-    exports2.isEmpty = isEmpty;
-  }
-});
-
-// ../../node_modules/fast-glob/out/utils/index.js
-var require_utils3 = __commonJS({
-  "../../node_modules/fast-glob/out/utils/index.js"(exports2) {
-    "use strict";
-    init_scoped_fetch();
-    Object.defineProperty(exports2, "__esModule", { value: true });
-    exports2.string = exports2.stream = exports2.pattern = exports2.path = exports2.fs = exports2.errno = exports2.array = void 0;
-    var array2 = require_array();
-    exports2.array = array2;
-    var errno = require_errno();
-    exports2.errno = errno;
-    var fs11 = require_fs();
-    exports2.fs = fs11;
-    var path = require_path();
-    exports2.path = path;
-    var pattern = require_pattern();
-    exports2.pattern = pattern;
-    var stream = require_stream();
-    exports2.stream = stream;
-    var string3 = require_string();
-    exports2.string = string3;
-  }
-});
-
-// ../../node_modules/fast-glob/out/managers/tasks.js
-var require_tasks = __commonJS({
-  "../../node_modules/fast-glob/out/managers/tasks.js"(exports2) {
-    "use strict";
-    init_scoped_fetch();
-    Object.defineProperty(exports2, "__esModule", { value: true });
-    exports2.convertPatternGroupToTask = exports2.convertPatternGroupsToTasks = exports2.groupPatternsByBaseDirectory = exports2.getNegativePatternsAsPositive = exports2.getPositivePatterns = exports2.convertPatternsToTasks = exports2.generate = void 0;
-    var utils = require_utils3();
-    function generate(input, settings) {
-      const patterns = processPatterns(input, settings);
-      const ignore = processPatterns(settings.ignore, settings);
-      const positivePatterns = getPositivePatterns(patterns);
-      const negativePatterns = getNegativePatternsAsPositive(patterns, ignore);
-      const staticPatterns = positivePatterns.filter((pattern) => utils.pattern.isStaticPattern(pattern, settings));
-      const dynamicPatterns = positivePatterns.filter((pattern) => utils.pattern.isDynamicPattern(pattern, settings));
-      const staticTasks = convertPatternsToTasks(
-        staticPatterns,
-        negativePatterns,
-        /* dynamic */
-        false
-      );
-      const dynamicTasks = convertPatternsToTasks(
-        dynamicPatterns,
-        negativePatterns,
-        /* dynamic */
-        true
-      );
-      return staticTasks.concat(dynamicTasks);
-    }
-    exports2.generate = generate;
-    function processPatterns(input, settings) {
-      let patterns = input;
-      if (settings.braceExpansion) {
-        patterns = utils.pattern.expandPatternsWithBraceExpansion(patterns);
-      }
-      if (settings.baseNameMatch) {
-        patterns = patterns.map((pattern) => pattern.includes("/") ? pattern : `**/${pattern}`);
-      }
-      return patterns.map((pattern) => utils.pattern.removeDuplicateSlashes(pattern));
-    }
-    function convertPatternsToTasks(positive, negative, dynamic) {
-      const tasks = [];
-      const patternsOutsideCurrentDirectory = utils.pattern.getPatternsOutsideCurrentDirectory(positive);
-      const patternsInsideCurrentDirectory = utils.pattern.getPatternsInsideCurrentDirectory(positive);
-      const outsideCurrentDirectoryGroup = groupPatternsByBaseDirectory(patternsOutsideCurrentDirectory);
-      const insideCurrentDirectoryGroup = groupPatternsByBaseDirectory(patternsInsideCurrentDirectory);
-      tasks.push(...convertPatternGroupsToTasks(outsideCurrentDirectoryGroup, negative, dynamic));
-      if ("." in insideCurrentDirectoryGroup) {
-        tasks.push(convertPatternGroupToTask(".", patternsInsideCurrentDirectory, negative, dynamic));
-      } else {
-        tasks.push(...convertPatternGroupsToTasks(insideCurrentDirectoryGroup, negative, dynamic));
-      }
-      return tasks;
-    }
-    exports2.convertPatternsToTasks = convertPatternsToTasks;
-    function getPositivePatterns(patterns) {
-      return utils.pattern.getPositivePatterns(patterns);
-    }
-    exports2.getPositivePatterns = getPositivePatterns;
-    function getNegativePatternsAsPositive(patterns, ignore) {
-      const negative = utils.pattern.getNegativePatterns(patterns).concat(ignore);
-      const positive = negative.map(utils.pattern.convertToPositivePattern);
-      return positive;
-    }
-    exports2.getNegativePatternsAsPositive = getNegativePatternsAsPositive;
-    function groupPatternsByBaseDirectory(patterns) {
-      const group = {};
-      return patterns.reduce((collection, pattern) => {
-        const base = utils.pattern.getBaseDirectory(pattern);
-        if (base in collection) {
-          collection[base].push(pattern);
-        } else {
-          collection[base] = [pattern];
-        }
-        return collection;
-      }, group);
-    }
-    exports2.groupPatternsByBaseDirectory = groupPatternsByBaseDirectory;
-    function convertPatternGroupsToTasks(positive, negative, dynamic) {
-      return Object.keys(positive).map((base) => {
-        return convertPatternGroupToTask(base, positive[base], negative, dynamic);
-      });
-    }
-    exports2.convertPatternGroupsToTasks = convertPatternGroupsToTasks;
-    function convertPatternGroupToTask(base, positive, negative, dynamic) {
-      return {
-        dynamic,
-        positive,
-        negative,
-        base,
-        patterns: [].concat(positive, negative.map(utils.pattern.convertToNegativePattern))
-      };
-    }
-    exports2.convertPatternGroupToTask = convertPatternGroupToTask;
-  }
-});
-
-// ../../node_modules/@nodelib/fs.stat/out/providers/async.js
-var require_async = __commonJS({
-  "../../node_modules/@nodelib/fs.stat/out/providers/async.js"(exports2) {
-    "use strict";
-    init_scoped_fetch();
-    Object.defineProperty(exports2, "__esModule", { value: true });
-    exports2.read = void 0;
-    function read(path, settings, callback) {
-      settings.fs.lstat(path, (lstatError, lstat5) => {
-        if (lstatError !== null) {
-          callFailureCallback(callback, lstatError);
-          return;
-        }
-        if (!lstat5.isSymbolicLink() || !settings.followSymbolicLink) {
-          callSuccessCallback(callback, lstat5);
-          return;
-        }
-        settings.fs.stat(path, (statError, stat5) => {
-          if (statError !== null) {
-            if (settings.throwErrorOnBrokenSymbolicLink) {
-              callFailureCallback(callback, statError);
-              return;
-            }
-            callSuccessCallback(callback, lstat5);
-            return;
-          }
-          if (settings.markSymbolicLink) {
-            stat5.isSymbolicLink = () => true;
-          }
-          callSuccessCallback(callback, stat5);
-        });
-      });
-    }
-    exports2.read = read;
-    function callFailureCallback(callback, error2) {
-      callback(error2);
-    }
-    function callSuccessCallback(callback, result) {
-      callback(null, result);
-    }
-  }
-});
-
-// ../../node_modules/@nodelib/fs.stat/out/providers/sync.js
-var require_sync = __commonJS({
-  "../../node_modules/@nodelib/fs.stat/out/providers/sync.js"(exports2) {
-    "use strict";
-    init_scoped_fetch();
-    Object.defineProperty(exports2, "__esModule", { value: true });
-    exports2.read = void 0;
-    function read(path, settings) {
-      const lstat5 = settings.fs.lstatSync(path);
-      if (!lstat5.isSymbolicLink() || !settings.followSymbolicLink) {
-        return lstat5;
-      }
-      try {
-        const stat5 = settings.fs.statSync(path);
-        if (settings.markSymbolicLink) {
-          stat5.isSymbolicLink = () => true;
-        }
-        return stat5;
-      } catch (error2) {
-        if (!settings.throwErrorOnBrokenSymbolicLink) {
-          return lstat5;
-        }
-        throw error2;
-      }
-    }
-    exports2.read = read;
-  }
-});
-
-// ../../node_modules/@nodelib/fs.stat/out/adapters/fs.js
-var require_fs2 = __commonJS({
-  "../../node_modules/@nodelib/fs.stat/out/adapters/fs.js"(exports2) {
-    "use strict";
-    init_scoped_fetch();
-    Object.defineProperty(exports2, "__esModule", { value: true });
-    exports2.createFileSystemAdapter = exports2.FILE_SYSTEM_ADAPTER = void 0;
-    var fs11 = require("fs");
-    exports2.FILE_SYSTEM_ADAPTER = {
-      lstat: fs11.lstat,
-      stat: fs11.stat,
-      lstatSync: fs11.lstatSync,
-      statSync: fs11.statSync
-    };
-    function createFileSystemAdapter(fsMethods) {
-      if (fsMethods === void 0) {
-        return exports2.FILE_SYSTEM_ADAPTER;
-      }
-      return Object.assign(Object.assign({}, exports2.FILE_SYSTEM_ADAPTER), fsMethods);
-    }
-    exports2.createFileSystemAdapter = createFileSystemAdapter;
-  }
-});
-
-// ../../node_modules/@nodelib/fs.stat/out/settings.js
-var require_settings = __commonJS({
-  "../../node_modules/@nodelib/fs.stat/out/settings.js"(exports2) {
-    "use strict";
-    init_scoped_fetch();
-    Object.defineProperty(exports2, "__esModule", { value: true });
-    var fs11 = require_fs2();
-    var Settings = class {
-      constructor(_options = {}) {
-        this._options = _options;
-        this.followSymbolicLink = this._getValue(this._options.followSymbolicLink, true);
-        this.fs = fs11.createFileSystemAdapter(this._options.fs);
-        this.markSymbolicLink = this._getValue(this._options.markSymbolicLink, false);
-        this.throwErrorOnBrokenSymbolicLink = this._getValue(this._options.throwErrorOnBrokenSymbolicLink, true);
-      }
-      _getValue(option, value) {
-        return option !== null && option !== void 0 ? option : value;
-      }
-    };
-    exports2.default = Settings;
-  }
-});
-
-// ../../node_modules/@nodelib/fs.stat/out/index.js
-var require_out = __commonJS({
-  "../../node_modules/@nodelib/fs.stat/out/index.js"(exports2) {
-    "use strict";
-    init_scoped_fetch();
-    Object.defineProperty(exports2, "__esModule", { value: true });
-    exports2.statSync = exports2.stat = exports2.Settings = void 0;
-    var async = require_async();
-    var sync = require_sync();
-    var settings_1 = require_settings();
-    exports2.Settings = settings_1.default;
-    function stat5(path, optionsOrSettingsOrCallback, callback) {
-      if (typeof optionsOrSettingsOrCallback === "function") {
-        async.read(path, getSettings(), optionsOrSettingsOrCallback);
-        return;
-      }
-      async.read(path, getSettings(optionsOrSettingsOrCallback), callback);
-    }
-    exports2.stat = stat5;
-    function statSync6(path, optionsOrSettings) {
-      const settings = getSettings(optionsOrSettings);
-      return sync.read(path, settings);
-    }
-    exports2.statSync = statSync6;
-    function getSettings(settingsOrOptions = {}) {
-      if (settingsOrOptions instanceof settings_1.default) {
-        return settingsOrOptions;
-      }
-      return new settings_1.default(settingsOrOptions);
-    }
-  }
-});
-
-// ../../node_modules/queue-microtask/index.js
-var require_queue_microtask = __commonJS({
-  "../../node_modules/queue-microtask/index.js"(exports2, module2) {
-    init_scoped_fetch();
-    var promise;
-    module2.exports = typeof queueMicrotask === "function" ? queueMicrotask.bind(typeof window !== "undefined" ? window : global) : (cb) => (promise || (promise = Promise.resolve())).then(cb).catch((err) => setTimeout(() => {
-      throw err;
-    }, 0));
-  }
-});
-
-// ../../node_modules/run-parallel/index.js
-var require_run_parallel = __commonJS({
-  "../../node_modules/run-parallel/index.js"(exports2, module2) {
-    init_scoped_fetch();
-    module2.exports = runParallel;
-    var queueMicrotask2 = require_queue_microtask();
-    function runParallel(tasks, cb) {
-      let results, pending, keys;
-      let isSync = true;
-      if (Array.isArray(tasks)) {
-        results = [];
-        pending = tasks.length;
-      } else {
-        keys = Object.keys(tasks);
-        results = {};
-        pending = keys.length;
-      }
-      function done(err) {
-        function end() {
-          if (cb) cb(err, results);
-          cb = null;
-        }
-        if (isSync) queueMicrotask2(end);
-        else end();
-      }
-      function each(i, err, result) {
-        results[i] = result;
-        if (--pending === 0 || err) {
-          done(err);
-        }
-      }
-      if (!pending) {
-        done(null);
-      } else if (keys) {
-        keys.forEach(function(key) {
-          tasks[key](function(err, result) {
-            each(key, err, result);
-          });
-        });
-      } else {
-        tasks.forEach(function(task, i) {
-          task(function(err, result) {
-            each(i, err, result);
-          });
-        });
-      }
-      isSync = false;
-    }
-  }
-});
-
-// ../../node_modules/@nodelib/fs.scandir/out/constants.js
-var require_constants3 = __commonJS({
-  "../../node_modules/@nodelib/fs.scandir/out/constants.js"(exports2) {
-    "use strict";
-    init_scoped_fetch();
-    Object.defineProperty(exports2, "__esModule", { value: true });
-    exports2.IS_SUPPORT_READDIR_WITH_FILE_TYPES = void 0;
-    var NODE_PROCESS_VERSION_PARTS = process.versions.node.split(".");
-    if (NODE_PROCESS_VERSION_PARTS[0] === void 0 || NODE_PROCESS_VERSION_PARTS[1] === void 0) {
-      throw new Error(`Unexpected behavior. The 'process.versions.node' variable has invalid value: ${process.versions.node}`);
-    }
-    var MAJOR_VERSION = Number.parseInt(NODE_PROCESS_VERSION_PARTS[0], 10);
-    var MINOR_VERSION = Number.parseInt(NODE_PROCESS_VERSION_PARTS[1], 10);
-    var SUPPORTED_MAJOR_VERSION = 10;
-    var SUPPORTED_MINOR_VERSION = 10;
-    var IS_MATCHED_BY_MAJOR = MAJOR_VERSION > SUPPORTED_MAJOR_VERSION;
-    var IS_MATCHED_BY_MAJOR_AND_MINOR = MAJOR_VERSION === SUPPORTED_MAJOR_VERSION && MINOR_VERSION >= SUPPORTED_MINOR_VERSION;
-    exports2.IS_SUPPORT_READDIR_WITH_FILE_TYPES = IS_MATCHED_BY_MAJOR || IS_MATCHED_BY_MAJOR_AND_MINOR;
-  }
-});
-
-// ../../node_modules/@nodelib/fs.scandir/out/utils/fs.js
-var require_fs3 = __commonJS({
-  "../../node_modules/@nodelib/fs.scandir/out/utils/fs.js"(exports2) {
-    "use strict";
-    init_scoped_fetch();
-    Object.defineProperty(exports2, "__esModule", { value: true });
-    exports2.createDirentFromStats = void 0;
-    var DirentFromStats = class {
-      constructor(name, stats) {
-        this.name = name;
-        this.isBlockDevice = stats.isBlockDevice.bind(stats);
-        this.isCharacterDevice = stats.isCharacterDevice.bind(stats);
-        this.isDirectory = stats.isDirectory.bind(stats);
-        this.isFIFO = stats.isFIFO.bind(stats);
-        this.isFile = stats.isFile.bind(stats);
-        this.isSocket = stats.isSocket.bind(stats);
-        this.isSymbolicLink = stats.isSymbolicLink.bind(stats);
-      }
-    };
-    function createDirentFromStats(name, stats) {
-      return new DirentFromStats(name, stats);
-    }
-    exports2.createDirentFromStats = createDirentFromStats;
-  }
-});
-
-// ../../node_modules/@nodelib/fs.scandir/out/utils/index.js
-var require_utils4 = __commonJS({
-  "../../node_modules/@nodelib/fs.scandir/out/utils/index.js"(exports2) {
-    "use strict";
-    init_scoped_fetch();
-    Object.defineProperty(exports2, "__esModule", { value: true });
-    exports2.fs = void 0;
-    var fs11 = require_fs3();
-    exports2.fs = fs11;
-  }
-});
-
-// ../../node_modules/@nodelib/fs.scandir/out/providers/common.js
-var require_common = __commonJS({
-  "../../node_modules/@nodelib/fs.scandir/out/providers/common.js"(exports2) {
-    "use strict";
-    init_scoped_fetch();
-    Object.defineProperty(exports2, "__esModule", { value: true });
-    exports2.joinPathSegments = void 0;
-    function joinPathSegments(a, b2, separator) {
-      if (a.endsWith(separator)) {
-        return a + b2;
-      }
-      return a + separator + b2;
-    }
-    exports2.joinPathSegments = joinPathSegments;
-  }
-});
-
-// ../../node_modules/@nodelib/fs.scandir/out/providers/async.js
-var require_async2 = __commonJS({
-  "../../node_modules/@nodelib/fs.scandir/out/providers/async.js"(exports2) {
-    "use strict";
-    init_scoped_fetch();
-    Object.defineProperty(exports2, "__esModule", { value: true });
-    exports2.readdir = exports2.readdirWithFileTypes = exports2.read = void 0;
-    var fsStat = require_out();
-    var rpl = require_run_parallel();
-    var constants_1 = require_constants3();
-    var utils = require_utils4();
-    var common = require_common();
-    function read(directory, settings, callback) {
-      if (!settings.stats && constants_1.IS_SUPPORT_READDIR_WITH_FILE_TYPES) {
-        readdirWithFileTypes(directory, settings, callback);
-        return;
-      }
-      readdir6(directory, settings, callback);
-    }
-    exports2.read = read;
-    function readdirWithFileTypes(directory, settings, callback) {
-      settings.fs.readdir(directory, { withFileTypes: true }, (readdirError, dirents) => {
-        if (readdirError !== null) {
-          callFailureCallback(callback, readdirError);
-          return;
-        }
-        const entries = dirents.map((dirent) => ({
-          dirent,
-          name: dirent.name,
-          path: common.joinPathSegments(directory, dirent.name, settings.pathSegmentSeparator)
-        }));
-        if (!settings.followSymbolicLinks) {
-          callSuccessCallback(callback, entries);
-          return;
-        }
-        const tasks = entries.map((entry) => makeRplTaskEntry(entry, settings));
-        rpl(tasks, (rplError, rplEntries) => {
-          if (rplError !== null) {
-            callFailureCallback(callback, rplError);
-            return;
-          }
-          callSuccessCallback(callback, rplEntries);
-        });
-      });
-    }
-    exports2.readdirWithFileTypes = readdirWithFileTypes;
-    function makeRplTaskEntry(entry, settings) {
-      return (done) => {
-        if (!entry.dirent.isSymbolicLink()) {
-          done(null, entry);
-          return;
-        }
-        settings.fs.stat(entry.path, (statError, stats) => {
-          if (statError !== null) {
-            if (settings.throwErrorOnBrokenSymbolicLink) {
-              done(statError);
-              return;
-            }
-            done(null, entry);
-            return;
-          }
-          entry.dirent = utils.fs.createDirentFromStats(entry.name, stats);
-          done(null, entry);
-        });
-      };
-    }
-    function readdir6(directory, settings, callback) {
-      settings.fs.readdir(directory, (readdirError, names) => {
-        if (readdirError !== null) {
-          callFailureCallback(callback, readdirError);
-          return;
-        }
-        const tasks = names.map((name) => {
-          const path = common.joinPathSegments(directory, name, settings.pathSegmentSeparator);
-          return (done) => {
-            fsStat.stat(path, settings.fsStatSettings, (error2, stats) => {
-              if (error2 !== null) {
-                done(error2);
-                return;
-              }
-              const entry = {
-                name,
-                path,
-                dirent: utils.fs.createDirentFromStats(name, stats)
-              };
-              if (settings.stats) {
-                entry.stats = stats;
-              }
-              done(null, entry);
-            });
-          };
-        });
-        rpl(tasks, (rplError, entries) => {
-          if (rplError !== null) {
-            callFailureCallback(callback, rplError);
-            return;
-          }
-          callSuccessCallback(callback, entries);
-        });
-      });
-    }
-    exports2.readdir = readdir6;
-    function callFailureCallback(callback, error2) {
-      callback(error2);
-    }
-    function callSuccessCallback(callback, result) {
-      callback(null, result);
-    }
-  }
-});
-
-// ../../node_modules/@nodelib/fs.scandir/out/providers/sync.js
-var require_sync2 = __commonJS({
-  "../../node_modules/@nodelib/fs.scandir/out/providers/sync.js"(exports2) {
-    "use strict";
-    init_scoped_fetch();
-    Object.defineProperty(exports2, "__esModule", { value: true });
-    exports2.readdir = exports2.readdirWithFileTypes = exports2.read = void 0;
-    var fsStat = require_out();
-    var constants_1 = require_constants3();
-    var utils = require_utils4();
-    var common = require_common();
-    function read(directory, settings) {
-      if (!settings.stats && constants_1.IS_SUPPORT_READDIR_WITH_FILE_TYPES) {
-        return readdirWithFileTypes(directory, settings);
-      }
-      return readdir6(directory, settings);
-    }
-    exports2.read = read;
-    function readdirWithFileTypes(directory, settings) {
-      const dirents = settings.fs.readdirSync(directory, { withFileTypes: true });
-      return dirents.map((dirent) => {
-        const entry = {
-          dirent,
-          name: dirent.name,
-          path: common.joinPathSegments(directory, dirent.name, settings.pathSegmentSeparator)
-        };
-        if (entry.dirent.isSymbolicLink() && settings.followSymbolicLinks) {
-          try {
-            const stats = settings.fs.statSync(entry.path);
-            entry.dirent = utils.fs.createDirentFromStats(entry.name, stats);
-          } catch (error2) {
-            if (settings.throwErrorOnBrokenSymbolicLink) {
-              throw error2;
-            }
-          }
-        }
-        return entry;
-      });
-    }
-    exports2.readdirWithFileTypes = readdirWithFileTypes;
-    function readdir6(directory, settings) {
-      const names = settings.fs.readdirSync(directory);
-      return names.map((name) => {
-        const entryPath = common.joinPathSegments(directory, name, settings.pathSegmentSeparator);
-        const stats = fsStat.statSync(entryPath, settings.fsStatSettings);
-        const entry = {
-          name,
-          path: entryPath,
-          dirent: utils.fs.createDirentFromStats(name, stats)
-        };
-        if (settings.stats) {
-          entry.stats = stats;
-        }
-        return entry;
-      });
-    }
-    exports2.readdir = readdir6;
-  }
-});
-
-// ../../node_modules/@nodelib/fs.scandir/out/adapters/fs.js
-var require_fs4 = __commonJS({
-  "../../node_modules/@nodelib/fs.scandir/out/adapters/fs.js"(exports2) {
-    "use strict";
-    init_scoped_fetch();
-    Object.defineProperty(exports2, "__esModule", { value: true });
-    exports2.createFileSystemAdapter = exports2.FILE_SYSTEM_ADAPTER = void 0;
-    var fs11 = require("fs");
-    exports2.FILE_SYSTEM_ADAPTER = {
-      lstat: fs11.lstat,
-      stat: fs11.stat,
-      lstatSync: fs11.lstatSync,
-      statSync: fs11.statSync,
-      readdir: fs11.readdir,
-      readdirSync: fs11.readdirSync
-    };
-    function createFileSystemAdapter(fsMethods) {
-      if (fsMethods === void 0) {
-        return exports2.FILE_SYSTEM_ADAPTER;
-      }
-      return Object.assign(Object.assign({}, exports2.FILE_SYSTEM_ADAPTER), fsMethods);
-    }
-    exports2.createFileSystemAdapter = createFileSystemAdapter;
-  }
-});
-
-// ../../node_modules/@nodelib/fs.scandir/out/settings.js
-var require_settings2 = __commonJS({
-  "../../node_modules/@nodelib/fs.scandir/out/settings.js"(exports2) {
-    "use strict";
-    init_scoped_fetch();
-    Object.defineProperty(exports2, "__esModule", { value: true });
-    var path = require("path");
-    var fsStat = require_out();
-    var fs11 = require_fs4();
-    var Settings = class {
-      constructor(_options = {}) {
-        this._options = _options;
-        this.followSymbolicLinks = this._getValue(this._options.followSymbolicLinks, false);
-        this.fs = fs11.createFileSystemAdapter(this._options.fs);
-        this.pathSegmentSeparator = this._getValue(this._options.pathSegmentSeparator, path.sep);
-        this.stats = this._getValue(this._options.stats, false);
-        this.throwErrorOnBrokenSymbolicLink = this._getValue(this._options.throwErrorOnBrokenSymbolicLink, true);
-        this.fsStatSettings = new fsStat.Settings({
-          followSymbolicLink: this.followSymbolicLinks,
-          fs: this.fs,
-          throwErrorOnBrokenSymbolicLink: this.throwErrorOnBrokenSymbolicLink
-        });
-      }
-      _getValue(option, value) {
-        return option !== null && option !== void 0 ? option : value;
-      }
-    };
-    exports2.default = Settings;
-  }
-});
-
-// ../../node_modules/@nodelib/fs.scandir/out/index.js
-var require_out2 = __commonJS({
-  "../../node_modules/@nodelib/fs.scandir/out/index.js"(exports2) {
-    "use strict";
-    init_scoped_fetch();
-    Object.defineProperty(exports2, "__esModule", { value: true });
-    exports2.Settings = exports2.scandirSync = exports2.scandir = void 0;
-    var async = require_async2();
-    var sync = require_sync2();
-    var settings_1 = require_settings2();
-    exports2.Settings = settings_1.default;
-    function scandir(path, optionsOrSettingsOrCallback, callback) {
-      if (typeof optionsOrSettingsOrCallback === "function") {
-        async.read(path, getSettings(), optionsOrSettingsOrCallback);
-        return;
-      }
-      async.read(path, getSettings(optionsOrSettingsOrCallback), callback);
-    }
-    exports2.scandir = scandir;
-    function scandirSync(path, optionsOrSettings) {
-      const settings = getSettings(optionsOrSettings);
-      return sync.read(path, settings);
-    }
-    exports2.scandirSync = scandirSync;
-    function getSettings(settingsOrOptions = {}) {
-      if (settingsOrOptions instanceof settings_1.default) {
-        return settingsOrOptions;
-      }
-      return new settings_1.default(settingsOrOptions);
-    }
-  }
-});
-
-// ../../node_modules/reusify/reusify.js
-var require_reusify = __commonJS({
-  "../../node_modules/reusify/reusify.js"(exports2, module2) {
-    "use strict";
-    init_scoped_fetch();
-    function reusify(Constructor) {
-      var head = new Constructor();
-      var tail = head;
-      function get() {
-        var current = head;
-        if (current.next) {
-          head = current.next;
-        } else {
-          head = new Constructor();
-          tail = head;
-        }
-        current.next = null;
-        return current;
-      }
-      function release(obj) {
-        tail.next = obj;
-        tail = obj;
-      }
-      return {
-        get,
-        release
-      };
-    }
-    module2.exports = reusify;
-  }
-});
-
-// ../../node_modules/fastq/queue.js
-var require_queue = __commonJS({
-  "../../node_modules/fastq/queue.js"(exports2, module2) {
-    "use strict";
-    init_scoped_fetch();
-    var reusify = require_reusify();
-    function fastqueue(context, worker, _concurrency) {
-      if (typeof context === "function") {
-        _concurrency = worker;
-        worker = context;
-        context = null;
-      }
-      if (!(_concurrency >= 1)) {
-        throw new Error("fastqueue concurrency must be equal to or greater than 1");
-      }
-      var cache = reusify(Task);
-      var queueHead = null;
-      var queueTail = null;
-      var _running = 0;
-      var errorHandler = null;
-      var self = {
-        push,
-        drain: noop,
-        saturated: noop,
-        pause,
-        paused: false,
-        get concurrency() {
-          return _concurrency;
-        },
-        set concurrency(value) {
-          if (!(value >= 1)) {
-            throw new Error("fastqueue concurrency must be equal to or greater than 1");
-          }
-          _concurrency = value;
-          if (self.paused) return;
-          for (; queueHead && _running < _concurrency; ) {
-            _running++;
-            release();
-          }
-        },
-        running,
-        resume,
-        idle,
-        length,
-        getQueue,
-        unshift,
-        empty: noop,
-        kill,
-        killAndDrain,
-        error: error2,
-        abort
-      };
-      return self;
-      function running() {
-        return _running;
-      }
-      function pause() {
-        self.paused = true;
-      }
-      function length() {
-        var current = queueHead;
-        var counter = 0;
-        while (current) {
-          current = current.next;
-          counter++;
-        }
-        return counter;
-      }
-      function getQueue() {
-        var current = queueHead;
-        var tasks = [];
-        while (current) {
-          tasks.push(current.value);
-          current = current.next;
-        }
-        return tasks;
-      }
-      function resume() {
-        if (!self.paused) return;
-        self.paused = false;
-        if (queueHead === null) {
-          _running++;
-          release();
-          return;
-        }
-        for (; queueHead && _running < _concurrency; ) {
-          _running++;
-          release();
-        }
-      }
-      function idle() {
-        return _running === 0 && self.length() === 0;
-      }
-      function push(value, done) {
-        var current = cache.get();
-        current.context = context;
-        current.release = release;
-        current.value = value;
-        current.callback = done || noop;
-        current.errorHandler = errorHandler;
-        if (_running >= _concurrency || self.paused) {
-          if (queueTail) {
-            queueTail.next = current;
-            queueTail = current;
-          } else {
-            queueHead = current;
-            queueTail = current;
-            self.saturated();
-          }
-        } else {
-          _running++;
-          worker.call(context, current.value, current.worked);
-        }
-      }
-      function unshift(value, done) {
-        var current = cache.get();
-        current.context = context;
-        current.release = release;
-        current.value = value;
-        current.callback = done || noop;
-        current.errorHandler = errorHandler;
-        if (_running >= _concurrency || self.paused) {
-          if (queueHead) {
-            current.next = queueHead;
-            queueHead = current;
-          } else {
-            queueHead = current;
-            queueTail = current;
-            self.saturated();
-          }
-        } else {
-          _running++;
-          worker.call(context, current.value, current.worked);
-        }
-      }
-      function release(holder) {
-        if (holder) {
-          cache.release(holder);
-        }
-        var next = queueHead;
-        if (next && _running <= _concurrency) {
-          if (!self.paused) {
-            if (queueTail === queueHead) {
-              queueTail = null;
-            }
-            queueHead = next.next;
-            next.next = null;
-            worker.call(context, next.value, next.worked);
-            if (queueTail === null) {
-              self.empty();
-            }
-          } else {
-            _running--;
-          }
-        } else if (--_running === 0) {
-          self.drain();
-        }
-      }
-      function kill() {
-        queueHead = null;
-        queueTail = null;
-        self.drain = noop;
-      }
-      function killAndDrain() {
-        queueHead = null;
-        queueTail = null;
-        self.drain();
-        self.drain = noop;
-      }
-      function abort() {
-        var current = queueHead;
-        queueHead = null;
-        queueTail = null;
-        while (current) {
-          var next = current.next;
-          var callback = current.callback;
-          var errorHandler2 = current.errorHandler;
-          var val = current.value;
-          var context2 = current.context;
-          current.value = null;
-          current.callback = noop;
-          current.errorHandler = null;
-          if (errorHandler2) {
-            errorHandler2(new Error("abort"), val);
-          }
-          callback.call(context2, new Error("abort"));
-          current.release(current);
-          current = next;
-        }
-        self.drain = noop;
-      }
-      function error2(handler) {
-        errorHandler = handler;
-      }
-    }
-    function noop() {
-    }
-    function Task() {
-      this.value = null;
-      this.callback = noop;
-      this.next = null;
-      this.release = noop;
-      this.context = null;
-      this.errorHandler = null;
-      var self = this;
-      this.worked = function worked(err, result) {
-        var callback = self.callback;
-        var errorHandler = self.errorHandler;
-        var val = self.value;
-        self.value = null;
-        self.callback = noop;
-        if (self.errorHandler) {
-          errorHandler(err, val);
-        }
-        callback.call(self.context, err, result);
-        self.release(self);
-      };
-    }
-    function queueAsPromised(context, worker, _concurrency) {
-      if (typeof context === "function") {
-        _concurrency = worker;
-        worker = context;
-        context = null;
-      }
-      function asyncWrapper(arg, cb) {
-        worker.call(this, arg).then(function(res) {
-          cb(null, res);
-        }, cb);
-      }
-      var queue = fastqueue(context, asyncWrapper, _concurrency);
-      var pushCb = queue.push;
-      var unshiftCb = queue.unshift;
-      queue.push = push;
-      queue.unshift = unshift;
-      queue.drained = drained;
-      return queue;
-      function push(value) {
-        var p = new Promise(function(resolve19, reject) {
-          pushCb(value, function(err, result) {
-            if (err) {
-              reject(err);
-              return;
-            }
-            resolve19(result);
-          });
-        });
-        p.catch(noop);
-        return p;
-      }
-      function unshift(value) {
-        var p = new Promise(function(resolve19, reject) {
-          unshiftCb(value, function(err, result) {
-            if (err) {
-              reject(err);
-              return;
-            }
-            resolve19(result);
-          });
-        });
-        p.catch(noop);
-        return p;
-      }
-      function drained() {
-        var p = new Promise(function(resolve19) {
-          process.nextTick(function() {
-            if (queue.idle()) {
-              resolve19();
-            } else {
-              var previousDrain = queue.drain;
-              queue.drain = function() {
-                if (typeof previousDrain === "function") previousDrain();
-                resolve19();
-                queue.drain = previousDrain;
-              };
-            }
-          });
-        });
-        return p;
-      }
-    }
-    module2.exports = fastqueue;
-    module2.exports.promise = queueAsPromised;
-  }
-});
-
-// ../../node_modules/@nodelib/fs.walk/out/readers/common.js
-var require_common2 = __commonJS({
-  "../../node_modules/@nodelib/fs.walk/out/readers/common.js"(exports2) {
-    "use strict";
-    init_scoped_fetch();
-    Object.defineProperty(exports2, "__esModule", { value: true });
-    exports2.joinPathSegments = exports2.replacePathSegmentSeparator = exports2.isAppliedFilter = exports2.isFatalError = void 0;
-    function isFatalError(settings, error2) {
-      if (settings.errorFilter === null) {
-        return true;
-      }
-      return !settings.errorFilter(error2);
-    }
-    exports2.isFatalError = isFatalError;
-    function isAppliedFilter(filter, value) {
-      return filter === null || filter(value);
-    }
-    exports2.isAppliedFilter = isAppliedFilter;
-    function replacePathSegmentSeparator(filepath, separator) {
-      return filepath.split(/[/\\]/).join(separator);
-    }
-    exports2.replacePathSegmentSeparator = replacePathSegmentSeparator;
-    function joinPathSegments(a, b2, separator) {
-      if (a === "") {
-        return b2;
-      }
-      if (a.endsWith(separator)) {
-        return a + b2;
-      }
-      return a + separator + b2;
-    }
-    exports2.joinPathSegments = joinPathSegments;
-  }
-});
-
-// ../../node_modules/@nodelib/fs.walk/out/readers/reader.js
-var require_reader = __commonJS({
-  "../../node_modules/@nodelib/fs.walk/out/readers/reader.js"(exports2) {
-    "use strict";
-    init_scoped_fetch();
-    Object.defineProperty(exports2, "__esModule", { value: true });
-    var common = require_common2();
-    var Reader = class {
-      constructor(_root, _settings) {
-        this._root = _root;
-        this._settings = _settings;
-        this._root = common.replacePathSegmentSeparator(_root, _settings.pathSegmentSeparator);
-      }
-    };
-    exports2.default = Reader;
-  }
-});
-
-// ../../node_modules/@nodelib/fs.walk/out/readers/async.js
-var require_async3 = __commonJS({
-  "../../node_modules/@nodelib/fs.walk/out/readers/async.js"(exports2) {
-    "use strict";
-    init_scoped_fetch();
-    Object.defineProperty(exports2, "__esModule", { value: true });
-    var events_1 = require("events");
-    var fsScandir = require_out2();
-    var fastq = require_queue();
-    var common = require_common2();
-    var reader_1 = require_reader();
-    var AsyncReader = class extends reader_1.default {
-      constructor(_root, _settings) {
-        super(_root, _settings);
-        this._settings = _settings;
-        this._scandir = fsScandir.scandir;
-        this._emitter = new events_1.EventEmitter();
-        this._queue = fastq(this._worker.bind(this), this._settings.concurrency);
-        this._isFatalError = false;
-        this._isDestroyed = false;
-        this._queue.drain = () => {
-          if (!this._isFatalError) {
-            this._emitter.emit("end");
-          }
-        };
-      }
-      read() {
-        this._isFatalError = false;
-        this._isDestroyed = false;
-        setImmediate(() => {
-          this._pushToQueue(this._root, this._settings.basePath);
-        });
-        return this._emitter;
-      }
-      get isDestroyed() {
-        return this._isDestroyed;
-      }
-      destroy() {
-        if (this._isDestroyed) {
-          throw new Error("The reader is already destroyed");
-        }
-        this._isDestroyed = true;
-        this._queue.killAndDrain();
-      }
-      onEntry(callback) {
-        this._emitter.on("entry", callback);
-      }
-      onError(callback) {
-        this._emitter.once("error", callback);
-      }
-      onEnd(callback) {
-        this._emitter.once("end", callback);
-      }
-      _pushToQueue(directory, base) {
-        const queueItem = { directory, base };
-        this._queue.push(queueItem, (error2) => {
-          if (error2 !== null) {
-            this._handleError(error2);
-          }
-        });
-      }
-      _worker(item, done) {
-        this._scandir(item.directory, this._settings.fsScandirSettings, (error2, entries) => {
-          if (error2 !== null) {
-            done(error2, void 0);
-            return;
-          }
-          for (const entry of entries) {
-            this._handleEntry(entry, item.base);
-          }
-          done(null, void 0);
-        });
-      }
-      _handleError(error2) {
-        if (this._isDestroyed || !common.isFatalError(this._settings, error2)) {
-          return;
-        }
-        this._isFatalError = true;
-        this._isDestroyed = true;
-        this._emitter.emit("error", error2);
-      }
-      _handleEntry(entry, base) {
-        if (this._isDestroyed || this._isFatalError) {
-          return;
-        }
-        const fullpath = entry.path;
-        if (base !== void 0) {
-          entry.path = common.joinPathSegments(base, entry.name, this._settings.pathSegmentSeparator);
-        }
-        if (common.isAppliedFilter(this._settings.entryFilter, entry)) {
-          this._emitEntry(entry);
-        }
-        if (entry.dirent.isDirectory() && common.isAppliedFilter(this._settings.deepFilter, entry)) {
-          this._pushToQueue(fullpath, base === void 0 ? void 0 : entry.path);
-        }
-      }
-      _emitEntry(entry) {
-        this._emitter.emit("entry", entry);
-      }
-    };
-    exports2.default = AsyncReader;
-  }
-});
-
-// ../../node_modules/@nodelib/fs.walk/out/providers/async.js
-var require_async4 = __commonJS({
-  "../../node_modules/@nodelib/fs.walk/out/providers/async.js"(exports2) {
-    "use strict";
-    init_scoped_fetch();
-    Object.defineProperty(exports2, "__esModule", { value: true });
-    var async_1 = require_async3();
-    var AsyncProvider = class {
-      constructor(_root, _settings) {
-        this._root = _root;
-        this._settings = _settings;
-        this._reader = new async_1.default(this._root, this._settings);
-        this._storage = [];
-      }
-      read(callback) {
-        this._reader.onError((error2) => {
-          callFailureCallback(callback, error2);
-        });
-        this._reader.onEntry((entry) => {
-          this._storage.push(entry);
-        });
-        this._reader.onEnd(() => {
-          callSuccessCallback(callback, this._storage);
-        });
-        this._reader.read();
-      }
-    };
-    exports2.default = AsyncProvider;
-    function callFailureCallback(callback, error2) {
-      callback(error2);
-    }
-    function callSuccessCallback(callback, entries) {
-      callback(null, entries);
-    }
-  }
-});
-
-// ../../node_modules/@nodelib/fs.walk/out/providers/stream.js
-var require_stream2 = __commonJS({
-  "../../node_modules/@nodelib/fs.walk/out/providers/stream.js"(exports2) {
-    "use strict";
-    init_scoped_fetch();
-    Object.defineProperty(exports2, "__esModule", { value: true });
-    var stream_1 = require("stream");
-    var async_1 = require_async3();
-    var StreamProvider = class {
-      constructor(_root, _settings) {
-        this._root = _root;
-        this._settings = _settings;
-        this._reader = new async_1.default(this._root, this._settings);
-        this._stream = new stream_1.Readable({
-          objectMode: true,
-          read: () => {
-          },
-          destroy: () => {
-            if (!this._reader.isDestroyed) {
-              this._reader.destroy();
-            }
-          }
-        });
-      }
-      read() {
-        this._reader.onError((error2) => {
-          this._stream.emit("error", error2);
-        });
-        this._reader.onEntry((entry) => {
-          this._stream.push(entry);
-        });
-        this._reader.onEnd(() => {
-          this._stream.push(null);
-        });
-        this._reader.read();
-        return this._stream;
-      }
-    };
-    exports2.default = StreamProvider;
-  }
-});
-
-// ../../node_modules/@nodelib/fs.walk/out/readers/sync.js
-var require_sync3 = __commonJS({
-  "../../node_modules/@nodelib/fs.walk/out/readers/sync.js"(exports2) {
-    "use strict";
-    init_scoped_fetch();
-    Object.defineProperty(exports2, "__esModule", { value: true });
-    var fsScandir = require_out2();
-    var common = require_common2();
-    var reader_1 = require_reader();
-    var SyncReader = class extends reader_1.default {
-      constructor() {
-        super(...arguments);
-        this._scandir = fsScandir.scandirSync;
-        this._storage = [];
-        this._queue = /* @__PURE__ */ new Set();
-      }
-      read() {
-        this._pushToQueue(this._root, this._settings.basePath);
-        this._handleQueue();
-        return this._storage;
-      }
-      _pushToQueue(directory, base) {
-        this._queue.add({ directory, base });
-      }
-      _handleQueue() {
-        for (const item of this._queue.values()) {
-          this._handleDirectory(item.directory, item.base);
-        }
-      }
-      _handleDirectory(directory, base) {
-        try {
-          const entries = this._scandir(directory, this._settings.fsScandirSettings);
-          for (const entry of entries) {
-            this._handleEntry(entry, base);
-          }
-        } catch (error2) {
-          this._handleError(error2);
-        }
-      }
-      _handleError(error2) {
-        if (!common.isFatalError(this._settings, error2)) {
-          return;
-        }
-        throw error2;
-      }
-      _handleEntry(entry, base) {
-        const fullpath = entry.path;
-        if (base !== void 0) {
-          entry.path = common.joinPathSegments(base, entry.name, this._settings.pathSegmentSeparator);
-        }
-        if (common.isAppliedFilter(this._settings.entryFilter, entry)) {
-          this._pushToStorage(entry);
-        }
-        if (entry.dirent.isDirectory() && common.isAppliedFilter(this._settings.deepFilter, entry)) {
-          this._pushToQueue(fullpath, base === void 0 ? void 0 : entry.path);
-        }
-      }
-      _pushToStorage(entry) {
-        this._storage.push(entry);
-      }
-    };
-    exports2.default = SyncReader;
-  }
-});
-
-// ../../node_modules/@nodelib/fs.walk/out/providers/sync.js
-var require_sync4 = __commonJS({
-  "../../node_modules/@nodelib/fs.walk/out/providers/sync.js"(exports2) {
-    "use strict";
-    init_scoped_fetch();
-    Object.defineProperty(exports2, "__esModule", { value: true });
-    var sync_1 = require_sync3();
-    var SyncProvider = class {
-      constructor(_root, _settings) {
-        this._root = _root;
-        this._settings = _settings;
-        this._reader = new sync_1.default(this._root, this._settings);
-      }
-      read() {
-        return this._reader.read();
-      }
-    };
-    exports2.default = SyncProvider;
-  }
-});
-
-// ../../node_modules/@nodelib/fs.walk/out/settings.js
-var require_settings3 = __commonJS({
-  "../../node_modules/@nodelib/fs.walk/out/settings.js"(exports2) {
-    "use strict";
-    init_scoped_fetch();
-    Object.defineProperty(exports2, "__esModule", { value: true });
-    var path = require("path");
-    var fsScandir = require_out2();
-    var Settings = class {
-      constructor(_options = {}) {
-        this._options = _options;
-        this.basePath = this._getValue(this._options.basePath, void 0);
-        this.concurrency = this._getValue(this._options.concurrency, Number.POSITIVE_INFINITY);
-        this.deepFilter = this._getValue(this._options.deepFilter, null);
-        this.entryFilter = this._getValue(this._options.entryFilter, null);
-        this.errorFilter = this._getValue(this._options.errorFilter, null);
-        this.pathSegmentSeparator = this._getValue(this._options.pathSegmentSeparator, path.sep);
-        this.fsScandirSettings = new fsScandir.Settings({
-          followSymbolicLinks: this._options.followSymbolicLinks,
-          fs: this._options.fs,
-          pathSegmentSeparator: this._options.pathSegmentSeparator,
-          stats: this._options.stats,
-          throwErrorOnBrokenSymbolicLink: this._options.throwErrorOnBrokenSymbolicLink
-        });
-      }
-      _getValue(option, value) {
-        return option !== null && option !== void 0 ? option : value;
-      }
-    };
-    exports2.default = Settings;
-  }
-});
-
-// ../../node_modules/@nodelib/fs.walk/out/index.js
-var require_out3 = __commonJS({
-  "../../node_modules/@nodelib/fs.walk/out/index.js"(exports2) {
-    "use strict";
-    init_scoped_fetch();
-    Object.defineProperty(exports2, "__esModule", { value: true });
-    exports2.Settings = exports2.walkStream = exports2.walkSync = exports2.walk = void 0;
-    var async_1 = require_async4();
-    var stream_1 = require_stream2();
-    var sync_1 = require_sync4();
-    var settings_1 = require_settings3();
-    exports2.Settings = settings_1.default;
-    function walk2(directory, optionsOrSettingsOrCallback, callback) {
-      if (typeof optionsOrSettingsOrCallback === "function") {
-        new async_1.default(directory, getSettings()).read(optionsOrSettingsOrCallback);
-        return;
-      }
-      new async_1.default(directory, getSettings(optionsOrSettingsOrCallback)).read(callback);
-    }
-    exports2.walk = walk2;
-    function walkSync(directory, optionsOrSettings) {
-      const settings = getSettings(optionsOrSettings);
-      const provider = new sync_1.default(directory, settings);
-      return provider.read();
-    }
-    exports2.walkSync = walkSync;
-    function walkStream(directory, optionsOrSettings) {
-      const settings = getSettings(optionsOrSettings);
-      const provider = new stream_1.default(directory, settings);
-      return provider.read();
-    }
-    exports2.walkStream = walkStream;
-    function getSettings(settingsOrOptions = {}) {
-      if (settingsOrOptions instanceof settings_1.default) {
-        return settingsOrOptions;
-      }
-      return new settings_1.default(settingsOrOptions);
-    }
-  }
-});
-
-// ../../node_modules/fast-glob/out/readers/reader.js
-var require_reader2 = __commonJS({
-  "../../node_modules/fast-glob/out/readers/reader.js"(exports2) {
-    "use strict";
-    init_scoped_fetch();
-    Object.defineProperty(exports2, "__esModule", { value: true });
-    var path = require("path");
-    var fsStat = require_out();
-    var utils = require_utils3();
-    var Reader = class {
-      constructor(_settings) {
-        this._settings = _settings;
-        this._fsStatSettings = new fsStat.Settings({
-          followSymbolicLink: this._settings.followSymbolicLinks,
-          fs: this._settings.fs,
-          throwErrorOnBrokenSymbolicLink: this._settings.followSymbolicLinks
-        });
-      }
-      _getFullEntryPath(filepath) {
-        return path.resolve(this._settings.cwd, filepath);
-      }
-      _makeEntry(stats, pattern) {
-        const entry = {
-          name: pattern,
-          path: pattern,
-          dirent: utils.fs.createDirentFromStats(pattern, stats)
-        };
-        if (this._settings.stats) {
-          entry.stats = stats;
-        }
-        return entry;
-      }
-      _isFatalError(error2) {
-        return !utils.errno.isEnoentCodeError(error2) && !this._settings.suppressErrors;
-      }
-    };
-    exports2.default = Reader;
-  }
-});
-
-// ../../node_modules/fast-glob/out/readers/stream.js
-var require_stream3 = __commonJS({
-  "../../node_modules/fast-glob/out/readers/stream.js"(exports2) {
-    "use strict";
-    init_scoped_fetch();
-    Object.defineProperty(exports2, "__esModule", { value: true });
-    var stream_1 = require("stream");
-    var fsStat = require_out();
-    var fsWalk = require_out3();
-    var reader_1 = require_reader2();
-    var ReaderStream = class extends reader_1.default {
-      constructor() {
-        super(...arguments);
-        this._walkStream = fsWalk.walkStream;
-        this._stat = fsStat.stat;
-      }
-      dynamic(root, options) {
-        return this._walkStream(root, options);
-      }
-      static(patterns, options) {
-        const filepaths = patterns.map(this._getFullEntryPath, this);
-        const stream = new stream_1.PassThrough({ objectMode: true });
-        stream._write = (index, _enc, done) => {
-          return this._getEntry(filepaths[index], patterns[index], options).then((entry) => {
-            if (entry !== null && options.entryFilter(entry)) {
-              stream.push(entry);
-            }
-            if (index === filepaths.length - 1) {
-              stream.end();
-            }
-            done();
-          }).catch(done);
-        };
-        for (let i = 0; i < filepaths.length; i++) {
-          stream.write(i);
-        }
-        return stream;
-      }
-      _getEntry(filepath, pattern, options) {
-        return this._getStat(filepath).then((stats) => this._makeEntry(stats, pattern)).catch((error2) => {
-          if (options.errorFilter(error2)) {
-            return null;
-          }
-          throw error2;
-        });
-      }
-      _getStat(filepath) {
-        return new Promise((resolve19, reject) => {
-          this._stat(filepath, this._fsStatSettings, (error2, stats) => {
-            return error2 === null ? resolve19(stats) : reject(error2);
-          });
-        });
-      }
-    };
-    exports2.default = ReaderStream;
-  }
-});
-
-// ../../node_modules/fast-glob/out/readers/async.js
-var require_async5 = __commonJS({
-  "../../node_modules/fast-glob/out/readers/async.js"(exports2) {
-    "use strict";
-    init_scoped_fetch();
-    Object.defineProperty(exports2, "__esModule", { value: true });
-    var fsWalk = require_out3();
-    var reader_1 = require_reader2();
-    var stream_1 = require_stream3();
-    var ReaderAsync = class extends reader_1.default {
-      constructor() {
-        super(...arguments);
-        this._walkAsync = fsWalk.walk;
-        this._readerStream = new stream_1.default(this._settings);
-      }
-      dynamic(root, options) {
-        return new Promise((resolve19, reject) => {
-          this._walkAsync(root, options, (error2, entries) => {
-            if (error2 === null) {
-              resolve19(entries);
-            } else {
-              reject(error2);
-            }
-          });
-        });
-      }
-      async static(patterns, options) {
-        const entries = [];
-        const stream = this._readerStream.static(patterns, options);
-        return new Promise((resolve19, reject) => {
-          stream.once("error", reject);
-          stream.on("data", (entry) => entries.push(entry));
-          stream.once("end", () => resolve19(entries));
-        });
-      }
-    };
-    exports2.default = ReaderAsync;
-  }
-});
-
-// ../../node_modules/fast-glob/out/providers/matchers/matcher.js
-var require_matcher = __commonJS({
-  "../../node_modules/fast-glob/out/providers/matchers/matcher.js"(exports2) {
-    "use strict";
-    init_scoped_fetch();
-    Object.defineProperty(exports2, "__esModule", { value: true });
-    var utils = require_utils3();
-    var Matcher = class {
-      constructor(_patterns, _settings, _micromatchOptions) {
-        this._patterns = _patterns;
-        this._settings = _settings;
-        this._micromatchOptions = _micromatchOptions;
-        this._storage = [];
-        this._fillStorage();
-      }
-      _fillStorage() {
-        for (const pattern of this._patterns) {
-          const segments = this._getPatternSegments(pattern);
-          const sections = this._splitSegmentsIntoSections(segments);
-          this._storage.push({
-            complete: sections.length <= 1,
-            pattern,
-            segments,
-            sections
-          });
-        }
-      }
-      _getPatternSegments(pattern) {
-        const parts = utils.pattern.getPatternParts(pattern, this._micromatchOptions);
-        return parts.map((part) => {
-          const dynamic = utils.pattern.isDynamicPattern(part, this._settings);
-          if (!dynamic) {
-            return {
-              dynamic: false,
-              pattern: part
-            };
-          }
-          return {
-            dynamic: true,
-            pattern: part,
-            patternRe: utils.pattern.makeRe(part, this._micromatchOptions)
-          };
-        });
-      }
-      _splitSegmentsIntoSections(segments) {
-        return utils.array.splitWhen(segments, (segment) => segment.dynamic && utils.pattern.hasGlobStar(segment.pattern));
-      }
-    };
-    exports2.default = Matcher;
-  }
-});
-
-// ../../node_modules/fast-glob/out/providers/matchers/partial.js
-var require_partial = __commonJS({
-  "../../node_modules/fast-glob/out/providers/matchers/partial.js"(exports2) {
-    "use strict";
-    init_scoped_fetch();
-    Object.defineProperty(exports2, "__esModule", { value: true });
-    var matcher_1 = require_matcher();
-    var PartialMatcher = class extends matcher_1.default {
-      match(filepath) {
-        const parts = filepath.split("/");
-        const levels = parts.length;
-        const patterns = this._storage.filter((info) => !info.complete || info.segments.length > levels);
-        for (const pattern of patterns) {
-          const section = pattern.sections[0];
-          if (!pattern.complete && levels > section.length) {
-            return true;
-          }
-          const match = parts.every((part, index) => {
-            const segment = pattern.segments[index];
-            if (segment.dynamic && segment.patternRe.test(part)) {
-              return true;
-            }
-            if (!segment.dynamic && segment.pattern === part) {
-              return true;
-            }
-            return false;
-          });
-          if (match) {
-            return true;
-          }
-        }
-        return false;
-      }
-    };
-    exports2.default = PartialMatcher;
-  }
-});
-
-// ../../node_modules/fast-glob/out/providers/filters/deep.js
-var require_deep = __commonJS({
-  "../../node_modules/fast-glob/out/providers/filters/deep.js"(exports2) {
-    "use strict";
-    init_scoped_fetch();
-    Object.defineProperty(exports2, "__esModule", { value: true });
-    var utils = require_utils3();
-    var partial_1 = require_partial();
-    var DeepFilter = class {
-      constructor(_settings, _micromatchOptions) {
-        this._settings = _settings;
-        this._micromatchOptions = _micromatchOptions;
-      }
-      getFilter(basePath, positive, negative) {
-        const matcher = this._getMatcher(positive);
-        const negativeRe = this._getNegativePatternsRe(negative);
-        return (entry) => this._filter(basePath, entry, matcher, negativeRe);
-      }
-      _getMatcher(patterns) {
-        return new partial_1.default(patterns, this._settings, this._micromatchOptions);
-      }
-      _getNegativePatternsRe(patterns) {
-        const affectDepthOfReadingPatterns = patterns.filter(utils.pattern.isAffectDepthOfReadingPattern);
-        return utils.pattern.convertPatternsToRe(affectDepthOfReadingPatterns, this._micromatchOptions);
-      }
-      _filter(basePath, entry, matcher, negativeRe) {
-        if (this._isSkippedByDeep(basePath, entry.path)) {
-          return false;
-        }
-        if (this._isSkippedSymbolicLink(entry)) {
-          return false;
-        }
-        const filepath = utils.path.removeLeadingDotSegment(entry.path);
-        if (this._isSkippedByPositivePatterns(filepath, matcher)) {
-          return false;
-        }
-        return this._isSkippedByNegativePatterns(filepath, negativeRe);
-      }
-      _isSkippedByDeep(basePath, entryPath) {
-        if (this._settings.deep === Infinity) {
-          return false;
-        }
-        return this._getEntryLevel(basePath, entryPath) >= this._settings.deep;
-      }
-      _getEntryLevel(basePath, entryPath) {
-        const entryPathDepth = entryPath.split("/").length;
-        if (basePath === "") {
-          return entryPathDepth;
-        }
-        const basePathDepth = basePath.split("/").length;
-        return entryPathDepth - basePathDepth;
-      }
-      _isSkippedSymbolicLink(entry) {
-        return !this._settings.followSymbolicLinks && entry.dirent.isSymbolicLink();
-      }
-      _isSkippedByPositivePatterns(entryPath, matcher) {
-        return !this._settings.baseNameMatch && !matcher.match(entryPath);
-      }
-      _isSkippedByNegativePatterns(entryPath, patternsRe) {
-        return !utils.pattern.matchAny(entryPath, patternsRe);
-      }
-    };
-    exports2.default = DeepFilter;
-  }
-});
-
-// ../../node_modules/fast-glob/out/providers/filters/entry.js
-var require_entry = __commonJS({
-  "../../node_modules/fast-glob/out/providers/filters/entry.js"(exports2) {
-    "use strict";
-    init_scoped_fetch();
-    Object.defineProperty(exports2, "__esModule", { value: true });
-    var utils = require_utils3();
-    var EntryFilter = class {
-      constructor(_settings, _micromatchOptions) {
-        this._settings = _settings;
-        this._micromatchOptions = _micromatchOptions;
-        this.index = /* @__PURE__ */ new Map();
-      }
-      getFilter(positive, negative) {
-        const [absoluteNegative, relativeNegative] = utils.pattern.partitionAbsoluteAndRelative(negative);
-        const patterns = {
-          positive: {
-            all: utils.pattern.convertPatternsToRe(positive, this._micromatchOptions)
-          },
-          negative: {
-            absolute: utils.pattern.convertPatternsToRe(absoluteNegative, Object.assign(Object.assign({}, this._micromatchOptions), { dot: true })),
-            relative: utils.pattern.convertPatternsToRe(relativeNegative, Object.assign(Object.assign({}, this._micromatchOptions), { dot: true }))
-          }
-        };
-        return (entry) => this._filter(entry, patterns);
-      }
-      _filter(entry, patterns) {
-        const filepath = utils.path.removeLeadingDotSegment(entry.path);
-        if (this._settings.unique && this._isDuplicateEntry(filepath)) {
-          return false;
-        }
-        if (this._onlyFileFilter(entry) || this._onlyDirectoryFilter(entry)) {
-          return false;
-        }
-        const isMatched = this._isMatchToPatternsSet(filepath, patterns, entry.dirent.isDirectory());
-        if (this._settings.unique && isMatched) {
-          this._createIndexRecord(filepath);
-        }
-        return isMatched;
-      }
-      _isDuplicateEntry(filepath) {
-        return this.index.has(filepath);
-      }
-      _createIndexRecord(filepath) {
-        this.index.set(filepath, void 0);
-      }
-      _onlyFileFilter(entry) {
-        return this._settings.onlyFiles && !entry.dirent.isFile();
-      }
-      _onlyDirectoryFilter(entry) {
-        return this._settings.onlyDirectories && !entry.dirent.isDirectory();
-      }
-      _isMatchToPatternsSet(filepath, patterns, isDirectory) {
-        const isMatched = this._isMatchToPatterns(filepath, patterns.positive.all, isDirectory);
-        if (!isMatched) {
-          return false;
-        }
-        const isMatchedByRelativeNegative = this._isMatchToPatterns(filepath, patterns.negative.relative, isDirectory);
-        if (isMatchedByRelativeNegative) {
-          return false;
-        }
-        const isMatchedByAbsoluteNegative = this._isMatchToAbsoluteNegative(filepath, patterns.negative.absolute, isDirectory);
-        if (isMatchedByAbsoluteNegative) {
-          return false;
-        }
-        return true;
-      }
-      _isMatchToAbsoluteNegative(filepath, patternsRe, isDirectory) {
-        if (patternsRe.length === 0) {
-          return false;
-        }
-        const fullpath = utils.path.makeAbsolute(this._settings.cwd, filepath);
-        return this._isMatchToPatterns(fullpath, patternsRe, isDirectory);
-      }
-      _isMatchToPatterns(filepath, patternsRe, isDirectory) {
-        if (patternsRe.length === 0) {
-          return false;
-        }
-        const isMatched = utils.pattern.matchAny(filepath, patternsRe);
-        if (!isMatched && isDirectory) {
-          return utils.pattern.matchAny(filepath + "/", patternsRe);
-        }
-        return isMatched;
-      }
-    };
-    exports2.default = EntryFilter;
-  }
-});
-
-// ../../node_modules/fast-glob/out/providers/filters/error.js
-var require_error = __commonJS({
-  "../../node_modules/fast-glob/out/providers/filters/error.js"(exports2) {
-    "use strict";
-    init_scoped_fetch();
-    Object.defineProperty(exports2, "__esModule", { value: true });
-    var utils = require_utils3();
-    var ErrorFilter = class {
-      constructor(_settings) {
-        this._settings = _settings;
-      }
-      getFilter() {
-        return (error2) => this._isNonFatalError(error2);
-      }
-      _isNonFatalError(error2) {
-        return utils.errno.isEnoentCodeError(error2) || this._settings.suppressErrors;
-      }
-    };
-    exports2.default = ErrorFilter;
-  }
-});
-
-// ../../node_modules/fast-glob/out/providers/transformers/entry.js
-var require_entry2 = __commonJS({
-  "../../node_modules/fast-glob/out/providers/transformers/entry.js"(exports2) {
-    "use strict";
-    init_scoped_fetch();
-    Object.defineProperty(exports2, "__esModule", { value: true });
-    var utils = require_utils3();
-    var EntryTransformer = class {
-      constructor(_settings) {
-        this._settings = _settings;
-      }
-      getTransformer() {
-        return (entry) => this._transform(entry);
-      }
-      _transform(entry) {
-        let filepath = entry.path;
-        if (this._settings.absolute) {
-          filepath = utils.path.makeAbsolute(this._settings.cwd, filepath);
-          filepath = utils.path.unixify(filepath);
-        }
-        if (this._settings.markDirectories && entry.dirent.isDirectory()) {
-          filepath += "/";
-        }
-        if (!this._settings.objectMode) {
-          return filepath;
-        }
-        return Object.assign(Object.assign({}, entry), { path: filepath });
-      }
-    };
-    exports2.default = EntryTransformer;
-  }
-});
-
-// ../../node_modules/fast-glob/out/providers/provider.js
-var require_provider = __commonJS({
-  "../../node_modules/fast-glob/out/providers/provider.js"(exports2) {
-    "use strict";
-    init_scoped_fetch();
-    Object.defineProperty(exports2, "__esModule", { value: true });
-    var path = require("path");
-    var deep_1 = require_deep();
-    var entry_1 = require_entry();
-    var error_1 = require_error();
-    var entry_2 = require_entry2();
-    var Provider = class {
-      constructor(_settings) {
-        this._settings = _settings;
-        this.errorFilter = new error_1.default(this._settings);
-        this.entryFilter = new entry_1.default(this._settings, this._getMicromatchOptions());
-        this.deepFilter = new deep_1.default(this._settings, this._getMicromatchOptions());
-        this.entryTransformer = new entry_2.default(this._settings);
-      }
-      _getRootDirectory(task) {
-        return path.resolve(this._settings.cwd, task.base);
-      }
-      _getReaderOptions(task) {
-        const basePath = task.base === "." ? "" : task.base;
-        return {
-          basePath,
-          pathSegmentSeparator: "/",
-          concurrency: this._settings.concurrency,
-          deepFilter: this.deepFilter.getFilter(basePath, task.positive, task.negative),
-          entryFilter: this.entryFilter.getFilter(task.positive, task.negative),
-          errorFilter: this.errorFilter.getFilter(),
-          followSymbolicLinks: this._settings.followSymbolicLinks,
-          fs: this._settings.fs,
-          stats: this._settings.stats,
-          throwErrorOnBrokenSymbolicLink: this._settings.throwErrorOnBrokenSymbolicLink,
-          transform: this.entryTransformer.getTransformer()
-        };
-      }
-      _getMicromatchOptions() {
-        return {
-          dot: this._settings.dot,
-          matchBase: this._settings.baseNameMatch,
-          nobrace: !this._settings.braceExpansion,
-          nocase: !this._settings.caseSensitiveMatch,
-          noext: !this._settings.extglob,
-          noglobstar: !this._settings.globstar,
-          posix: true,
-          strictSlashes: false
-        };
-      }
-    };
-    exports2.default = Provider;
-  }
-});
-
-// ../../node_modules/fast-glob/out/providers/async.js
-var require_async6 = __commonJS({
-  "../../node_modules/fast-glob/out/providers/async.js"(exports2) {
-    "use strict";
-    init_scoped_fetch();
-    Object.defineProperty(exports2, "__esModule", { value: true });
-    var async_1 = require_async5();
-    var provider_1 = require_provider();
-    var ProviderAsync = class extends provider_1.default {
-      constructor() {
-        super(...arguments);
-        this._reader = new async_1.default(this._settings);
-      }
-      async read(task) {
-        const root = this._getRootDirectory(task);
-        const options = this._getReaderOptions(task);
-        const entries = await this.api(root, task, options);
-        return entries.map((entry) => options.transform(entry));
-      }
-      api(root, task, options) {
-        if (task.dynamic) {
-          return this._reader.dynamic(root, options);
-        }
-        return this._reader.static(task.patterns, options);
-      }
-    };
-    exports2.default = ProviderAsync;
-  }
-});
-
-// ../../node_modules/fast-glob/out/providers/stream.js
-var require_stream4 = __commonJS({
-  "../../node_modules/fast-glob/out/providers/stream.js"(exports2) {
-    "use strict";
-    init_scoped_fetch();
-    Object.defineProperty(exports2, "__esModule", { value: true });
-    var stream_1 = require("stream");
-    var stream_2 = require_stream3();
-    var provider_1 = require_provider();
-    var ProviderStream = class extends provider_1.default {
-      constructor() {
-        super(...arguments);
-        this._reader = new stream_2.default(this._settings);
-      }
-      read(task) {
-        const root = this._getRootDirectory(task);
-        const options = this._getReaderOptions(task);
-        const source = this.api(root, task, options);
-        const destination = new stream_1.Readable({ objectMode: true, read: () => {
-        } });
-        source.once("error", (error2) => destination.emit("error", error2)).on("data", (entry) => destination.emit("data", options.transform(entry))).once("end", () => destination.emit("end"));
-        destination.once("close", () => source.destroy());
-        return destination;
-      }
-      api(root, task, options) {
-        if (task.dynamic) {
-          return this._reader.dynamic(root, options);
-        }
-        return this._reader.static(task.patterns, options);
-      }
-    };
-    exports2.default = ProviderStream;
-  }
-});
-
-// ../../node_modules/fast-glob/out/readers/sync.js
-var require_sync5 = __commonJS({
-  "../../node_modules/fast-glob/out/readers/sync.js"(exports2) {
-    "use strict";
-    init_scoped_fetch();
-    Object.defineProperty(exports2, "__esModule", { value: true });
-    var fsStat = require_out();
-    var fsWalk = require_out3();
-    var reader_1 = require_reader2();
-    var ReaderSync = class extends reader_1.default {
-      constructor() {
-        super(...arguments);
-        this._walkSync = fsWalk.walkSync;
-        this._statSync = fsStat.statSync;
-      }
-      dynamic(root, options) {
-        return this._walkSync(root, options);
-      }
-      static(patterns, options) {
-        const entries = [];
-        for (const pattern of patterns) {
-          const filepath = this._getFullEntryPath(pattern);
-          const entry = this._getEntry(filepath, pattern, options);
-          if (entry === null || !options.entryFilter(entry)) {
-            continue;
-          }
-          entries.push(entry);
-        }
-        return entries;
-      }
-      _getEntry(filepath, pattern, options) {
-        try {
-          const stats = this._getStat(filepath);
-          return this._makeEntry(stats, pattern);
-        } catch (error2) {
-          if (options.errorFilter(error2)) {
-            return null;
-          }
-          throw error2;
-        }
-      }
-      _getStat(filepath) {
-        return this._statSync(filepath, this._fsStatSettings);
-      }
-    };
-    exports2.default = ReaderSync;
-  }
-});
-
-// ../../node_modules/fast-glob/out/providers/sync.js
-var require_sync6 = __commonJS({
-  "../../node_modules/fast-glob/out/providers/sync.js"(exports2) {
-    "use strict";
-    init_scoped_fetch();
-    Object.defineProperty(exports2, "__esModule", { value: true });
-    var sync_1 = require_sync5();
-    var provider_1 = require_provider();
-    var ProviderSync = class extends provider_1.default {
-      constructor() {
-        super(...arguments);
-        this._reader = new sync_1.default(this._settings);
-      }
-      read(task) {
-        const root = this._getRootDirectory(task);
-        const options = this._getReaderOptions(task);
-        const entries = this.api(root, task, options);
-        return entries.map(options.transform);
-      }
-      api(root, task, options) {
-        if (task.dynamic) {
-          return this._reader.dynamic(root, options);
-        }
-        return this._reader.static(task.patterns, options);
-      }
-    };
-    exports2.default = ProviderSync;
-  }
-});
-
-// ../../node_modules/fast-glob/out/settings.js
-var require_settings4 = __commonJS({
-  "../../node_modules/fast-glob/out/settings.js"(exports2) {
-    "use strict";
-    init_scoped_fetch();
-    Object.defineProperty(exports2, "__esModule", { value: true });
-    exports2.DEFAULT_FILE_SYSTEM_ADAPTER = void 0;
-    var fs11 = require("fs");
-    var os = require("os");
-    var CPU_COUNT = Math.max(os.cpus().length, 1);
-    exports2.DEFAULT_FILE_SYSTEM_ADAPTER = {
-      lstat: fs11.lstat,
-      lstatSync: fs11.lstatSync,
-      stat: fs11.stat,
-      statSync: fs11.statSync,
-      readdir: fs11.readdir,
-      readdirSync: fs11.readdirSync
-    };
-    var Settings = class {
-      constructor(_options = {}) {
-        this._options = _options;
-        this.absolute = this._getValue(this._options.absolute, false);
-        this.baseNameMatch = this._getValue(this._options.baseNameMatch, false);
-        this.braceExpansion = this._getValue(this._options.braceExpansion, true);
-        this.caseSensitiveMatch = this._getValue(this._options.caseSensitiveMatch, true);
-        this.concurrency = this._getValue(this._options.concurrency, CPU_COUNT);
-        this.cwd = this._getValue(this._options.cwd, process.cwd());
-        this.deep = this._getValue(this._options.deep, Infinity);
-        this.dot = this._getValue(this._options.dot, false);
-        this.extglob = this._getValue(this._options.extglob, true);
-        this.followSymbolicLinks = this._getValue(this._options.followSymbolicLinks, true);
-        this.fs = this._getFileSystemMethods(this._options.fs);
-        this.globstar = this._getValue(this._options.globstar, true);
-        this.ignore = this._getValue(this._options.ignore, []);
-        this.markDirectories = this._getValue(this._options.markDirectories, false);
-        this.objectMode = this._getValue(this._options.objectMode, false);
-        this.onlyDirectories = this._getValue(this._options.onlyDirectories, false);
-        this.onlyFiles = this._getValue(this._options.onlyFiles, true);
-        this.stats = this._getValue(this._options.stats, false);
-        this.suppressErrors = this._getValue(this._options.suppressErrors, false);
-        this.throwErrorOnBrokenSymbolicLink = this._getValue(this._options.throwErrorOnBrokenSymbolicLink, false);
-        this.unique = this._getValue(this._options.unique, true);
-        if (this.onlyDirectories) {
-          this.onlyFiles = false;
-        }
-        if (this.stats) {
-          this.objectMode = true;
-        }
-        this.ignore = [].concat(this.ignore);
-      }
-      _getValue(option, value) {
-        return option === void 0 ? value : option;
-      }
-      _getFileSystemMethods(methods = {}) {
-        return Object.assign(Object.assign({}, exports2.DEFAULT_FILE_SYSTEM_ADAPTER), methods);
-      }
-    };
-    exports2.default = Settings;
-  }
-});
-
-// ../../node_modules/fast-glob/out/index.js
-var require_out4 = __commonJS({
-  "../../node_modules/fast-glob/out/index.js"(exports2, module2) {
-    "use strict";
-    init_scoped_fetch();
-    var taskManager = require_tasks();
-    var async_1 = require_async6();
-    var stream_1 = require_stream4();
-    var sync_1 = require_sync6();
-    var settings_1 = require_settings4();
-    var utils = require_utils3();
-    async function FastGlob(source, options) {
-      assertPatternsInput(source);
-      const works = getWorks(source, async_1.default, options);
-      const result = await Promise.all(works);
-      return utils.array.flatten(result);
-    }
-    (function(FastGlob2) {
-      FastGlob2.glob = FastGlob2;
-      FastGlob2.globSync = sync;
-      FastGlob2.globStream = stream;
-      FastGlob2.async = FastGlob2;
-      function sync(source, options) {
-        assertPatternsInput(source);
-        const works = getWorks(source, sync_1.default, options);
-        return utils.array.flatten(works);
-      }
-      FastGlob2.sync = sync;
-      function stream(source, options) {
-        assertPatternsInput(source);
-        const works = getWorks(source, stream_1.default, options);
-        return utils.stream.merge(works);
-      }
-      FastGlob2.stream = stream;
-      function generateTasks(source, options) {
-        assertPatternsInput(source);
-        const patterns = [].concat(source);
-        const settings = new settings_1.default(options);
-        return taskManager.generate(patterns, settings);
-      }
-      FastGlob2.generateTasks = generateTasks;
-      function isDynamicPattern(source, options) {
-        assertPatternsInput(source);
-        const settings = new settings_1.default(options);
-        return utils.pattern.isDynamicPattern(source, settings);
-      }
-      FastGlob2.isDynamicPattern = isDynamicPattern;
-      function escapePath(source) {
-        assertPatternsInput(source);
-        return utils.path.escape(source);
-      }
-      FastGlob2.escapePath = escapePath;
-      function convertPathToPattern(source) {
-        assertPatternsInput(source);
-        return utils.path.convertPathToPattern(source);
-      }
-      FastGlob2.convertPathToPattern = convertPathToPattern;
-      let posix2;
-      (function(posix3) {
-        function escapePath2(source) {
-          assertPatternsInput(source);
-          return utils.path.escapePosixPath(source);
-        }
-        posix3.escapePath = escapePath2;
-        function convertPathToPattern2(source) {
-          assertPatternsInput(source);
-          return utils.path.convertPosixPathToPattern(source);
-        }
-        posix3.convertPathToPattern = convertPathToPattern2;
-      })(posix2 = FastGlob2.posix || (FastGlob2.posix = {}));
-      let win32;
-      (function(win322) {
-        function escapePath2(source) {
-          assertPatternsInput(source);
-          return utils.path.escapeWindowsPath(source);
-        }
-        win322.escapePath = escapePath2;
-        function convertPathToPattern2(source) {
-          assertPatternsInput(source);
-          return utils.path.convertWindowsPathToPattern(source);
-        }
-        win322.convertPathToPattern = convertPathToPattern2;
-      })(win32 = FastGlob2.win32 || (FastGlob2.win32 = {}));
-    })(FastGlob || (FastGlob = {}));
-    function getWorks(source, _Provider, options) {
-      const patterns = [].concat(source);
-      const settings = new settings_1.default(options);
-      const tasks = taskManager.generate(patterns, settings);
-      const provider = new _Provider(settings);
-      return tasks.map(provider.read, provider);
-    }
-    function assertPatternsInput(input) {
-      const source = [].concat(input);
-      const isValidSource = source.every((item) => utils.string.isString(item) && !utils.string.isEmpty(item));
-      if (!isValidSource) {
-        throw new TypeError("Patterns must be a string (non empty) or an array of strings");
-      }
-    }
-    module2.exports = FastGlob;
-  }
-});
-
-// ../../dist/src/tools/search-files.js
-function redactSecretMatches(lines) {
-  let redactedCount = 0;
-  const kept = [];
-  for (const line of lines) {
-    const firstColon = line.indexOf(":");
-    const path = firstColon === -1 ? line : line.slice(0, firstColon);
-    if (classifySecretPath(path).matched) {
-      redactedCount += 1;
-      continue;
-    }
-    kept.push(line);
-  }
-  return { kept, redactedCount };
-}
-async function ripgrepAvailable() {
-  return new Promise((resolveReady) => {
-    const child = safeSpawn("rg", ["--version"], { stdio: "ignore" });
-    child.on("error", () => resolveReady(false));
-    child.on("close", (code) => resolveReady(code === 0));
-  });
-}
-async function runRipgrep(pattern, path, fileGlob, contextLines = 0, signal) {
-  const args = [
-    "--line-number",
-    "--no-heading",
-    "--color=never",
-    "--max-count=10",
-    "--context",
-    String(Math.max(0, Math.min(20, Math.floor(contextLines)))),
-    pattern,
-    path
-  ];
-  if (fileGlob) {
-    args.unshift(fileGlob);
-    args.unshift("--glob");
-  }
-  return new Promise((resolveReady) => {
-    const child = safeSpawn("rg", args, {
-      stdio: ["ignore", "pipe", "pipe"],
-      signal
-    });
-    let stdout = "";
-    let stderr = "";
-    child.stdout.on("data", (d) => {
-      stdout += d.toString();
-    });
-    child.stderr.on("data", (d) => {
-      stderr += d.toString();
-    });
-    child.on("close", (code) => {
-      if (code !== 0 && code !== 1) {
-        resolveReady({
-          output: `error: rg exited ${code}
-${stderr}`,
-          isError: true
-        });
-        return;
-      }
-      const rawLines = stdout.trimEnd().split("\n").filter(Boolean);
-      const { kept: lines, redactedCount } = redactSecretMatches(rawLines);
-      const truncated = lines.length > MAX_RESULTS;
-      const slice = lines.slice(0, MAX_RESULTS);
-      const tailParts = [];
-      if (truncated) {
-        tailParts.push(`[... ${lines.length - MAX_RESULTS} more matches]`);
-      }
-      if (redactedCount > 0) {
-        tailParts.push(`[redacted ${redactedCount} match${redactedCount === 1 ? "" : "es"} from secret-pattern files]`);
-      }
-      const tail = tailParts.length > 0 ? "\n" + tailParts.join("\n") : "";
-      resolveReady({
-        output: slice.length === 0 ? "(no matches)" + tail : slice.join("\n") + tail,
-        isError: false
-      });
-    });
-  });
-}
-async function fallbackSearch(pattern, path, fileGlob, contextLines = 0) {
-  let rootInfo;
-  try {
-    rootInfo = await (0, import_promises7.stat)(path);
-  } catch (err) {
-    return {
-      output: `error: ${err instanceof Error ? err.message : String(err)}`,
-      isError: true
-    };
-  }
-  const allFiles = rootInfo.isFile() ? [path] : await (0, import_fast_glob.default)(fileGlob ?? "**/*", {
-    cwd: path,
-    absolute: true,
-    onlyFiles: true,
-    ignore: ["**/node_modules/**", "**/.git/**", "**/dist/**", "**/build/**"]
-  });
-  let redactedFileCount = 0;
-  const files = [];
-  for (const f2 of allFiles) {
-    if (classifySecretPath(f2).matched) {
-      redactedFileCount += 1;
-      continue;
-    }
-    files.push(f2);
-  }
-  let regex;
-  try {
-    regex = new RegExp(pattern);
-  } catch (err) {
-    return {
-      output: `error: invalid regex pattern: ${err instanceof Error ? err.message : String(err)}`,
-      isError: true
-    };
-  }
-  const out = [];
-  let totalMatches = 0;
-  const context = Math.max(0, Math.min(20, Math.floor(contextLines)));
-  for (const file of files) {
-    if (out.length >= MAX_RESULTS)
-      break;
-    let content;
-    try {
-      content = await (0, import_promises7.readFile)(file, "utf8");
-    } catch {
-      continue;
-    }
-    const lines = content.split("\n");
-    for (let i = 0; i < lines.length; i += 1) {
-      if (regex.test(lines[i] ?? "")) {
-        const start = Math.max(0, i - context);
-        const end = Math.min(lines.length - 1, i + context);
-        for (let lineIndex = start; lineIndex <= end; lineIndex += 1) {
-          const marker = lineIndex === i ? ":" : "-";
-          out.push(`${file}${marker}${lineIndex + 1}${marker} ${lines[lineIndex]?.trim()}`);
-          if (out.length >= MAX_RESULTS)
-            break;
-        }
-        totalMatches += 1;
-        if (out.length >= MAX_RESULTS)
-          break;
-      }
-    }
-  }
-  const trailParts = [];
-  if (totalMatches > out.length) {
-    trailParts.push(`[... ${totalMatches - out.length} more matches]`);
-  }
-  if (redactedFileCount > 0) {
-    trailParts.push(`[skipped ${redactedFileCount} secret-pattern file${redactedFileCount === 1 ? "" : "s"}]`);
-  }
-  const trail = trailParts.length > 0 ? "\n" + trailParts.join("\n") : "";
-  return {
-    output: out.length === 0 ? "(no matches)" + trail : out.join("\n") + trail,
-    isError: false
-  };
-}
-var import_promises7, import_fast_glob, import_node_path10, MAX_RESULTS, searchFilesTool;
-var init_search_files = __esm({
-  "../../dist/src/tools/search-files.js"() {
-    "use strict";
-    init_scoped_fetch();
-    import_promises7 = require("node:fs/promises");
-    import_fast_glob = __toESM(require_out4(), 1);
-    import_node_path10 = require("node:path");
-    init_safe_spawn();
-    init_base();
-    init_secret_guard();
-    MAX_RESULTS = 50;
-    searchFilesTool = {
-      readOnly: true,
-      definition: {
-        name: "search_files",
-        description: 'Search for a regex pattern across files. Uses ripgrep (rg) when available, falls back to a Node-based glob+regex scan otherwise. Returns up to 50 matches. IMPORTANT: `pattern` is a REGEX, not a shell glob. To find files containing the word "Adventure" pass `Adventure`, NOT `*Adventure*` (which crashes the regex parser). Use `file_glob` for filename filtering with `*` wildcards.',
-        input_schema: {
-          type: "object",
-          properties: {
-            pattern: {
-              type: "string",
-              description: "REGEX pattern (not glob). Plain words match as substrings. Examples: `TODO`, `function\\s+main`, `(?i)error|fail`. NEVER wrap in `*`s."
-            },
-            path: { type: "string", description: "Directory root (default: cwd)" },
-            file_glob: {
-              type: "string",
-              description: "Glob to filter filenames (this IS where wildcards belong), e.g. '**/*.ts', '*.md'"
-            },
-            context_lines: {
-              type: "integer",
-              description: "Number of surrounding context lines per match, like rg -C. Defaults to 0, max 20."
-            }
-          },
-          required: ["pattern"],
-          additionalProperties: false
-        }
-      },
-      async execute(input, context = {}) {
-        const pattern = requireString(input, "pattern");
-        const path = (0, import_node_path10.resolve)(optionalString(input, "path") ?? process.cwd());
-        const fileGlob = optionalString(input, "file_glob");
-        const contextLines = optionalNumber(input, "context_lines", 0);
-        if (await ripgrepAvailable()) {
-          return runRipgrep(pattern, path, fileGlob, contextLines, context.signal);
-        }
-        return fallbackSearch(pattern, path, fileGlob, contextLines);
-      }
-    };
-  }
-});
-
-// ../../dist/src/tools/code-index.js
-function definitionRegex(symbol) {
-  const escaped = symbol.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  return new RegExp([
-    `(?:export\\s+)?(?:async\\s+)?function\\s+${escaped}\\b`,
-    `(?:export\\s+)?(?:const|let|var)\\s+${escaped}\\b`,
-    `(?:export\\s+)?class\\s+${escaped}\\b`,
-    `(?:export\\s+)?interface\\s+${escaped}\\b`,
-    `(?:export\\s+)?type\\s+${escaped}\\b`,
-    `def\\s+${escaped}\\b`,
-    `class\\s+${escaped}\\b`
-  ].join("|"));
-}
-function referenceRegex(symbol) {
-  const escaped = symbol.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  return new RegExp(`\\b${escaped}\\b`);
-}
-var import_promises8, import_fast_glob2, import_node_path11, DEFAULT_GLOBS, codeIndexTool;
-var init_code_index = __esm({
-  "../../dist/src/tools/code-index.js"() {
-    "use strict";
-    init_scoped_fetch();
-    import_promises8 = require("node:fs/promises");
-    import_fast_glob2 = __toESM(require_out4(), 1);
-    import_node_path11 = require("node:path");
-    init_base();
-    init_secret_guard();
-    DEFAULT_GLOBS = [
-      "**/*.{ts,tsx,js,jsx,mjs,cjs,py,go,rs,java,cs,cpp,c,h,hpp,rb,php}"
-    ];
-    codeIndexTool = {
-      readOnly: true,
-      definition: {
-        name: "code_index",
-        description: "Lightweight repo code index for symbol definitions and references. Use before broad code edits when ripgrep is too raw. This is deterministic text/regex indexing, not a language server.",
-        input_schema: {
-          type: "object",
-          properties: {
-            symbol: { type: "string", description: "Symbol/function/class/type name to find." },
-            path: { type: "string", description: "Repo root. Defaults to cwd." },
-            mode: { type: "string", description: "definitions | references | both. Defaults to both." },
-            file_glob: { type: "string", description: "Optional glob override, e.g. '**/*.ts'." },
-            limit: { type: "integer", description: "Maximum matches. Defaults to 80." }
-          },
-          required: ["symbol"],
-          additionalProperties: false
-        }
-      },
-      async execute(input) {
-        const symbol = requireString(input, "symbol");
-        const root = (0, import_node_path11.resolve)(optionalString(input, "path") ?? process.cwd());
-        const mode = (optionalString(input, "mode") ?? "both").toLowerCase();
-        const limit = Math.max(1, Math.min(500, Math.floor(optionalNumber(input, "limit", 80))));
-        const patterns = optionalString(input, "file_glob") ? [optionalString(input, "file_glob")] : DEFAULT_GLOBS;
-        const files = await (0, import_fast_glob2.default)(patterns, {
-          cwd: root,
-          absolute: true,
-          onlyFiles: true,
-          ignore: ["**/node_modules/**", "**/.git/**", "**/dist/**", "**/build/**", "**/.next/**"]
-        });
-        const defRe = definitionRegex(symbol);
-        const refRe = referenceRegex(symbol);
-        const out = [];
-        let skippedSecrets = 0;
-        for (const file of files) {
-          if (out.length >= limit)
-            break;
-          if (classifySecretPath(file).matched) {
-            skippedSecrets += 1;
-            continue;
-          }
-          let text2 = "";
-          try {
-            text2 = await (0, import_promises8.readFile)(file, "utf8");
-          } catch {
-            continue;
-          }
-          const lines = text2.split("\n");
-          for (let index = 0; index < lines.length; index += 1) {
-            const line = lines[index] ?? "";
-            const isDefinition = defRe.test(line);
-            const isReference = refRe.test(line);
-            if (mode === "definitions" && isDefinition || mode === "references" && isReference || mode !== "definitions" && mode !== "references" && (isDefinition || isReference)) {
-              out.push(`${isDefinition ? "def" : "ref"} ${file}:${index + 1}: ${line.trim()}`);
-              if (out.length >= limit)
-                break;
-            }
-          }
-        }
-        if (skippedSecrets > 0) {
-          out.push(`[skipped ${skippedSecrets} secret-pattern file${skippedSecrets === 1 ? "" : "s"}]`);
-        }
-        return { output: out.length > 0 ? out.join("\n") : "(no matches)", isError: false };
-      }
-    };
-  }
-});
-
-// ../../dist/src/tools/git-status.js
-function gitExec(cwd, args) {
-  try {
-    const r = (0, import_node_child_process4.spawnSync)("git", args, {
-      cwd,
-      windowsHide: true,
-      encoding: "utf8",
-      timeout: 1e4
-    });
-    return {
-      ok: r.status === 0 && !r.error,
-      stdout: r.stdout.trimEnd(),
-      stderr: r.stderr.trimEnd()
-    };
-  } catch (err) {
-    return {
-      ok: false,
-      stdout: "",
-      stderr: err instanceof Error ? err.message : String(err)
-    };
-  }
-}
-function parsePorcelain(stdout) {
-  const staged = [];
-  const unstaged = [];
-  const untracked = [];
-  const lines = stdout.split("\n").map((line) => line.trimEnd()).filter(Boolean);
-  for (const line of lines) {
-    if (line.length < 3)
-      continue;
-    const xy = line.slice(0, 2);
-    const file = line.slice(3).trim().replace(/^"|"$/g, "");
-    if (xy === "??") {
-      untracked.push(file);
-      continue;
-    }
-    const stagedStatus = xy[0];
-    const unstagedStatus = xy[1];
-    if (stagedStatus !== " " && stagedStatus !== "?") {
-      staged.push({ status: stagedStatus, file });
-    }
-    if (unstagedStatus !== " " && unstagedStatus !== "?") {
-      unstaged.push({ status: unstagedStatus, file });
-    }
-  }
-  return {
-    staged,
-    unstaged,
-    untracked,
-    dirty: lines.length > 0
-  };
-}
-function parseAheadBehind(stdout) {
-  const [behindRaw, aheadRaw] = stdout.split(/\s+/);
-  return {
-    ahead: Math.max(0, Number.parseInt(aheadRaw ?? "0", 10) || 0),
-    behind: Math.max(0, Number.parseInt(behindRaw ?? "0", 10) || 0)
-  };
-}
-function parseRecentCommits(stdout) {
-  if (!stdout)
-    return [];
-  return stdout.split("\n").map((line) => line.split("")).filter((parts) => parts.length >= 4).map((parts) => ({
-    hash: parts[0].trim(),
-    subject: parts[1].trim(),
-    author: parts[2].trim(),
-    date: parts[3].trim()
-  }));
-}
-function getGitStatusSummary(args = {}) {
-  const cwd = (0, import_node_path12.resolve)(args.path ?? process.cwd());
-  const inside = gitExec(cwd, ["rev-parse", "--is-inside-work-tree"]);
-  if (!inside.ok || inside.stdout !== "true") {
-    return {
-      root: cwd,
-      isRepo: false,
-      branch: null,
-      upstream: null,
-      dirty: false,
-      ahead: 0,
-      behind: 0,
-      staged: [],
-      unstaged: [],
-      untracked: [],
-      recentCommits: []
-    };
-  }
-  const rootResult = gitExec(cwd, ["rev-parse", "--show-toplevel"]);
-  const root = rootResult.ok && rootResult.stdout ? rootResult.stdout : cwd;
-  const branchResult = gitExec(root, ["rev-parse", "--abbrev-ref", "HEAD"]);
-  const upstreamResult = gitExec(root, ["rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{upstream}"]);
-  const statusResult = gitExec(root, ["status", "--porcelain=v1"]);
-  const parsedStatus = parsePorcelain(statusResult.ok ? statusResult.stdout : "");
-  const aheadBehindResult = gitExec(root, ["rev-list", "--left-right", "--count", "@{upstream}...HEAD"]);
-  const aheadBehind = aheadBehindResult.ok ? parseAheadBehind(aheadBehindResult.stdout) : { ahead: 0, behind: 0 };
-  const logLimit = Math.max(1, Math.min(50, Math.floor(args.logLimit ?? 10)));
-  const logResult = gitExec(root, ["log", `-${logLimit}`, "--pretty=format:%h%x1f%s%x1f%an%x1f%aI"]);
-  const summary = {
-    root,
-    isRepo: true,
-    branch: branchResult.ok ? branchResult.stdout : null,
-    upstream: upstreamResult.ok ? upstreamResult.stdout : null,
-    dirty: parsedStatus.dirty,
-    ahead: aheadBehind.ahead,
-    behind: aheadBehind.behind,
-    staged: parsedStatus.staged,
-    unstaged: parsedStatus.unstaged,
-    untracked: parsedStatus.untracked,
-    recentCommits: logResult.ok ? parseRecentCommits(logResult.stdout) : []
-  };
-  if (args.includeDiff) {
-    const diffArgs = args.cachedDiff ? ["diff", "--cached"] : ["diff"];
-    const diff = gitExec(root, diffArgs);
-    const max = Math.max(500, Math.floor(args.maxDiffChars ?? 2e4));
-    const text2 = diff.ok ? diff.stdout : diff.stderr;
-    summary.diff = {
-      cached: Boolean(args.cachedDiff),
-      text: text2.length > max ? text2.slice(0, max) : text2,
-      truncated: text2.length > max
-    };
-  }
-  if (!(0, import_node_fs2.existsSync)(root))
-    summary.root = cwd;
-  return summary;
-}
-var import_node_child_process4, import_node_fs2, import_node_path12, gitStatusTool;
-var init_git_status = __esm({
-  "../../dist/src/tools/git-status.js"() {
-    "use strict";
-    init_scoped_fetch();
-    import_node_child_process4 = require("node:child_process");
-    import_node_fs2 = require("node:fs");
-    import_node_path12 = require("node:path");
-    init_base();
-    gitStatusTool = {
-      readOnly: true,
-      definition: {
-        name: "git_status",
-        description: "Return structured git repo state without shelling out: root, branch, upstream, dirty files, ahead/behind, recent commits, and optionally diff text. Use this before repo edits, reviews, commits, or PR work instead of raw `git status` via bash.",
-        input_schema: {
-          type: "object",
-          properties: {
-            path: {
-              type: "string",
-              description: "Workspace path. Defaults to the current working directory."
-            },
-            include_diff: {
-              type: "boolean",
-              description: "Include unstaged diff text, truncated to max_diff_chars."
-            },
-            cached_diff: {
-              type: "boolean",
-              description: "When include_diff is true, include staged diff instead of unstaged diff."
-            },
-            max_diff_chars: {
-              type: "integer",
-              description: "Maximum diff characters to return. Defaults to 20000."
-            },
-            log_limit: {
-              type: "integer",
-              description: "Recent commit count. Defaults to 10, max 50."
-            }
-          },
-          additionalProperties: false
-        }
-      },
-      async execute(input) {
-        const summary = getGitStatusSummary({
-          path: optionalString(input, "path"),
-          includeDiff: Boolean(input.include_diff),
-          cachedDiff: Boolean(input.cached_diff),
-          maxDiffChars: optionalNumber(input, "max_diff_chars", 2e4),
-          logLimit: optionalNumber(input, "log_limit", 10)
-        });
-        return { output: JSON.stringify(summary, null, 2), isError: false };
-      }
-    };
-  }
-});
-
-// ../../dist/src/tools/git-diff.js
-function git(cwd, args) {
-  const result = (0, import_node_child_process5.spawnSync)("git", args, {
-    cwd,
-    encoding: "utf8",
-    windowsHide: true,
-    timeout: 1e4
-  });
-  return {
-    ok: result.status === 0 && !result.error,
-    text: (result.stdout || result.stderr || "").trimEnd()
-  };
-}
-var import_node_child_process5, import_node_path13, gitDiffTool;
-var init_git_diff = __esm({
-  "../../dist/src/tools/git-diff.js"() {
-    "use strict";
-    init_scoped_fetch();
-    import_node_child_process5 = require("node:child_process");
-    import_node_path13 = require("node:path");
-    init_base();
-    gitDiffTool = {
-      readOnly: true,
-      definition: {
-        name: "git_diff",
-        description: "Show git diff text for model self-review after edits. Use this after write_file/edit_file/multi_edit before finalizing, and before commits or PRs.",
-        input_schema: {
-          type: "object",
-          properties: {
-            path: { type: "string", description: "Repo path. Defaults to cwd." },
-            file: { type: "string", description: "Optional single file path to diff." },
-            cached: { type: "boolean", description: "Show staged diff instead of unstaged diff." },
-            stat: { type: "boolean", description: "Show diff --stat summary only." },
-            max_chars: { type: "integer", description: "Maximum characters to return. Defaults to 30000." }
-          },
-          additionalProperties: false
-        }
-      },
-      async execute(input) {
-        const cwd = (0, import_node_path13.resolve)(optionalString(input, "path") ?? process.cwd());
-        const file = optionalString(input, "file");
-        const max = Math.max(500, Math.floor(optionalNumber(input, "max_chars", 3e4)));
-        const args = ["diff"];
-        if (Boolean(input.cached))
-          args.push("--cached");
-        if (Boolean(input.stat))
-          args.push("--stat");
-        if (file)
-          args.push("--", file);
-        const result = git(cwd, args);
-        const text2 = result.text || "(no diff)";
-        return {
-          output: text2.length > max ? `${text2.slice(0, max)}
-[truncated, ${text2.length} chars total]` : text2,
-          isError: !result.ok
-        };
-      }
-    };
-  }
-});
-
-// ../../dist/src/tools/multi-edit.js
-function parseOperations(value) {
-  if (!Array.isArray(value) || value.length === 0) {
-    throw new ToolValidationError("Tool argument 'files' must be a non-empty array");
-  }
-  return value.map((entry, index) => {
-    if (!entry || typeof entry !== "object" || Array.isArray(entry)) {
-      throw new ToolValidationError(`files[${index}] must be an object`);
-    }
-    const item = entry;
-    if (typeof item.path !== "string" || !item.path.trim()) {
-      throw new ToolValidationError(`files[${index}].path must be a non-empty string`);
-    }
-    if (!Array.isArray(item.edits) || item.edits.length === 0) {
-      throw new ToolValidationError(`files[${index}].edits must be a non-empty array`);
-    }
-    const edits = item.edits.map((edit, editIndex) => {
-      if (!edit || typeof edit !== "object" || Array.isArray(edit)) {
-        throw new ToolValidationError(`files[${index}].edits[${editIndex}] must be an object`);
-      }
-      const object3 = edit;
-      if (typeof object3.old_str !== "string" || typeof object3.new_str !== "string") {
-        throw new ToolValidationError(`files[${index}].edits[${editIndex}] requires old_str and new_str`);
-      }
-      const expected = object3.expected_replacements;
-      if (expected !== void 0 && (typeof expected !== "number" || !Number.isFinite(expected))) {
-        throw new ToolValidationError(`files[${index}].edits[${editIndex}].expected_replacements must be a number`);
-      }
-      return {
-        oldStr: object3.old_str,
-        newStr: object3.new_str,
-        replaceAll: object3.replace_all === true,
-        expectedReplacements: typeof expected === "number" ? Math.floor(expected) : void 0
-      };
-    });
-    return { path: (0, import_node_path14.resolve)(item.path), edits };
-  });
-}
-var import_promises9, import_node_path14, multiEditTool;
-var init_multi_edit = __esm({
-  "../../dist/src/tools/multi-edit.js"() {
-    "use strict";
-    init_scoped_fetch();
-    import_promises9 = require("node:fs/promises");
-    import_node_path14 = require("node:path");
-    init_base();
-    init_edit_file();
-    init_store();
-    multiEditTool = {
-      readOnly: false,
-      definition: {
-        name: "multi_edit",
-        description: "Apply coordinated search-and-replace edits across multiple files as one planned changeset. Reads and validates every file/edit before writing, returns diffs, syntax status, and rollback ids. Use for multi-file refactors instead of many separate edit_file calls.",
-        input_schema: {
-          type: "object",
-          properties: {
-            files: {
-              type: "array",
-              items: {
-                type: "object",
-                properties: {
-                  path: { type: "string" },
-                  edits: {
-                    type: "array",
-                    items: {
-                      type: "object",
-                      properties: {
-                        old_str: { type: "string" },
-                        new_str: { type: "string" },
-                        replace_all: { type: "boolean" },
-                        expected_replacements: { type: "integer" }
-                      },
-                      required: ["old_str", "new_str"],
-                      additionalProperties: false
-                    }
-                  }
-                },
-                required: ["path", "edits"],
-                additionalProperties: false
-              }
-            }
-          },
-          required: ["files"],
-          additionalProperties: false
-        }
-      },
-      async execute(input) {
-        try {
-          const operations = parseOperations(input.files);
-          const prepared = [];
-          for (const operation of operations) {
-            const before = await (0, import_promises9.readFile)(operation.path, "utf8");
-            let after = before;
-            for (const [index, edit] of operation.edits.entries()) {
-              after = applyEdit(after, operation.path, edit, index);
-            }
-            prepared.push({ path: operation.path, before, after });
-          }
-          const output = [];
-          for (const item of prepared) {
-            await (0, import_promises9.writeFile)(item.path, item.after, "utf8");
-            const checkpoint = await recordFileRollbackCheckpoint({
-              tool: "multi_edit",
-              path: item.path,
-              before: item.before,
-              after: item.after
-            });
-            output.push([
-              `# ${item.path}`,
-              unifiedDiff(item.before, item.after, item.path),
-              syntaxCheck(item.path, item.after),
-              `rollback: ${checkpoint.id}`
-            ].join("\n"));
-          }
-          return { output: output.join("\n\n"), isError: false };
-        } catch (err) {
-          return {
-            output: `error: ${err instanceof Error ? err.message : String(err)}`,
-            isError: true
-          };
-        }
-      }
-    };
-  }
-});
-
-// ../../dist/src/tools/test-run.js
-function safeReadPackage(cwd) {
-  try {
-    return JSON.parse((0, import_node_fs3.readFileSync)((0, import_node_path15.join)(cwd, "package.json"), "utf8"));
-  } catch {
-    return null;
-  }
-}
-function detectTestCommand(cwd) {
-  const pkg = safeReadPackage(cwd);
-  const scripts = pkg?.scripts;
-  if (scripts && typeof scripts === "object" && !Array.isArray(scripts)) {
-    const test = scripts.test;
-    if (typeof test === "string" && test.trim())
-      return "npm test";
-  }
-  if ((0, import_node_fs3.existsSync)((0, import_node_path15.join)(cwd, "pyproject.toml")) || (0, import_node_fs3.existsSync)((0, import_node_path15.join)(cwd, "pytest.ini"))) {
-    return "python -m pytest";
-  }
-  if ((0, import_node_fs3.existsSync)((0, import_node_path15.join)(cwd, "Cargo.toml")))
-    return "cargo test";
-  if ((0, import_node_fs3.existsSync)((0, import_node_path15.join)(cwd, "go.mod")))
-    return "go test ./...";
-  if ((0, import_node_fs3.existsSync)((0, import_node_path15.join)(cwd, "pom.xml")))
-    return "mvn test";
-  if ((0, import_node_fs3.existsSync)((0, import_node_path15.join)(cwd, "build.gradle")) || (0, import_node_fs3.existsSync)((0, import_node_path15.join)(cwd, "build.gradle.kts"))) {
-    return "gradle test";
-  }
-  return null;
-}
-function shellFor(command) {
-  if (process.platform === "win32") {
-    return {
-      command: "powershell.exe",
-      args: ["-NoLogo", "-NoProfile", "-NonInteractive", "-Command", command],
-      shell: false
-    };
-  }
-  return { command, args: [], shell: true };
-}
-function truncateMiddle(text2, maxChars) {
-  if (text2.length <= maxChars)
-    return { text: text2, truncated: false };
-  const head = Math.ceil(maxChars * 0.6);
-  const tail = Math.max(0, maxChars - head - 80);
-  return {
-    text: text2.slice(0, head) + `
-...[${text2.length - head - tail} chars omitted]...
-` + text2.slice(-tail),
-    truncated: true
-  };
-}
-function parseCounts(output) {
-  const counts = {};
-  const nodeSummary = output.match(/(?:#|ℹ)\s*pass\s+(\d+)[\s\S]*?(?:#|ℹ)\s*fail\s+(\d+)[\s\S]*?(?:#|ℹ)\s*(?:cancelled|skipped)\s+(\d+)/i);
-  if (nodeSummary) {
-    counts.passed = Number.parseInt(nodeSummary[1], 10);
-    counts.failed = Number.parseInt(nodeSummary[2], 10);
-    counts.skipped = Number.parseInt(nodeSummary[3], 10);
-    counts.total = (counts.passed ?? 0) + (counts.failed ?? 0) + (counts.skipped ?? 0);
-    return counts;
-  }
-  const pytest = output.match(/=+\s*(?:(\d+)\s+failed,\s*)?(?:(\d+)\s+passed,?\s*)?(?:(\d+)\s+skipped,?\s*)?/i);
-  if (pytest && (pytest[1] || pytest[2] || pytest[3])) {
-    counts.failed = pytest[1] ? Number.parseInt(pytest[1], 10) : 0;
-    counts.passed = pytest[2] ? Number.parseInt(pytest[2], 10) : 0;
-    counts.skipped = pytest[3] ? Number.parseInt(pytest[3], 10) : 0;
-    counts.total = (counts.passed ?? 0) + (counts.failed ?? 0) + (counts.skipped ?? 0);
-    return counts;
-  }
-  const generic = output.match(/Tests?:\s*(?:(\d+)\s+failed,\s*)?(?:(\d+)\s+passed,\s*)?(?:(\d+)\s+skipped,\s*)?(?:(\d+)\s+total)/i);
-  if (generic) {
-    counts.failed = generic[1] ? Number.parseInt(generic[1], 10) : 0;
-    counts.passed = generic[2] ? Number.parseInt(generic[2], 10) : void 0;
-    counts.skipped = generic[3] ? Number.parseInt(generic[3], 10) : void 0;
-    counts.total = Number.parseInt(generic[4], 10);
-  }
-  if (Object.keys(counts).length === 0) {
-    const passLines = output.split("\n").filter((line) => /^\s*(ok\s+\d+\b|✔\s+)/.test(line)).length;
-    const failLines = output.split("\n").filter((line) => /^\s*(not ok\s+\d+\b|✖\s+)/.test(line)).length;
-    if (passLines > 0 || failLines > 0) {
-      counts.passed = passLines;
-      counts.failed = failLines;
-      counts.total = passLines + failLines;
-    }
-  }
-  return counts;
-}
-function parseFailures(output) {
-  const failures = [];
-  for (const line of output.split("\n")) {
-    const trimmed = line.trim();
-    if (/^(not ok|✖|x\s+|fail(?:ed)?\b|FAIL\b|FAILED\b)/.test(trimmed) || /\b(error|assertion|expected|received)\b/i.test(trimmed)) {
-      failures.push(trimmed);
-      if (failures.length >= 20)
-        break;
-    }
-  }
-  return failures;
-}
-function runTestCommand(args) {
-  const cwd = (0, import_node_path15.resolve)(args.cwd ?? process.cwd());
-  const command = args.command?.trim() || detectTestCommand(cwd);
-  const timeoutMs = Math.max(1e3, args.timeoutMs ?? DEFAULT_TIMEOUT_MS2);
-  const maxOutputChars = Math.max(1e3, args.maxOutputChars ?? DEFAULT_MAX_OUTPUT_CHARS);
-  const started = Date.now();
-  if (!command) {
-    return Promise.resolve({
-      cwd,
-      command: "",
-      exitCode: -1,
-      status: "error",
-      durationMs: 0,
-      counts: {},
-      failures: ["No test command detected. Pass command explicitly."],
-      stdout: "",
-      stderr: "",
-      truncated: false
-    });
-  }
-  return new Promise((resolveReady) => {
-    const shell = shellFor(command);
-    const child = (0, import_node_child_process6.spawn)(shell.command, shell.args, {
-      cwd,
-      shell: shell.shell,
-      windowsHide: true,
-      stdio: ["ignore", "pipe", "pipe"]
-    });
-    let stdout = "";
-    let stderr = "";
-    let timedOut = false;
-    let cancelled = false;
-    const kill = () => {
-      try {
-        child.kill();
-      } catch {
-      }
-    };
-    const timer = setTimeout(() => {
-      timedOut = true;
-      kill();
-    }, timeoutMs);
-    if (args.signal) {
-      if (args.signal.aborted) {
-        cancelled = true;
-        kill();
-      } else {
-        args.signal.addEventListener("abort", () => {
-          cancelled = true;
-          kill();
-        }, { once: true });
-      }
-    }
-    child.stdout.on("data", (buf) => {
-      const text2 = buf.toString();
-      stdout += text2;
-      args.onProgress?.({ stream: "stdout", text: text2 });
-    });
-    child.stderr.on("data", (buf) => {
-      const text2 = buf.toString();
-      stderr += text2;
-      args.onProgress?.({ stream: "stderr", text: text2 });
-    });
-    child.on("error", (err) => {
-      clearTimeout(timer);
-      resolveReady({
-        cwd,
-        command,
-        exitCode: -1,
-        status: "error",
-        durationMs: Date.now() - started,
-        counts: {},
-        failures: [err.message],
-        stdout: "",
-        stderr: err.message,
-        truncated: false
-      });
-    });
-    child.on("close", (code) => {
-      clearTimeout(timer);
-      const combined = `${stdout}
-${stderr}`;
-      const out = truncateMiddle(stdout, Math.floor(maxOutputChars * 0.7));
-      const err = truncateMiddle(stderr, Math.floor(maxOutputChars * 0.3));
-      const status = cancelled ? "cancelled" : timedOut ? "timeout" : (code ?? -1) === 0 ? "passed" : "failed";
-      resolveReady({
-        cwd,
-        command,
-        exitCode: code ?? -1,
-        status,
-        durationMs: Date.now() - started,
-        counts: parseCounts(combined),
-        failures: parseFailures(combined),
-        stdout: out.text,
-        stderr: err.text,
-        truncated: out.truncated || err.truncated
-      });
-    });
-  });
-}
-var import_node_child_process6, import_node_fs3, import_node_path15, DEFAULT_TIMEOUT_MS2, DEFAULT_MAX_OUTPUT_CHARS, testRunTool;
-var init_test_run = __esm({
-  "../../dist/src/tools/test-run.js"() {
-    "use strict";
-    init_scoped_fetch();
-    import_node_child_process6 = require("node:child_process");
-    import_node_fs3 = require("node:fs");
-    import_node_path15 = require("node:path");
-    init_base();
-    DEFAULT_TIMEOUT_MS2 = 6e5;
-    DEFAULT_MAX_OUTPUT_CHARS = 3e4;
-    testRunTool = {
-      readOnly: false,
-      definition: {
-        name: "test_run",
-        description: "Run the workspace test command and return structured pass/fail output. Autodetects npm test, pytest, cargo test, go test, Maven, or Gradle. Use after edits instead of raw bash so failures are easier to interpret.",
-        input_schema: {
-          type: "object",
-          properties: {
-            path: {
-              type: "string",
-              description: "Workspace root. Defaults to current working directory."
-            },
-            command: {
-              type: "string",
-              description: "Explicit test command. If omitted, PeriCode autodetects one."
-            },
-            timeout_ms: {
-              type: "integer",
-              description: "Timeout in milliseconds. Defaults to 600000."
-            },
-            max_output_chars: {
-              type: "integer",
-              description: "Maximum stdout+stderr chars to return. Defaults to 30000."
-            }
-          },
-          additionalProperties: false
-        }
-      },
-      async execute(input, context = {}) {
-        const result = await runTestCommand({
-          cwd: optionalString(input, "path"),
-          command: optionalString(input, "command"),
-          timeoutMs: optionalNumber(input, "timeout_ms", DEFAULT_TIMEOUT_MS2),
-          maxOutputChars: optionalNumber(input, "max_output_chars", DEFAULT_MAX_OUTPUT_CHARS),
-          signal: context.signal,
-          onProgress: context.onProgress
-        });
-        return {
-          output: JSON.stringify(result, null, 2),
-          isError: result.status !== "passed"
-        };
-      }
-    };
-  }
-});
-
-// ../../dist/src/tools/todo.js
-function todoPath() {
-  return process.env.PERICODE_TODO_PATH ?? ownedPath(TODO_FILE);
-}
-function readTodos() {
-  const path = todoPath();
-  if (!(0, import_node_fs4.existsSync)(path))
-    return [];
-  try {
-    const parsed = JSON.parse((0, import_node_fs4.readFileSync)(path, "utf8"));
-    return Array.isArray(parsed.todos) ? parsed.todos.filter(isTodoItem) : [];
-  } catch {
-    return [];
-  }
-}
-function writeTodos(todos) {
-  const path = todoPath();
-  (0, import_node_fs4.mkdirSync)((0, import_node_path16.dirname)(path), { recursive: true });
-  (0, import_node_fs4.writeFileSync)(path, JSON.stringify({ version: 1, updatedAt: (/* @__PURE__ */ new Date()).toISOString(), todos }, null, 2), "utf8");
-}
-function isTodoItem(value) {
-  if (!value || typeof value !== "object" || Array.isArray(value))
-    return false;
-  const item = value;
-  return typeof item.id === "string" && typeof item.content === "string" && (item.status === "pending" || item.status === "in_progress" || item.status === "completed" || item.status === "blocked");
-}
-function parseTodos(value) {
-  if (!Array.isArray(value)) {
-    throw new ToolValidationError("Tool argument 'todos' must be an array");
-  }
-  return value.map((entry, index) => {
-    if (!entry || typeof entry !== "object" || Array.isArray(entry)) {
-      throw new ToolValidationError(`todos[${index}] must be an object`);
-    }
-    const item = entry;
-    const content = item.content;
-    const status = item.status;
-    const id = typeof item.id === "string" && item.id.trim() ? item.id.trim() : `todo-${index + 1}`;
-    if (typeof content !== "string" || !content.trim()) {
-      throw new ToolValidationError(`todos[${index}].content must be a non-empty string`);
-    }
-    if (status !== "pending" && status !== "in_progress" && status !== "completed" && status !== "blocked") {
-      throw new ToolValidationError(`todos[${index}].status must be pending, in_progress, completed, or blocked`);
-    }
-    return { id, content: content.trim(), status };
-  });
-}
-function formatTodos(todos) {
-  if (todos.length === 0)
-    return "(no todos)";
-  return todos.map((todo) => `${todo.id} [${todo.status}] ${todo.content}`).join("\n");
-}
-var import_node_fs4, import_node_path16, TODO_FILE, todoReadTool, todoWriteTool;
-var init_todo = __esm({
-  "../../dist/src/tools/todo.js"() {
-    "use strict";
-    init_scoped_fetch();
-    import_node_fs4 = require("node:fs");
-    import_node_path16 = require("node:path");
-    init_base();
-    init_paths();
-    TODO_FILE = "todos.json";
-    todoReadTool = {
-      readOnly: true,
-      definition: {
-        name: "todo_read",
-        description: "Read the current lightweight turn/workspace todo list. Use this before multi-step work to see the active plan.",
-        input_schema: {
-          type: "object",
-          properties: {
-            format: { type: "string", description: "text or json. Defaults to text." }
-          },
-          additionalProperties: false
-        }
-      },
-      async execute(input) {
-        const todos = readTodos();
-        return {
-          output: optionalString(input, "format") === "json" ? JSON.stringify({ todos }, null, 2) : formatTodos(todos),
-          isError: false
-        };
-      }
-    };
-    todoWriteTool = {
-      readOnly: false,
-      definition: {
-        name: "todo_write",
-        description: "Replace the current lightweight todo list for a multi-step task. Keep exactly one item in_progress, update statuses as work proceeds, and prefer this over prose-only planning.",
-        input_schema: {
-          type: "object",
-          properties: {
-            todos: {
-              type: "array",
-              items: {
-                type: "object",
-                properties: {
-                  id: { type: "string" },
-                  content: { type: "string" },
-                  status: { type: "string", enum: ["pending", "in_progress", "completed", "blocked"] }
-                },
-                required: ["content", "status"],
-                additionalProperties: false
-              }
-            }
-          },
-          required: ["todos"],
-          additionalProperties: false
-        }
-      },
-      async execute(input) {
-        const todos = parseTodos(input.todos);
-        const active = todos.filter((todo) => todo.status === "in_progress");
-        if (active.length > 1) {
-          return {
-            output: "error: only one todo may be in_progress at a time",
-            isError: true
-          };
-        }
-        writeTodos(todos);
-        return { output: formatTodos(todos), isError: false };
-      }
-    };
-  }
-});
-
-// ../../dist/src/tools/rollback.js
-function optionalBoolean3(input, key) {
-  const value = input[key];
-  if (value === void 0 || value === null)
-    return false;
-  return value === true;
-}
-function summarize(checkpoint) {
-  return {
-    id: checkpoint.id,
-    createdAt: checkpoint.createdAt,
-    cwd: checkpoint.cwd,
-    tool: checkpoint.tool,
-    path: checkpoint.path,
-    before: {
-      exists: checkpoint.before.exists,
-      bytes: checkpoint.before.bytes,
-      sha256: checkpoint.before.sha256
-    },
-    after: {
-      exists: checkpoint.after.exists,
-      bytes: checkpoint.after.bytes,
-      sha256: checkpoint.after.sha256
-    }
-  };
-}
-var rollbackReadTool, rollbackApplyTool;
-var init_rollback = __esm({
-  "../../dist/src/tools/rollback.js"() {
-    "use strict";
-    init_scoped_fetch();
-    init_base();
-    init_store();
-    rollbackReadTool = {
-      readOnly: true,
-      definition: {
-        name: "rollback_read",
-        description: "List or inspect PeriCode rollback checkpoints recorded before agent file changes. Use this before applying a rollback.",
-        input_schema: {
-          type: "object",
-          properties: {
-            id: { type: "string", description: "Checkpoint id to inspect. Omit to list recent checkpoints." },
-            limit: { type: "integer", description: "Maximum checkpoints to list. Defaults to 20." },
-            include_content: {
-              type: "boolean",
-              description: "When inspecting one checkpoint, include before/after content snapshots."
-            }
-          },
-          additionalProperties: false
-        }
-      },
-      async execute(input) {
-        try {
-          const id = optionalString(input, "id");
-          if (id) {
-            const checkpoint = await loadRollbackCheckpoint(id);
-            const output = optionalBoolean3(input, "include_content") ? checkpoint : summarize(checkpoint);
-            return { output: JSON.stringify(output, null, 2), isError: false };
-          }
-          const checkpoints = await listRollbackCheckpoints(optionalNumber(input, "limit", 20));
-          return {
-            output: JSON.stringify(checkpoints.map((checkpoint) => summarize(checkpoint)), null, 2),
-            isError: false
-          };
-        } catch (err) {
-          return {
-            output: `error: ${err instanceof Error ? err.message : String(err)}`,
-            isError: true
-          };
-        }
-      }
-    };
-    rollbackApplyTool = {
-      readOnly: false,
-      definition: {
-        name: "rollback_apply",
-        description: "Restore one PeriCode rollback checkpoint. Refuses to overwrite newer user edits unless force=true. Use dry_run=true first.",
-        input_schema: {
-          type: "object",
-          properties: {
-            id: { type: "string", description: "Rollback checkpoint id." },
-            dry_run: { type: "boolean", description: "Preview the restore without changing files." },
-            force: {
-              type: "boolean",
-              description: "Override current-file hash mismatch. Use only after explicit operator approval."
-            }
-          },
-          required: ["id"],
-          additionalProperties: false
-        }
-      },
-      async execute(input) {
-        try {
-          const result = await applyRollbackCheckpoint({
-            id: requireString(input, "id"),
-            dryRun: optionalBoolean3(input, "dry_run"),
-            force: optionalBoolean3(input, "force")
-          });
-          return {
-            output: `${result.dryRun ? "Would restore" : "Restored"} ${result.checkpoint.path} from rollback ${result.checkpoint.id} (${result.restored}${result.forced ? ", forced" : ""}).`,
-            isError: false
-          };
-        } catch (err) {
-          return {
-            output: `error: ${err instanceof RollbackStoreError || err instanceof Error ? err.message : String(err)}`,
-            isError: true
-          };
-        }
-      }
-    };
-  }
-});
-
-// ../../dist/src/knowledge/store.js
-function knowledgeDir() {
-  return process.env[KNOWLEDGE_DIR_ENV] ?? ownedPath("knowledge");
-}
-function slugify(text2) {
-  const slug = text2.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 80);
-  return slug || "knowledge";
-}
-function sha2562(text2) {
-  return (0, import_node_crypto3.createHash)("sha256").update(text2, "utf8").digest("hex");
-}
-function inferFormat(source, content, requested) {
-  if (requested !== "auto")
-    return requested;
-  const ext = source ? (0, import_node_path17.extname)(source).toLowerCase() : "";
-  if (ext === ".md" || ext === ".markdown")
-    return "markdown";
-  if (ext === ".json")
-    return "json";
-  if (ext === ".csv")
-    return "csv";
-  const trimmed = content.trim();
-  if (trimmed.startsWith("{") && trimmed.endsWith("}") || trimmed.startsWith("[") && trimmed.endsWith("]")) {
-    return "json";
-  }
-  return "text";
-}
-function parseCsvLine(line) {
-  const out = [];
-  let current = "";
-  let quoted = false;
-  for (let i = 0; i < line.length; i += 1) {
-    const char = line[i];
-    const next = line[i + 1];
-    if (char === '"' && quoted && next === '"') {
-      current += '"';
-      i += 1;
-    } else if (char === '"') {
-      quoted = !quoted;
-    } else if (char === "," && !quoted) {
-      out.push(current.trim());
-      current = "";
-    } else {
-      current += char;
-    }
-  }
-  out.push(current.trim());
-  return out;
-}
-function escapeTableCell(value) {
-  return value.replace(/\|/g, "\\|").replace(/\r?\n/g, " ").trim();
-}
-function csvToMarkdown(content) {
-  const rows = content.split(/\r?\n/).filter((line) => line.trim().length > 0).map(parseCsvLine);
-  if (rows.length === 0)
-    return "";
-  const header = rows[0];
-  const body = rows.slice(1);
-  const lines = [
-    `| ${header.map(escapeTableCell).join(" | ")} |`,
-    `| ${header.map(() => "---").join(" | ")} |`
-  ];
-  for (const row of body) {
-    lines.push(`| ${header.map((_2, index) => escapeTableCell(row[index] ?? "")).join(" | ")} |`);
-  }
-  return lines.join("\n");
-}
-function jsonToMarkdownValue(value, depth = 0) {
-  const indent = "  ".repeat(depth);
-  if (Array.isArray(value)) {
-    return value.flatMap((item, index) => {
-      if (item && typeof item === "object") {
-        return [`${indent}- item ${index + 1}:`, ...jsonToMarkdownValue(item, depth + 1)];
-      }
-      return [`${indent}- ${String(item)}`];
-    });
-  }
-  if (value && typeof value === "object") {
-    const lines = [];
-    for (const [key, item] of Object.entries(value)) {
-      if (item && typeof item === "object") {
-        lines.push(`${indent}- ${key}:`);
-        lines.push(...jsonToMarkdownValue(item, depth + 1));
-      } else {
-        lines.push(`${indent}- ${key}: ${String(item)}`);
-      }
-    }
-    return lines;
-  }
-  return [`${indent}- ${String(value)}`];
-}
-function jsonToMarkdown(content) {
-  try {
-    return jsonToMarkdownValue(JSON.parse(content)).join("\n");
-  } catch (err) {
-    throw new KnowledgeStoreError(`invalid JSON: ${err instanceof Error ? err.message : String(err)}`);
-  }
-}
-function parseTags(tags) {
-  const seen = /* @__PURE__ */ new Set();
-  for (const tag of tags ?? []) {
-    const normalized = tag.trim().toLowerCase().replace(/\s+/g, "-");
-    if (normalized)
-      seen.add(normalized);
-  }
-  return [...seen].slice(0, 20);
-}
-function frontmatter(record2) {
-  return [
-    "---",
-    `pericode-knowledge-version: ${KNOWLEDGE_VERSION}`,
-    `id: ${record2.id}`,
-    `title: ${JSON.stringify(record2.title)}`,
-    `created: ${record2.createdAt}`,
-    `updated: ${record2.updatedAt}`,
-    `source: ${JSON.stringify(record2.source ?? "")}`,
-    `tags: [${record2.tags.map((tag) => JSON.stringify(tag)).join(", ")}]`,
-    "---",
-    ""
-  ].join("\n");
-}
-async function ingestKnowledge(args) {
-  if (!args.text && !args.path)
-    throw new KnowledgeStoreError("provide text or path");
-  const sourcePath = args.path ? (0, import_node_path17.resolve)(args.path) : void 0;
-  const raw = args.text ?? await (0, import_promises10.readFile)(sourcePath, "utf8");
-  const title = (args.title ?? (sourcePath ? (0, import_node_path17.basename)(sourcePath) : "Knowledge note")).trim();
-  const id = `kb_${(0, import_node_crypto3.randomUUID)().replace(/-/g, "").slice(0, 12)}`;
-  const createdAt = (/* @__PURE__ */ new Date()).toISOString();
-  const format = inferFormat(sourcePath, raw, args.format ?? "auto");
-  const body = format === "markdown" ? raw.trim() : format === "json" ? jsonToMarkdown(raw) : format === "csv" ? csvToMarkdown(raw) : raw.trim();
-  const tags = parseTags(args.tags);
-  const md = `${frontmatter({
-    id,
-    title,
-    source: sourcePath,
-    createdAt,
-    updatedAt: createdAt,
-    tags
-  })}# ${title}
-
-${body}
-`;
-  const dir = knowledgeDir();
-  await (0, import_promises10.mkdir)(dir, { recursive: true });
-  const path = (0, import_node_path17.join)(dir, `${slugify(title)}-${id}.md`);
-  await (0, import_promises10.writeFile)(path, md, "utf8");
-  return {
-    id,
-    title,
-    path,
-    source: sourcePath,
-    createdAt,
-    updatedAt: createdAt,
-    bytes: Buffer.byteLength(md, "utf8"),
-    sha256: sha2562(md),
-    tags
-  };
-}
-function recordFromMarkdown(path, content) {
-  const id = content.match(/^id:\s*(kb_[a-f0-9]{12})$/m)?.[1] ?? `kb_${sha2562(path).slice(0, 12)}`;
-  const titleRaw = content.match(/^title:\s*(.+)$/m)?.[1];
-  const sourceRaw = content.match(/^source:\s*(.+)$/m)?.[1];
-  const tagsRaw = content.match(/^tags:\s*\[(.*)\]\s*$/m)?.[1];
-  let title = (0, import_node_path17.basename)(path, (0, import_node_path17.extname)(path));
-  if (titleRaw) {
-    try {
-      title = JSON.parse(titleRaw);
-    } catch {
-      title = titleRaw.replace(/^"|"$/g, "");
-    }
-  }
-  let source;
-  if (sourceRaw) {
-    try {
-      const parsed = JSON.parse(sourceRaw);
-      source = parsed || void 0;
-    } catch {
-      source = sourceRaw.replace(/^"|"$/g, "") || void 0;
-    }
-  }
-  let tags = [];
-  if (tagsRaw) {
-    try {
-      const parsed = JSON.parse(`[${tagsRaw}]`);
-      if (Array.isArray(parsed)) {
-        tags = parsed.filter((tag) => typeof tag === "string");
-      }
-    } catch {
-      tags = tagsRaw.split(",").map((tag) => tag.trim().replace(/^"|"$/g, "")).filter(Boolean);
-    }
-  }
-  const createdAt = content.match(/^created:\s*(.+)$/m)?.[1] ?? "";
-  const updatedAt = content.match(/^updated:\s*(.+)$/m)?.[1] ?? createdAt;
-  return {
-    id,
-    title,
-    path,
-    source,
-    createdAt,
-    updatedAt,
-    bytes: Buffer.byteLength(content, "utf8"),
-    sha256: sha2562(content),
-    tags
-  };
-}
-async function listKnowledge() {
-  try {
-    const names = await (0, import_promises10.readdir)(knowledgeDir());
-    const records = await Promise.all(names.filter((name) => name.endsWith(".md")).map(async (name) => {
-      const path = (0, import_node_path17.join)(knowledgeDir(), name);
-      return recordFromMarkdown(path, await (0, import_promises10.readFile)(path, "utf8"));
-    }));
-    return records.sort((a, b2) => b2.updatedAt.localeCompare(a.updatedAt));
-  } catch (err) {
-    const code = err?.code;
-    if (code === "ENOENT")
-      return [];
-    throw err;
-  }
-}
-function tokenize(text2) {
-  return text2.toLowerCase().match(/[a-z0-9_/-]{2,}/g) ?? [];
-}
-function chunks(text2) {
-  const normalized = text2.replace(/^---[\s\S]*?---\s*/m, "").trim();
-  const parts = normalized.split(/\n(?=#+\s)|\n\s*\n/).map((part) => part.trim()).filter(Boolean);
-  return parts.length > 0 ? parts : [normalized];
-}
-function termCounts(text2) {
-  const counts = {};
-  for (const term of tokenize(text2)) {
-    counts[term] = (counts[term] ?? 0) + 1;
-  }
-  return counts;
-}
-function indexPath() {
-  return (0, import_node_path17.join)(knowledgeDir(), KNOWLEDGE_INDEX_FILE);
-}
-function indexIsFresh(index, records) {
-  if (index.version !== KNOWLEDGE_INDEX_VERSION)
-    return false;
-  if (index.records.length !== records.length)
-    return false;
-  const byId = new Map(index.records.map((entry) => [entry.record.id, entry.record]));
-  return records.every((record2) => {
-    const indexed = byId.get(record2.id);
-    if (!indexed)
-      return false;
-    return indexed.path === record2.path && indexed.sha256 === record2.sha256;
-  });
-}
-function normalizeIndex(value) {
-  if (!value || typeof value !== "object" || Array.isArray(value))
-    return null;
-  const index = value;
-  if (index.version !== KNOWLEDGE_INDEX_VERSION)
-    return null;
-  if (!Array.isArray(index.records))
-    return null;
-  return index;
-}
-async function buildKnowledgeIndex(records) {
-  const entries = [];
-  for (const record2 of records) {
-    const content = await (0, import_promises10.readFile)(record2.path, "utf8");
-    entries.push({
-      record: record2,
-      chunks: chunks(content).map((chunk) => {
-        const terms = termCounts(chunk);
-        return {
-          excerpt: chunk.length > 1200 ? `${chunk.slice(0, 1200)}
-[truncated]` : chunk,
-          terms,
-          length: Object.values(terms).reduce((sum, count) => sum + count, 0)
-        };
-      })
-    });
-  }
-  const index = {
-    version: KNOWLEDGE_INDEX_VERSION,
-    updatedAt: (/* @__PURE__ */ new Date()).toISOString(),
-    records: entries
-  };
-  await (0, import_promises10.mkdir)(knowledgeDir(), { recursive: true });
-  await (0, import_promises10.writeFile)(indexPath(), JSON.stringify(index, null, 2), "utf8");
-  return index;
-}
-async function readKnowledgeIndex(records) {
-  try {
-    const parsed = normalizeIndex(JSON.parse(await (0, import_promises10.readFile)(indexPath(), "utf8")));
-    if (parsed && indexIsFresh(parsed, records))
-      return parsed;
-  } catch (err) {
-    const code = err?.code;
-    if (code !== "ENOENT") {
-    }
-  }
-  return buildKnowledgeIndex(records);
-}
-async function searchKnowledge(query, limit = 5) {
-  const terms = tokenize(query);
-  if (terms.length === 0)
-    return [];
-  const records = await listKnowledge();
-  const index = await readKnowledgeIndex(records);
-  const docFrequency = /* @__PURE__ */ new Map();
-  let chunkCount = 0;
-  for (const entry of index.records) {
-    for (const chunk of entry.chunks) {
-      chunkCount += 1;
-      for (const term of new Set(Object.keys(chunk.terms))) {
-        docFrequency.set(term, (docFrequency.get(term) ?? 0) + 1);
-      }
-    }
-  }
-  const hits = [];
-  const uniqueTerms = [...new Set(terms)];
-  for (const entry of index.records) {
-    for (const chunk of entry.chunks) {
-      let score = 0;
-      for (const term of uniqueTerms) {
-        const tf = chunk.terms[term] ?? 0;
-        if (tf === 0)
-          continue;
-        const df = docFrequency.get(term) ?? 0;
-        const idf = Math.log(1 + (chunkCount - df + 0.5) / (df + 0.5));
-        score += idf * (tf * 2.2 / (tf + 1.2)) * Math.max(1, term.length / 3);
-      }
-      if (score > 0) {
-        hits.push({
-          record: entry.record,
-          score: Math.round(score * 100) / 100,
-          excerpt: chunk.excerpt
-        });
-      }
-    }
-  }
-  return hits.sort((a, b2) => b2.score - a.score).slice(0, Math.max(1, Math.min(20, Math.floor(limit))));
-}
-var import_node_crypto3, import_promises10, import_node_path17, KNOWLEDGE_DIR_ENV, KNOWLEDGE_VERSION, KNOWLEDGE_INDEX_VERSION, KNOWLEDGE_INDEX_FILE, KnowledgeStoreError;
-var init_store2 = __esm({
-  "../../dist/src/knowledge/store.js"() {
-    "use strict";
-    init_scoped_fetch();
-    import_node_crypto3 = require("node:crypto");
-    import_promises10 = require("node:fs/promises");
-    import_node_path17 = require("node:path");
-    init_paths();
-    KNOWLEDGE_DIR_ENV = "PERICODE_KNOWLEDGE_DIR";
-    KNOWLEDGE_VERSION = 1;
-    KNOWLEDGE_INDEX_VERSION = 1;
-    KNOWLEDGE_INDEX_FILE = ".pericode-knowledge-index.json";
-    KnowledgeStoreError = class extends Error {
-      constructor(message) {
-        super(message);
-        this.name = "KnowledgeStoreError";
-      }
-    };
-  }
-});
-
-// ../../dist/src/tools/knowledge.js
-function optionalStringArray(input, key) {
-  const value = input[key];
-  if (value === void 0 || value === null)
-    return void 0;
-  if (Array.isArray(value) && value.every((item) => typeof item === "string"))
-    return value;
-  if (typeof value === "string")
-    return value.split(",").map((tag) => tag.trim()).filter(Boolean);
-  throw new ToolValidationError(`Tool argument '${key}' must be a string or string array`);
-}
-function optionalFormat(input) {
-  const value = optionalString(input, "format") ?? "auto";
-  if (["auto", "markdown", "text", "json", "csv"].includes(value))
-    return value;
-  throw new ToolValidationError("format must be one of auto, markdown, text, json, or csv");
-}
-var knowledgeWriteTool, knowledgeReadTool;
-var init_knowledge = __esm({
-  "../../dist/src/tools/knowledge.js"() {
-    "use strict";
-    init_scoped_fetch();
-    init_secret_guard();
-    init_base();
-    init_store2();
-    knowledgeWriteTool = {
-      readOnly: false,
-      definition: {
-        name: "knowledge_write",
-        description: "Convert data into a local markdown knowledge note for token-efficient future querying. Accepts inline text or a local text/JSON/CSV/Markdown file path.",
-        input_schema: {
-          type: "object",
-          properties: {
-            title: { type: "string" },
-            text: { type: "string", description: "Inline data to convert to markdown." },
-            path: { type: "string", description: "Local file to ingest. Secret-looking paths are refused." },
-            format: { type: "string", enum: ["auto", "markdown", "text", "json", "csv"] },
-            tags: { oneOf: [{ type: "string" }, { type: "array", items: { type: "string" } }] }
-          },
-          additionalProperties: false
-        }
-      },
-      async execute(input) {
-        try {
-          const path = optionalString(input, "path");
-          if (path) {
-            const classification = classifySecretPath(path);
-            if (classification.matched) {
-              return {
-                output: `error: refusing to ingest secret-looking path '${path}': ${classification.reason}`,
-                isError: true
-              };
-            }
-          }
-          const record2 = await ingestKnowledge({
-            title: optionalString(input, "title"),
-            text: optionalString(input, "text"),
-            path,
-            format: optionalFormat(input),
-            tags: optionalStringArray(input, "tags")
-          });
-          return {
-            output: `knowledge note ${record2.id}
-path: ${record2.path}
-bytes: ${record2.bytes}`,
-            isError: false
-          };
-        } catch (err) {
-          return {
-            output: `error: ${err instanceof KnowledgeStoreError || err instanceof Error ? err.message : String(err)}`,
-            isError: true
-          };
-        }
-      }
-    };
-    knowledgeReadTool = {
-      readOnly: true,
-      definition: {
-        name: "knowledge_read",
-        description: "List or query local markdown knowledge notes. Returns compact excerpts, not entire raw data blobs, for token-efficient recall.",
-        input_schema: {
-          type: "object",
-          properties: {
-            query: { type: "string", description: "Search query. Omit to list notes." },
-            limit: { type: "integer", description: "Maximum notes or excerpts. Defaults to 5." },
-            format: { type: "string", enum: ["text", "json"] }
-          },
-          additionalProperties: false
-        }
-      },
-      async execute(input) {
-        try {
-          const query = optionalString(input, "query");
-          const limit = optionalNumber(input, "limit", query ? 5 : 20);
-          const format = optionalString(input, "format") ?? "text";
-          if (format !== "text" && format !== "json") {
-            return { output: "error: format must be text or json", isError: true };
-          }
-          if (!query) {
-            const records = (await listKnowledge()).slice(0, limit);
-            return {
-              output: format === "json" ? JSON.stringify(records, null, 2) : records.map((record2) => `${record2.id} ${record2.title}
-  ${record2.path}`).join("\n"),
-              isError: false
-            };
-          }
-          const hits = await searchKnowledge(query, limit);
-          return {
-            output: format === "json" ? JSON.stringify(hits, null, 2) : hits.map((hit) => `### ${hit.record.title} (${hit.record.id}, score ${hit.score})
-${hit.excerpt}`).join("\n\n"),
-            isError: false
-          };
-        } catch (err) {
-          return {
-            output: `error: ${err instanceof Error ? err.message : String(err)}`,
-            isError: true
-          };
-        }
-      }
-    };
-  }
-});
-
-// ../../dist/src/tools/web-fetch.js
-function stripHtml(html) {
-  let out = html.replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, " ");
-  out = out.replace(/<style\b[^>]*>[\s\S]*?<\/style>/gi, " ");
-  out = out.replace(/<[^>]+>/g, " ");
-  out = out.replace(/&nbsp;/g, " ").replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/&#39;/g, "'");
-  out = out.replace(/[ \t]+/g, " ").replace(/\s*\n\s*/g, "\n").trim();
-  return out;
-}
-function isHtmlContentType(contentType) {
-  const lower = contentType.toLowerCase();
-  return lower.includes("text/html") || lower.includes("application/xhtml");
-}
-async function fetchOnce(url, opts, redirectsLeft) {
-  let parsed;
-  try {
-    parsed = new URL(url);
-  } catch {
-    return { ok: false, reason: `invalid URL: ${url}` };
-  }
-  if (!ALLOWED_PROTOCOLS.has(parsed.protocol)) {
-    return {
-      ok: false,
-      reason: `protocol ${parsed.protocol} not allowed (http/https only)`
-    };
-  }
-  const localCtrl = new AbortController();
-  const timer = setTimeout(() => localCtrl.abort(), opts.timeoutMs);
-  const onParentAbort = () => localCtrl.abort();
-  if (opts.signal)
-    opts.signal.addEventListener("abort", onParentAbort, { once: true });
-  try {
-    const res = await fetch(url, {
-      redirect: "manual",
-      headers: { "User-Agent": USER_AGENT, Accept: "text/html, text/plain, */*;q=0.5" },
-      signal: localCtrl.signal
-    });
-    if (res.status >= 300 && res.status < 400) {
-      const location = res.headers.get("location");
-      if (!location) {
-        return { ok: false, reason: `${res.status} redirect with no Location header`, status: res.status };
-      }
-      if (redirectsLeft <= 0) {
-        return { ok: false, reason: `too many redirects (>${MAX_REDIRECTS})`, status: res.status };
-      }
-      const next = new URL(location, url).toString();
-      return fetchOnce(next, opts, redirectsLeft - 1);
-    }
-    if (!res.ok) {
-      let bodyPreview = "";
-      try {
-        bodyPreview = (await res.text()).slice(0, 500);
-      } catch {
-      }
-      return {
-        ok: false,
-        reason: `HTTP ${res.status} ${res.statusText}${bodyPreview ? `
-${bodyPreview}` : ""}`,
-        finalUrl: url,
-        status: res.status
-      };
-    }
-    const contentType = res.headers.get("content-type") ?? "";
-    const reader = res.body?.getReader();
-    if (!reader) {
-      const text2 = await res.text();
-      const truncated2 = text2.length > opts.maxBytes;
-      return {
-        ok: true,
-        status: res.status,
-        finalUrl: url,
-        contentType,
-        body: truncated2 ? text2.slice(0, opts.maxBytes) : text2,
-        truncated: truncated2,
-        totalBytes: text2.length
-      };
-    }
-    const decoder = new TextDecoder();
-    let accumulated = "";
-    let totalBytes = 0;
-    let truncated = false;
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done)
-        break;
-      totalBytes += value.byteLength;
-      if (accumulated.length < opts.maxBytes) {
-        accumulated += decoder.decode(value, { stream: true });
-        if (accumulated.length > opts.maxBytes) {
-          accumulated = accumulated.slice(0, opts.maxBytes);
-          truncated = true;
-          while (true) {
-            const drain = await reader.read();
-            if (drain.done)
-              break;
-            totalBytes += drain.value.byteLength;
-          }
-          break;
-        }
-      } else {
-        truncated = true;
-      }
-    }
-    return {
-      ok: true,
-      status: res.status,
-      finalUrl: url,
-      contentType,
-      body: accumulated,
-      truncated,
-      totalBytes
-    };
-  } catch (err) {
-    if (localCtrl.signal.aborted) {
-      return {
-        ok: false,
-        reason: opts.signal?.aborted ? "cancelled by operator" : `timeout after ${opts.timeoutMs}ms`
-      };
-    }
-    return {
-      ok: false,
-      reason: `fetch failed: ${err instanceof Error ? err.message : String(err)}`
-    };
-  } finally {
-    clearTimeout(timer);
-    if (opts.signal)
-      opts.signal.removeEventListener("abort", onParentAbort);
-  }
-}
-var DEFAULT_MAX_BYTES, DEFAULT_TIMEOUT_MS3, MAX_REDIRECTS, USER_AGENT, ALLOWED_PROTOCOLS, webFetchTool;
-var init_web_fetch = __esm({
-  "../../dist/src/tools/web-fetch.js"() {
-    "use strict";
-    init_scoped_fetch();
-    init_base();
-    DEFAULT_MAX_BYTES = 2e5;
-    DEFAULT_TIMEOUT_MS3 = 1e4;
-    MAX_REDIRECTS = 5;
-    USER_AGENT = "pericode-web-fetch/0.1";
-    ALLOWED_PROTOCOLS = /* @__PURE__ */ new Set(["http:", "https:"]);
-    webFetchTool = {
-      readOnly: true,
-      definition: {
-        name: "web_fetch",
-        description: `Fetch a URL via HTTP/HTTPS and return the body as text. HTML is reduced to readable text (scripts/styles stripped). Default cap ${DEFAULT_MAX_BYTES} bytes; default timeout ${DEFAULT_TIMEOUT_MS3} ms. Useful for reading docs, changelogs, RFCs, and other public references.`,
-        input_schema: {
-          type: "object",
-          properties: {
-            url: { type: "string", description: "Absolute http(s) URL to fetch" },
-            max_bytes: {
-              type: "integer",
-              default: DEFAULT_MAX_BYTES,
-              description: "Truncate response after this many bytes"
-            },
-            timeout_ms: {
-              type: "integer",
-              default: DEFAULT_TIMEOUT_MS3,
-              description: "Abort the request after this many milliseconds"
-            },
-            format: {
-              type: "string",
-              description: "'auto' (default; strips HTML when content-type is HTML), 'text' (return raw body), 'html' (force HTML strip)"
-            }
-          },
-          required: ["url"],
-          additionalProperties: false
-        }
-      },
-      async execute(input, context = {}) {
-        const url = requireString(input, "url");
-        const maxBytes = Math.max(1e3, optionalNumber(input, "max_bytes", DEFAULT_MAX_BYTES));
-        const timeoutMs = Math.max(500, optionalNumber(input, "timeout_ms", DEFAULT_TIMEOUT_MS3));
-        const format = (optionalString(input, "format") ?? "auto").toLowerCase();
-        const result = await fetchOnce(url, { timeoutMs, maxBytes, signal: context.signal }, MAX_REDIRECTS);
-        if (!result.ok) {
-          return {
-            output: `web_fetch error: ${result.reason}` + (result.finalUrl ? `
-final URL: ${result.finalUrl}` : ""),
-            isError: true
-          };
-        }
-        const shouldStrip = format === "html" || format === "auto" && isHtmlContentType(result.contentType);
-        const rendered = shouldStrip ? stripHtml(result.body) : result.body;
-        const trailers = [];
-        if (result.truncated) {
-          trailers.push(`[truncated at ${maxBytes} bytes; total ${result.totalBytes}]`);
-        }
-        if (result.finalUrl !== url) {
-          trailers.push(`[redirected to ${result.finalUrl}]`);
-        }
-        const trailer = trailers.length > 0 ? `
-
-${trailers.join("\n")}` : "";
-        return {
-          output: `URL: ${result.finalUrl}
-Status: ${result.status}
-Content-Type: ${result.contentType || "(unknown)"}
-
-` + rendered + trailer,
-          isError: false
-        };
-      }
-    };
-  }
-});
-
-// ../../dist/src/memory/store.js
-function isObject(value) {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-function isoNow() {
-  return (/* @__PURE__ */ new Date()).toISOString();
-}
-function oneLine(text2) {
-  return text2.replace(/\s+/g, " ").trim();
-}
-function clampLimit(limit, fallback) {
-  if (limit === void 0)
-    return fallback;
-  if (!Number.isFinite(limit))
-    return fallback;
-  return Math.max(1, Math.min(100, Math.round(limit)));
-}
-function normalizedDate(value, fallback) {
-  if (typeof value !== "string" || value.trim().length === 0)
-    return fallback;
-  const time3 = Date.parse(value);
-  return Number.isFinite(time3) ? new Date(time3).toISOString() : fallback;
-}
-function normalizeMemoryText(value) {
-  const text2 = value.trim();
-  if (!text2)
-    throw new MemoryStoreError("memory text cannot be empty");
-  if (text2.length > MEMORY_TEXT_MAX_CHARS) {
-    throw new MemoryStoreError(`memory text is too long (${text2.length} chars; max ${MEMORY_TEXT_MAX_CHARS})`);
-  }
-  const sensitive = detectSensitiveMemoryText(text2);
-  if (sensitive) {
-    throw new MemoryStoreError(`refusing to store likely secret (${sensitive}); store durable preferences, facts, and workflow notes instead`);
-  }
-  return text2;
-}
-function memoryPath() {
-  return resolveOwnedPath({
-    ownedEnv: MEMORY_PATH_ENV,
-    fileName: MEMORY_FILE_NAME
-  }).path;
-}
-function normalizeMemoryScope(value, fallback = "fact") {
-  if (value === void 0 || value === null || value === "")
-    return fallback;
-  if (typeof value !== "string") {
-    throw new MemoryStoreError("memory scope must be a string");
-  }
-  const normalized = value.trim().toLowerCase();
-  if (MEMORY_SCOPES.includes(normalized)) {
-    return normalized;
-  }
-  throw new MemoryStoreError(`memory scope must be one of: ${MEMORY_SCOPES.join(", ")}`);
-}
-function normalizeMemoryTags(value) {
-  if (value === void 0 || value === null || value === "")
-    return [];
-  const raw = Array.isArray(value) ? value : typeof value === "string" ? value.split(",") : null;
-  if (!raw)
-    throw new MemoryStoreError("memory tags must be a string or string array");
-  const seen = /* @__PURE__ */ new Set();
-  const out = [];
-  for (const item of raw) {
-    if (typeof item !== "string") {
-      throw new MemoryStoreError("memory tags must contain only strings");
-    }
-    const tag = item.trim().toLowerCase().replace(/\s+/g, "-");
-    if (!tag)
-      continue;
-    if (tag.length > 48) {
-      throw new MemoryStoreError(`memory tag is too long: ${tag}`);
-    }
-    if (!/^[a-z0-9._:-]+$/.test(tag)) {
-      throw new MemoryStoreError(`memory tag '${tag}' may only contain letters, digits, dot, underscore, colon, or dash`);
-    }
-    if (!seen.has(tag)) {
-      seen.add(tag);
-      out.push(tag);
-    }
-  }
-  return out;
-}
-function detectSensitiveMemoryText(text2) {
-  for (const pattern of SENSITIVE_MEMORY_PATTERNS) {
-    if (pattern.regex.test(text2))
-      return pattern.label;
-  }
-  return null;
-}
-function normalizeSource(value) {
-  if (value === void 0 || value === null || value === "")
-    return void 0;
-  if (typeof value !== "string") {
-    throw new MemoryStoreError("memory source must be a string");
-  }
-  const source = oneLine(value);
-  if (!source)
-    return void 0;
-  if (source.length > 200) {
-    throw new MemoryStoreError("memory source must be 200 characters or less");
-  }
-  return source;
-}
-function normalizeRecord(value, index) {
-  if (!isObject(value)) {
-    throw new MemoryStoreError(`memory record ${index} must be an object`);
-  }
-  const now = isoNow();
-  const id = typeof value.id === "string" ? value.id.trim() : "";
-  if (!/^mem_[a-f0-9]{8}$/.test(id) && !/^[A-Za-z0-9._:-]{3,80}$/.test(id)) {
-    throw new MemoryStoreError(`memory record ${index} has invalid id`);
-  }
-  if (typeof value.text !== "string" || value.text.trim().length === 0) {
-    throw new MemoryStoreError(`memory record ${id} has empty text`);
-  }
-  const text2 = value.text.trim();
-  if (text2.length > MEMORY_TEXT_MAX_CHARS) {
-    throw new MemoryStoreError(`memory record ${id} exceeds max text length`);
-  }
-  const sensitive = detectSensitiveMemoryText(text2);
-  if (sensitive) {
-    throw new MemoryStoreError(`memory record ${id} contains likely secret (${sensitive})`);
-  }
-  const createdAt = normalizedDate(value.createdAt, now);
-  const updatedAt = normalizedDate(value.updatedAt, createdAt);
-  return {
-    id,
-    scope: normalizeMemoryScope(value.scope),
-    text: text2,
-    tags: normalizeMemoryTags(value.tags),
-    createdAt,
-    updatedAt,
-    source: normalizeSource(value.source)
-  };
-}
-function emptyMemoryFile() {
-  return { version: MEMORY_VERSION, records: [] };
-}
-function readMemoryFile() {
-  const path = memoryPath();
-  if (!(0, import_node_fs5.existsSync)(path))
-    return emptyMemoryFile();
-  let parsed;
-  try {
-    const raw = (0, import_node_fs5.readFileSync)(path, "utf8");
-    if (!raw.trim())
-      return emptyMemoryFile();
-    parsed = JSON.parse(raw);
-  } catch (err) {
-    throw new MemoryStoreError(`could not read memory file ${path}: ${err instanceof Error ? err.message : String(err)}`);
-  }
-  if (!isObject(parsed)) {
-    throw new MemoryStoreError(`memory file ${path} must contain a JSON object`);
-  }
-  const records = parsed.records;
-  if (!Array.isArray(records)) {
-    throw new MemoryStoreError(`memory file ${path} must contain a records array`);
-  }
-  return {
-    version: MEMORY_VERSION,
-    records: records.map((record2, index) => normalizeRecord(record2, index))
-  };
-}
-function writeMemoryFile(file) {
-  const path = memoryPath();
-  (0, import_node_fs5.mkdirSync)((0, import_node_path18.dirname)(path), { recursive: true });
-  const tmp = `${path}.${process.pid}.${Date.now()}.tmp`;
-  (0, import_node_fs5.writeFileSync)(tmp, `${JSON.stringify(file, null, 2)}
-`, {
-    encoding: "utf8"
-  });
-  (0, import_node_fs5.renameSync)(tmp, path);
-}
-function sortByUpdated(records) {
-  return [...records].sort((a, b2) => b2.updatedAt.localeCompare(a.updatedAt));
-}
-function nextMemoryId(existing) {
-  const used = new Set(existing.map((record2) => record2.id));
-  for (let i = 0; i < 100; i += 1) {
-    const id = `mem_${(0, import_node_crypto4.randomUUID)().replace(/-/g, "").slice(0, 8)}`;
-    if (!used.has(id))
-      return id;
-  }
-  throw new MemoryStoreError("could not allocate a unique memory id");
-}
-function addMemory(input) {
-  const file = readMemoryFile();
-  const now = isoNow();
-  const record2 = {
-    id: nextMemoryId(file.records),
-    scope: normalizeMemoryScope(input.scope),
-    text: normalizeMemoryText(input.text),
-    tags: normalizeMemoryTags(input.tags),
-    createdAt: now,
-    updatedAt: now,
-    source: normalizeSource(input.source)
-  };
-  file.records.push(record2);
-  writeMemoryFile(file);
-  return record2;
-}
-function updateMemory(input) {
-  const file = readMemoryFile();
-  const index = file.records.findIndex((record2) => record2.id === input.id);
-  if (index === -1)
-    throw new MemoryStoreError(`memory '${input.id}' not found`);
-  const current = file.records[index];
-  const next = {
-    ...current,
-    updatedAt: isoNow()
-  };
-  if (input.text !== void 0)
-    next.text = normalizeMemoryText(input.text);
-  if (input.scope !== void 0)
-    next.scope = normalizeMemoryScope(input.scope);
-  if (input.tags !== void 0)
-    next.tags = normalizeMemoryTags(input.tags);
-  if (input.source !== void 0)
-    next.source = normalizeSource(input.source);
-  file.records[index] = next;
-  writeMemoryFile(file);
-  return next;
-}
-function removeMemory(id) {
-  const file = readMemoryFile();
-  const index = file.records.findIndex((record2) => record2.id === id);
-  if (index === -1)
-    throw new MemoryStoreError(`memory '${id}' not found`);
-  const [removed] = file.records.splice(index, 1);
-  writeMemoryFile(file);
-  return removed;
-}
-function listMemory(options = {}) {
-  const limit = clampLimit(options.limit, MEMORY_CONTEXT_MAX_RECORDS);
-  const records = readMemoryFile().records.filter((record2) => options.scope ? record2.scope === options.scope : true);
-  return sortByUpdated(records).slice(0, limit);
-}
-function scoreRecord(record2, terms) {
-  const haystack = [
-    record2.id,
-    record2.scope,
-    record2.text,
-    record2.tags.join(" "),
-    record2.source ?? ""
-  ].join(" ").toLowerCase();
-  let score = 0;
-  for (const term of terms) {
-    if (haystack.includes(term))
-      score += 1;
-  }
-  return score;
-}
-function searchMemory(options) {
-  const terms = options.query.toLowerCase().split(/\s+/).map((term) => term.trim()).filter(Boolean);
-  if (terms.length === 0)
-    return listMemory(options);
-  const limit = clampLimit(options.limit, MEMORY_CONTEXT_MAX_RECORDS);
-  return readMemoryFile().records.filter((record2) => options.scope ? record2.scope === options.scope : true).map((record2) => ({ record: record2, score: scoreRecord(record2, terms) })).filter((entry) => entry.score > 0).sort((a, b2) => {
-    if (b2.score !== a.score)
-      return b2.score - a.score;
-    return b2.record.updatedAt.localeCompare(a.record.updatedAt);
-  }).slice(0, limit).map((entry) => entry.record);
-}
-function formatMemoryRecord(record2) {
-  const tags = record2.tags.length > 0 ? ` tags=${record2.tags.join(",")}` : "";
-  const source = record2.source ? ` source=${record2.source}` : "";
-  return `- ${record2.id} [${record2.scope}] ${oneLine(record2.text)}${tags}${source}`;
-}
-var import_node_crypto4, import_node_fs5, import_node_path18, MEMORY_PATH_ENV, MEMORY_FILE_NAME, MEMORY_VERSION, MEMORY_CONTEXT_MAX_RECORDS, MEMORY_TEXT_MAX_CHARS, MEMORY_SCOPES, MemoryStoreError, SENSITIVE_MEMORY_PATTERNS;
-var init_store3 = __esm({
-  "../../dist/src/memory/store.js"() {
-    "use strict";
-    init_scoped_fetch();
-    import_node_crypto4 = require("node:crypto");
-    import_node_fs5 = require("node:fs");
-    import_node_path18 = require("node:path");
-    init_paths();
-    MEMORY_PATH_ENV = "PERICODE_MEMORY_PATH";
-    MEMORY_FILE_NAME = "memory.json";
-    MEMORY_VERSION = 1;
-    MEMORY_CONTEXT_MAX_RECORDS = 20;
-    MEMORY_TEXT_MAX_CHARS = 2e3;
-    MEMORY_SCOPES = [
-      "user",
-      "project",
-      "preference",
-      "workflow",
-      "fact"
-    ];
-    MemoryStoreError = class extends Error {
-      constructor(message) {
-        super(message);
-        this.name = "MemoryStoreError";
-      }
-    };
-    SENSITIVE_MEMORY_PATTERNS = [
-      {
-        label: "credential assignment",
-        regex: /\b(?:api[_ -]?key|access[_ -]?token|refresh[_ -]?token|auth[_ -]?token|client[_ -]?secret|password|passwd|private[_ -]?key|secret)\b\s*[:=]/i
-      },
-      {
-        label: "private key block",
-        regex: /-----BEGIN [A-Z ]*PRIVATE KEY-----/i
-      },
-      {
-        label: "OpenAI-style API key",
-        regex: /\bsk-[A-Za-z0-9_-]{20,}\b/
-      },
-      {
-        label: "GitHub token",
-        regex: /\b(?:ghp|gho|ghu|ghs|ghr)_[A-Za-z0-9_]{20,}\b/
-      },
-      {
-        label: "AWS access key",
-        regex: /\bAKIA[0-9A-Z]{16}\b/
-      },
-      {
-        label: "JWT",
-        regex: /\beyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\b/
-      }
-    ];
-  }
-});
-
-// ../../dist/src/tools/memory.js
-function parseScope(input) {
-  const raw = input.scope;
-  if (raw === void 0 || raw === null || raw === "")
-    return void 0;
-  return normalizeMemoryScope(raw);
-}
-function formatError(toolName, err) {
-  if (err instanceof MemoryStoreError) {
-    return { output: `${toolName} error: ${err.message}`, isError: true };
-  }
-  throw err;
-}
-var memoryReadTool, memoryWriteTool;
-var init_memory = __esm({
-  "../../dist/src/tools/memory.js"() {
-    "use strict";
-    init_scoped_fetch();
-    init_base();
-    init_store3();
-    memoryReadTool = {
-      readOnly: true,
-      definition: {
-        name: "memory_read",
-        description: "Read or search PeriCode's persistent semantic memory. Use this for durable user preferences, project facts, and workflow notes saved across sessions.",
-        input_schema: {
-          type: "object",
-          properties: {
-            query: {
-              type: "string",
-              description: "Optional search query. Omit to list the most recently updated memories."
-            },
-            scope: {
-              type: "string",
-              enum: ["user", "project", "preference", "workflow", "fact"],
-              description: "Optional scope filter."
-            },
-            limit: {
-              type: "integer",
-              default: 20,
-              description: "Maximum number of memory records to return."
-            }
-          },
-          additionalProperties: false
-        }
-      },
-      async execute(input) {
-        try {
-          const query = optionalString(input, "query")?.trim();
-          const scope = parseScope(input);
-          const limit = Math.max(1, Math.min(50, Math.round(optionalNumber(input, "limit", 20))));
-          const records = query ? searchMemory({ query, scope, limit }) : listMemory({ scope, limit });
-          const header = `memory file: ${memoryPath()}`;
-          if (records.length === 0) {
-            return {
-              output: `${header}
-(no saved memories${query ? " match the query" : ""})`,
-              isError: false
-            };
-          }
-          return {
-            output: `${header}
-${records.map(formatMemoryRecord).join("\n")}`,
-            isError: false
-          };
-        } catch (err) {
-          return formatError("memory_read", err);
-        }
-      }
-    };
-    memoryWriteTool = {
-      readOnly: false,
-      definition: {
-        name: "memory_write",
-        description: "Add, update, or remove a durable PeriCode memory. Use only for stable preferences, project facts, and reusable workflow notes. Never store secrets, credentials, or raw private data.",
-        input_schema: {
-          type: "object",
-          properties: {
-            action: {
-              type: "string",
-              enum: ["add", "update", "remove", "delete"],
-              description: "Mutation to perform. 'delete' is accepted as an alias for 'remove'."
-            },
-            id: {
-              type: "string",
-              description: "Required for update/remove."
-            },
-            text: {
-              type: "string",
-              description: "Memory text. Required for add; optional for update."
-            },
-            scope: {
-              type: "string",
-              enum: ["user", "project", "preference", "workflow", "fact"],
-              description: "Memory scope. Defaults to fact."
-            },
-            tags: {
-              oneOf: [
-                { type: "array", items: { type: "string" } },
-                { type: "string" }
-              ],
-              description: "Optional tags, either an array or comma-separated string."
-            },
-            source: {
-              type: "string",
-              description: "Optional short provenance label."
-            }
-          },
-          required: ["action"],
-          additionalProperties: false
-        }
-      },
-      async execute(input) {
-        try {
-          const rawAction = requireString(input, "action").trim().toLowerCase();
-          const action = rawAction === "delete" ? "remove" : rawAction;
-          if (action === "add") {
-            const record2 = addMemory({
-              text: requireString(input, "text"),
-              scope: input.scope,
-              tags: input.tags,
-              source: input.source
-            });
-            return {
-              output: `stored memory ${record2.id}
-${formatMemoryRecord(record2)}`,
-              isError: false
-            };
-          }
-          if (action === "update") {
-            const id = requireString(input, "id");
-            if (input.text === void 0 && input.scope === void 0 && input.tags === void 0 && input.source === void 0) {
-              throw new MemoryStoreError("update requires text, scope, tags, or source");
-            }
-            const record2 = updateMemory({
-              id,
-              text: optionalString(input, "text"),
-              scope: input.scope,
-              tags: input.tags,
-              source: input.source
-            });
-            return {
-              output: `updated memory ${record2.id}
-${formatMemoryRecord(record2)}`,
-              isError: false
-            };
-          }
-          if (action === "remove") {
-            const removed = removeMemory(requireString(input, "id"));
-            return {
-              output: `removed memory ${removed.id}
-${formatMemoryRecord(removed)}`,
-              isError: false
-            };
-          }
-          throw new MemoryStoreError("action must be add, update, remove, or delete");
-        } catch (err) {
-          return formatError("memory_write", err);
-        }
-      }
-    };
-  }
-});
-
-// ../../dist/src/skills/store.js
-function isObject2(value) {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-function isoNow2() {
-  return (/* @__PURE__ */ new Date()).toISOString();
-}
-function oneLine2(text2) {
-  return text2.replace(/\s+/g, " ").trim();
-}
-function clampLimit2(limit, fallback) {
-  if (limit === void 0 || !Number.isFinite(limit))
-    return fallback;
-  return Math.max(1, Math.min(100, Math.round(limit)));
-}
-function normalizedDate2(value, fallback) {
-  if (typeof value !== "string" || value.trim().length === 0)
-    return fallback;
-  const time3 = Date.parse(value);
-  return Number.isFinite(time3) ? new Date(time3).toISOString() : fallback;
-}
-function requireSafeText(value, label, maxChars) {
-  const text2 = value.trim();
-  if (!text2)
-    throw new SkillStoreError(`${label} cannot be empty`);
-  if (text2.length > maxChars) {
-    throw new SkillStoreError(`${label} is too long (${text2.length} chars; max ${maxChars})`);
-  }
-  const sensitive = detectSensitiveMemoryText(text2);
-  if (sensitive) {
-    throw new SkillStoreError(`refusing to store likely secret in ${label} (${sensitive})`);
-  }
-  return text2;
-}
-function optionalSafeText(value, label, maxChars) {
-  if (value === void 0 || value === null || value === "")
-    return void 0;
-  if (typeof value !== "string")
-    throw new SkillStoreError(`${label} must be a string`);
-  return requireSafeText(value, label, maxChars);
-}
-function normalizeList(value, label, fallback = []) {
-  if (value === void 0 || value === null || value === "")
-    return fallback;
-  const raw = Array.isArray(value) ? value : typeof value === "string" ? value.split(",") : null;
-  if (!raw)
-    throw new SkillStoreError(`${label} must be a string or string array`);
-  const seen = /* @__PURE__ */ new Set();
-  const out = [];
-  for (const item of raw) {
-    if (typeof item !== "string") {
-      throw new SkillStoreError(`${label} must contain only strings`);
-    }
-    const text2 = oneLine2(item).toLowerCase();
-    if (!text2)
-      continue;
-    if (text2.length > 120) {
-      throw new SkillStoreError(`${label} entry is too long: ${text2}`);
-    }
-    const sensitive = detectSensitiveMemoryText(text2);
-    if (sensitive) {
-      throw new SkillStoreError(`refusing to store likely secret in ${label} (${sensitive})`);
-    }
-    if (!seen.has(text2)) {
-      seen.add(text2);
-      out.push(text2);
-    }
-  }
-  return out;
-}
-function normalizeTags(value) {
-  const tags = normalizeList(value, "skill tags");
-  for (const tag of tags) {
-    if (tag.length > 48)
-      throw new SkillStoreError(`skill tag is too long: ${tag}`);
-    if (!/^[a-z0-9._:-]+$/.test(tag)) {
-      throw new SkillStoreError(`skill tag '${tag}' may only contain letters, digits, dot, underscore, colon, or dash`);
-    }
-  }
-  return tags;
-}
-function defaultTriggers(title) {
-  return [oneLine2(title).toLowerCase()];
-}
-function skillsPath() {
-  return resolveOwnedPath({
-    ownedEnv: SKILLS_PATH_ENV,
-    fileName: SKILLS_FILE_NAME
-  }).path;
-}
-function normalizeRecord2(value, index) {
-  if (!isObject2(value)) {
-    throw new SkillStoreError(`skill record ${index} must be an object`);
-  }
-  const now = isoNow2();
-  const id = typeof value.id === "string" ? value.id.trim() : "";
-  if (!/^skill_[a-f0-9]{8}$/.test(id) && !/^[A-Za-z0-9._:-]{3,80}$/.test(id)) {
-    throw new SkillStoreError(`skill record ${index} has invalid id`);
-  }
-  const title = optionalSafeText(value.title, "skill title", 120);
-  const body = optionalSafeText(value.body, "skill body", SKILL_BODY_MAX_CHARS);
-  if (!title || !body)
-    throw new SkillStoreError(`skill record ${id} is incomplete`);
-  return {
-    id,
-    title,
-    description: optionalSafeText(value.description, "skill description", 500),
-    triggers: normalizeList(value.triggers, "skill triggers", defaultTriggers(title)),
-    body,
-    tags: normalizeTags(value.tags),
-    createdAt: normalizedDate2(value.createdAt, now),
-    updatedAt: normalizedDate2(value.updatedAt, now),
-    lastUsedAt: value.lastUsedAt === void 0 ? void 0 : normalizedDate2(value.lastUsedAt, now),
-    successCount: typeof value.successCount === "number" && Number.isFinite(value.successCount) ? Math.max(0, Math.round(value.successCount)) : 0
-  };
-}
-function emptySkillsFile() {
-  return { version: SKILLS_VERSION, records: [] };
-}
-function readSkillsFile() {
-  const path = skillsPath();
-  if (!(0, import_node_fs6.existsSync)(path))
-    return emptySkillsFile();
-  let parsed;
-  try {
-    const raw = (0, import_node_fs6.readFileSync)(path, "utf8");
-    if (!raw.trim())
-      return emptySkillsFile();
-    parsed = JSON.parse(raw);
-  } catch (err) {
-    throw new SkillStoreError(`could not read skills file ${path}: ${err instanceof Error ? err.message : String(err)}`);
-  }
-  if (!isObject2(parsed) || !Array.isArray(parsed.records)) {
-    throw new SkillStoreError(`skills file ${path} must contain a records array`);
-  }
-  return {
-    version: SKILLS_VERSION,
-    records: parsed.records.map((record2, index) => normalizeRecord2(record2, index))
-  };
-}
-function writeSkillsFile(file) {
-  const path = skillsPath();
-  (0, import_node_fs6.mkdirSync)((0, import_node_path19.dirname)(path), { recursive: true });
-  const tmp = `${path}.${process.pid}.${Date.now()}.tmp`;
-  (0, import_node_fs6.writeFileSync)(tmp, `${JSON.stringify(file, null, 2)}
-`, {
-    encoding: "utf8"
-  });
-  (0, import_node_fs6.renameSync)(tmp, path);
-}
-function nextSkillId(existing) {
-  const used = new Set(existing.map((record2) => record2.id));
-  for (let i = 0; i < 100; i += 1) {
-    const id = `skill_${(0, import_node_crypto5.randomUUID)().replace(/-/g, "").slice(0, 8)}`;
-    if (!used.has(id))
-      return id;
-  }
-  throw new SkillStoreError("could not allocate a unique skill id");
-}
-function sortByUpdated2(records) {
-  return [...records].sort((a, b2) => b2.updatedAt.localeCompare(a.updatedAt));
-}
-function addSkill(input) {
-  const file = readSkillsFile();
-  const title = requireSafeText(input.title, "skill title", 120);
-  const now = isoNow2();
-  const record2 = {
-    id: nextSkillId(file.records),
-    title,
-    description: optionalSafeText(input.description, "skill description", 500),
-    triggers: normalizeList(input.triggers, "skill triggers", defaultTriggers(title)),
-    body: requireSafeText(input.body, "skill body", SKILL_BODY_MAX_CHARS),
-    tags: normalizeTags(input.tags),
-    createdAt: now,
-    updatedAt: now,
-    successCount: 0
-  };
-  file.records.push(record2);
-  writeSkillsFile(file);
-  return record2;
-}
-function updateSkill(input) {
-  const file = readSkillsFile();
-  const index = file.records.findIndex((record2) => record2.id === input.id);
-  if (index === -1)
-    throw new SkillStoreError(`skill '${input.id}' not found`);
-  const current = file.records[index];
-  const next = {
-    ...current,
-    updatedAt: isoNow2()
-  };
-  if (input.title !== void 0)
-    next.title = requireSafeText(input.title, "skill title", 120);
-  if (input.description !== void 0) {
-    next.description = optionalSafeText(input.description, "skill description", 500);
-  }
-  if (input.triggers !== void 0)
-    next.triggers = normalizeList(input.triggers, "skill triggers");
-  if (input.tags !== void 0)
-    next.tags = normalizeTags(input.tags);
-  if (input.body !== void 0)
-    next.body = requireSafeText(input.body, "skill body", SKILL_BODY_MAX_CHARS);
-  file.records[index] = next;
-  writeSkillsFile(file);
-  return next;
-}
-function removeSkill(id) {
-  const file = readSkillsFile();
-  const index = file.records.findIndex((record2) => record2.id === id);
-  if (index === -1)
-    throw new SkillStoreError(`skill '${id}' not found`);
-  const [removed] = file.records.splice(index, 1);
-  writeSkillsFile(file);
-  return removed;
-}
-function recordSkillUse(id, success = true) {
-  const file = readSkillsFile();
-  const index = file.records.findIndex((record2) => record2.id === id);
-  if (index === -1)
-    throw new SkillStoreError(`skill '${id}' not found`);
-  const current = file.records[index];
-  const next = {
-    ...current,
-    updatedAt: isoNow2(),
-    lastUsedAt: isoNow2(),
-    successCount: success ? current.successCount + 1 : current.successCount
-  };
-  file.records[index] = next;
-  writeSkillsFile(file);
-  return next;
-}
-function skillSearchText(record2) {
-  return [
-    record2.id,
-    record2.title,
-    record2.description ?? "",
-    record2.triggers.join(" "),
-    record2.body,
-    record2.tags.join(" ")
-  ].join(" ").toLowerCase();
-}
-function scoreSkill(record2, query) {
-  const haystack = skillSearchText(record2);
-  const terms = query.toLowerCase().split(/\s+/).map((term) => term.trim()).filter(Boolean);
-  if (terms.length === 0)
-    return 1;
-  let score = 0;
-  for (const trigger of record2.triggers) {
-    if (query.toLowerCase().includes(trigger))
-      score += 5;
-  }
-  for (const term of terms) {
-    if (haystack.includes(term))
-      score += 1;
-  }
-  return score;
-}
-function listSkills(options = {}) {
-  const limit = clampLimit2(options.limit, 20);
-  const tag = options.tag?.trim().toLowerCase();
-  const records = readSkillsFile().records.filter((record2) => tag ? record2.tags.includes(tag) : true);
-  if (!options.query?.trim())
-    return sortByUpdated2(records).slice(0, limit);
-  return records.map((record2) => ({ record: record2, score: scoreSkill(record2, options.query) })).filter((entry) => entry.score > 0).sort((a, b2) => {
-    if (b2.score !== a.score)
-      return b2.score - a.score;
-    return b2.record.updatedAt.localeCompare(a.record.updatedAt);
-  }).slice(0, limit).map((entry) => entry.record);
-}
-function formatSkillRecord(record2) {
-  const tags = record2.tags.length > 0 ? ` tags=${record2.tags.join(",")}` : "";
-  const used = record2.successCount > 0 ? ` used=${record2.successCount}` : "";
-  return `- ${record2.id} "${oneLine2(record2.title)}" triggers=${record2.triggers.join("|")}${tags}${used}`;
-}
-var import_node_crypto5, import_node_fs6, import_node_path19, SKILLS_PATH_ENV, SKILLS_FILE_NAME, SKILLS_VERSION, SKILL_BODY_MAX_CHARS, SkillStoreError;
-var init_store4 = __esm({
-  "../../dist/src/skills/store.js"() {
-    "use strict";
-    init_scoped_fetch();
-    import_node_crypto5 = require("node:crypto");
-    import_node_fs6 = require("node:fs");
-    import_node_path19 = require("node:path");
-    init_store3();
-    init_paths();
-    SKILLS_PATH_ENV = "PERICODE_SKILLS_PATH";
-    SKILLS_FILE_NAME = "skills.json";
-    SKILLS_VERSION = 1;
-    SKILL_BODY_MAX_CHARS = 6e3;
-    SkillStoreError = class extends Error {
-      constructor(message) {
-        super(message);
-        this.name = "SkillStoreError";
-      }
-    };
-  }
-});
-
-// ../../dist/src/tools/skills.js
-function formatError2(toolName, err) {
-  if (err instanceof SkillStoreError) {
-    return { output: `${toolName} error: ${err.message}`, isError: true };
-  }
-  throw err;
-}
-var skillReadTool, skillWriteTool;
-var init_skills = __esm({
-  "../../dist/src/tools/skills.js"() {
-    "use strict";
-    init_scoped_fetch();
-    init_base();
-    init_store4();
-    skillReadTool = {
-      readOnly: true,
-      definition: {
-        name: "skill_read",
-        description: "List, search, or match PeriCode reusable skills/playbooks saved across sessions.",
-        input_schema: {
-          type: "object",
-          properties: {
-            query: {
-              type: "string",
-              description: "Optional search or task prompt. Omit to list recently updated skills."
-            },
-            tag: { type: "string", description: "Optional tag filter." },
-            limit: {
-              type: "integer",
-              default: 20,
-              description: "Maximum number of skills to return."
-            }
-          },
-          additionalProperties: false
-        }
-      },
-      async execute(input) {
-        try {
-          const query = optionalString(input, "query")?.trim();
-          const tag = optionalString(input, "tag")?.trim().toLowerCase();
-          const limit = Math.max(1, Math.min(50, Math.round(optionalNumber(input, "limit", 20))));
-          const records = listSkills({ query, tag, limit });
-          const header = `skills file: ${skillsPath()}`;
-          if (records.length === 0) {
-            return {
-              output: `${header}
-(no saved skills${query ? " match the query" : ""})`,
-              isError: false
-            };
-          }
-          return {
-            output: `${header}
-${records.map(formatSkillRecord).join("\n")}`,
-            isError: false
-          };
-        } catch (err) {
-          return formatError2("skill_read", err);
-        }
-      }
-    };
-    skillWriteTool = {
-      readOnly: false,
-      definition: {
-        name: "skill_write",
-        description: "Add, update, remove, or mark-use for a durable PeriCode skill/playbook. Use for repeatable procedures, not one-off facts or secrets.",
-        input_schema: {
-          type: "object",
-          properties: {
-            action: {
-              type: "string",
-              enum: ["add", "update", "remove", "delete", "record_use"]
-            },
-            id: { type: "string", description: "Required for update/remove/record_use." },
-            title: { type: "string", description: "Skill title. Required for add." },
-            description: { type: "string", description: "Optional short description." },
-            triggers: {
-              oneOf: [
-                { type: "array", items: { type: "string" } },
-                { type: "string" }
-              ],
-              description: "Trigger phrases, array or comma-separated string."
-            },
-            body: {
-              type: "string",
-              description: "Procedure body. Required for add; optional for update."
-            },
-            tags: {
-              oneOf: [
-                { type: "array", items: { type: "string" } },
-                { type: "string" }
-              ]
-            },
-            success: {
-              type: "boolean",
-              default: true,
-              description: "For record_use, whether to increment success count."
-            }
-          },
-          required: ["action"],
-          additionalProperties: false
-        }
-      },
-      async execute(input) {
-        try {
-          const rawAction = requireString(input, "action").trim().toLowerCase();
-          const action = rawAction === "delete" ? "remove" : rawAction;
-          if (action === "add") {
-            const record2 = addSkill({
-              title: requireString(input, "title"),
-              body: requireString(input, "body"),
-              description: input.description,
-              triggers: input.triggers,
-              tags: input.tags
-            });
-            return {
-              output: `stored skill ${record2.id}
-${formatSkillRecord(record2)}`,
-              isError: false
-            };
-          }
-          if (action === "update") {
-            const id = requireString(input, "id");
-            const record2 = updateSkill({
-              id,
-              title: optionalString(input, "title"),
-              body: optionalString(input, "body"),
-              description: input.description,
-              triggers: input.triggers,
-              tags: input.tags
-            });
-            return {
-              output: `updated skill ${record2.id}
-${formatSkillRecord(record2)}`,
-              isError: false
-            };
-          }
-          if (action === "remove") {
-            const removed = removeSkill(requireString(input, "id"));
-            return {
-              output: `removed skill ${removed.id}
-${formatSkillRecord(removed)}`,
-              isError: false
-            };
-          }
-          if (action === "record_use") {
-            const success = typeof input.success === "boolean" ? input.success : true;
-            const record2 = recordSkillUse(requireString(input, "id"), success);
-            return {
-              output: `recorded skill use ${record2.id}
-${formatSkillRecord(record2)}`,
-              isError: false
-            };
-          }
-          throw new SkillStoreError("action must be add, update, remove, delete, or record_use");
-        } catch (err) {
-          return formatError2("skill_write", err);
-        }
-      }
-    };
-  }
-});
-
-// ../../dist/src/tools/skillmint.js
-function oneLine3(text2) {
-  return text2.replace(/\s+/g, " ").trim();
-}
-function clip(text2, maxChars) {
-  if (text2.length <= maxChars)
-    return text2;
-  return `${text2.slice(0, Math.max(0, maxChars - 3)).trimEnd()}...`;
-}
-function normalizeSourceType(value) {
-  const normalized = (value ?? "auto").trim().toLowerCase().replace(/-/g, "_");
-  if (normalized === "auto" || normalized === "url" || normalized === "file" || normalized === "text") {
-    return normalized;
-  }
-  throw new ToolValidationError("source_type must be auto, url, file, or text");
-}
-function looksLikeHttpUrl(value) {
-  try {
-    const parsed = new URL(value);
-    return parsed.protocol === "http:" || parsed.protocol === "https:";
-  } catch {
-    return false;
-  }
-}
-function stripHtml2(html) {
-  let out = html.replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, " ");
-  out = out.replace(/<style\b[^>]*>[\s\S]*?<\/style>/gi, " ");
-  out = out.replace(/<[^>]+>/g, " ");
-  out = out.replace(/&nbsp;/g, " ").replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/&#39;/g, "'");
-  return out.replace(/[ \t]+/g, " ").replace(/\s*\n\s*/g, "\n").trim();
-}
-function isLikelyHtml(contentType, body) {
-  const lower = contentType.toLowerCase();
-  return lower.includes("text/html") || lower.includes("application/xhtml") || /<html\b|<body\b|<main\b|<article\b/i.test(body);
-}
-function isLikelyBinary2(text2) {
-  return text2.includes("\0");
-}
-async function fetchSource(url, options) {
-  const parsed = new URL(url);
-  if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
-    throw new ToolValidationError("URL source must use http or https");
-  }
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), options.timeoutMs);
-  const onParentAbort = () => controller.abort();
-  if (options.signal) {
-    options.signal.addEventListener("abort", onParentAbort, { once: true });
-  }
-  try {
-    const response = await fetch(url, {
-      headers: {
-        Accept: "text/html,text/plain,application/xhtml+xml,*/*;q=0.5",
-        "User-Agent": "pericode-skillmint-create/0.1"
-      },
-      signal: controller.signal
-    });
-    if (!response.ok) {
-      throw new SkillStoreError(`fetch failed: HTTP ${response.status} ${response.statusText}`);
-    }
-    const contentType = response.headers.get("content-type") ?? "";
-    if (contentType.toLowerCase().includes("application/pdf")) {
-      throw new SkillStoreError("native skillmint_create supports text and HTML sources; extract PDF text first");
-    }
-    const raw = await response.text();
-    const text2 = isLikelyHtml(contentType, raw) ? stripHtml2(raw) : raw.trim();
-    return trimCapturedSource({
-      kind: "url",
-      reference: response.url || url,
-      text: text2,
-      truncated: false
-    }, options.maxChars);
-  } catch (err) {
-    if (controller.signal.aborted) {
-      throw new SkillStoreError(options.signal?.aborted ? "source capture cancelled by operator" : `source capture timed out after ${options.timeoutMs}ms`);
-    }
-    if (err instanceof SkillStoreError || err instanceof ToolValidationError) {
-      throw err;
-    }
-    throw new SkillStoreError(`source capture failed: ${err instanceof Error ? err.message : String(err)}`);
-  } finally {
-    clearTimeout(timer);
-    if (options.signal) {
-      options.signal.removeEventListener("abort", onParentAbort);
-    }
-  }
-}
-function readFileSource(path, maxChars) {
-  const resolved = (0, import_node_path20.resolve)(path);
-  if (!(0, import_node_fs7.existsSync)(resolved)) {
-    throw new SkillStoreError(`source file not found: ${resolved}`);
-  }
-  const stat5 = (0, import_node_fs7.statSync)(resolved);
-  if (!stat5.isFile()) {
-    throw new SkillStoreError(`source path is not a file: ${resolved}`);
-  }
-  if (stat5.size > SOURCE_FILE_MAX_BYTES) {
-    throw new SkillStoreError(`source file is too large (${stat5.size} bytes; max ${SOURCE_FILE_MAX_BYTES})`);
-  }
-  const ext = (0, import_node_path20.extname)(resolved).toLowerCase();
-  if (ext === ".pdf") {
-    throw new SkillStoreError("native skillmint_create supports text files; extract PDF text first");
-  }
-  const text2 = (0, import_node_fs7.readFileSync)(resolved, "utf8");
-  if (isLikelyBinary2(text2)) {
-    throw new SkillStoreError("source file looks binary; provide text or markdown");
-  }
-  return trimCapturedSource({
-    kind: "file",
-    reference: resolved,
-    text: text2,
-    truncated: false
-  }, maxChars);
-}
-function trimCapturedSource(source, maxChars) {
-  const text2 = source.text.trim();
-  if (!text2)
-    throw new SkillStoreError("captured source text is empty");
-  const sensitive = detectSensitiveMemoryText(text2);
-  if (sensitive) {
-    throw new SkillStoreError(`refusing to store likely secret from source (${sensitive})`);
-  }
-  if (text2.length <= maxChars)
-    return { ...source, text: text2 };
-  return { ...source, text: text2.slice(0, maxChars).trim(), truncated: true };
-}
-async function captureSource(input, context) {
-  const source = requireString(input, "source").trim();
-  const sourceType = normalizeSourceType(optionalString(input, "source_type"));
-  const maxChars = Math.max(1e3, Math.min(SOURCE_MAX_CHARS_LIMIT, Math.round(optionalNumber(input, "max_chars", DEFAULT_SOURCE_MAX_CHARS))));
-  if (sourceType === "url" || sourceType === "auto" && looksLikeHttpUrl(source)) {
-    return fetchSource(source, {
-      maxChars,
-      timeoutMs: Math.max(500, optionalNumber(input, "timeout_ms", DEFAULT_TIMEOUT_MS4)),
-      signal: context.signal
-    });
-  }
-  if (sourceType === "file" || sourceType === "auto" && (0, import_node_fs7.existsSync)((0, import_node_path20.resolve)(source))) {
-    return readFileSource(source, maxChars);
-  }
-  if (sourceType === "text" || sourceType === "auto") {
-    return trimCapturedSource({
-      kind: "text",
-      reference: "inline text",
-      text: source,
-      truncated: false
-    }, maxChars);
-  }
-  throw new SkillStoreError(`could not capture source as ${sourceType}`);
-}
-function titleFromReference(source) {
-  if (source.kind === "url") {
-    const parsed = new URL(source.reference);
-    const segment = parsed.pathname.split("/").filter(Boolean).pop();
-    return segment ? humanize(segment) : parsed.hostname.replace(/^www\./, "");
-  }
-  if (source.kind === "file") {
-    return humanize((0, import_node_path20.basename)(source.reference, (0, import_node_path20.extname)(source.reference)));
-  }
-  return "Source-derived skill";
-}
-function humanize(value) {
-  const text2 = value.replace(/\.[a-z0-9]+$/i, "").replace(/[-_]+/g, " ").replace(/\s+/g, " ").trim();
-  if (!text2)
-    return "Source-derived skill";
-  return text2.replace(/\b\w/g, (char) => char.toUpperCase());
-}
-function deriveTitle(explicit, source) {
-  if (explicit?.trim())
-    return oneLine3(explicit).slice(0, 120);
-  for (const line of source.text.split(/\r?\n/)) {
-    const trimmed = line.trim();
-    const heading = trimmed.match(/^#{1,3}\s+(.{4,120})$/);
-    if (heading)
-      return oneLine3(heading[1]).slice(0, 120);
-    if (trimmed.length >= 8 && trimmed.length <= 90 && /^[A-Z0-9][A-Za-z0-9 ,:/'"()&.-]+$/.test(trimmed) && !/[.!?]$/.test(trimmed)) {
-      return oneLine3(trimmed).slice(0, 120);
-    }
-  }
-  return titleFromReference(source).slice(0, 120);
-}
-function normalizeListInput(value) {
-  const raw = Array.isArray(value) ? value : typeof value === "string" ? value.split(",") : [];
-  const seen = /* @__PURE__ */ new Set();
-  const out = [];
-  for (const item of raw) {
-    if (typeof item !== "string")
-      continue;
-    const text2 = oneLine3(item).toLowerCase();
-    if (!text2 || seen.has(text2))
-      continue;
-    seen.add(text2);
-    out.push(text2);
-  }
-  return out;
-}
-function normalizeTagListInput(value) {
-  return normalizeListInput(value).map((tag) => tag.replace(/\s+/g, "-").replace(/[^a-z0-9._:-]/g, "")).filter((tag) => tag.length > 0);
-}
-function defaultTriggers2(title, source, hint) {
-  const triggers = [title.toLowerCase()];
-  if (hint?.trim())
-    triggers.push(oneLine3(hint).toLowerCase());
-  if (source.kind === "url") {
-    const host = new URL(source.reference).hostname.replace(/^www\./, "");
-    triggers.push(host.toLowerCase());
-  }
-  if (source.kind === "file") {
-    triggers.push((0, import_node_path20.basename)(source.reference, (0, import_node_path20.extname)(source.reference)).toLowerCase());
-  }
-  return [...new Set(triggers)].slice(0, 8);
-}
-function sourceNotes(text2) {
-  const lines = text2.split(/\r?\n/).map((line) => line.trim()).filter((line) => line.length > 0);
-  const candidates = [];
-  for (const line of lines) {
-    const heading = line.match(/^#{1,4}\s+(.+)$/);
-    if (heading)
-      candidates.push(`Section: ${oneLine3(heading[1])}`);
-    else if (/^(?:[-*]|\d+[.)])\s+/.test(line)) {
-      candidates.push(oneLine3(line.replace(/^(?:[-*]|\d+[.)])\s+/, "")));
-    }
-    if (candidates.length >= 14)
-      break;
-  }
-  const compact = text2.replace(/\s+/g, " ");
-  for (const sentence of compact.split(/(?<=[.!?])\s+/)) {
-    const clean = oneLine3(sentence);
-    if (clean.length >= 40 && clean.length <= 220)
-      candidates.push(clean);
-    if (candidates.length >= 20)
-      break;
-  }
-  const seen = /* @__PURE__ */ new Set();
-  const out = [];
-  for (const item of candidates) {
-    const clipped = clip(item, 240);
-    const key = clipped.toLowerCase();
-    if (seen.has(key))
-      continue;
-    seen.add(key);
-    out.push(clipped);
-    if (out.length >= 12)
-      break;
-  }
-  return out.length > 0 ? out : lines.slice(0, 8).map((line) => oneLine3(line).slice(0, 240));
-}
-function buildBody(args) {
-  const lines = [
-    `Use this skill when the user asks about ${args.title} or work covered by the captured source.`,
-    "",
-    "## Source",
-    `- Kind: ${args.source.kind}`,
-    `- Reference: ${args.source.reference}`,
-    `- Captured by: PeriCode native skillmint_create`,
-    ...args.source.truncated ? ["- Capture note: source text was truncated before synthesis"] : [],
-    "",
-    "## Success Criteria",
-    "- The answer or workflow is grounded in the source-derived notes below.",
-    "- Missing inputs, version assumptions, or unsupported source gaps are surfaced plainly.",
-    "- The final response gives the user a concrete next step or finished artifact.",
-    "",
-    "## Procedure",
-    "1. Confirm the request matches this source-derived skill and identify the needed output.",
-    "2. Use the source-derived notes as the primary procedure or reference.",
-    "3. Check current repository, files, or visible app state before making claims when the task depends on local state.",
-    "4. Apply the procedure in the user's workspace when implementation is requested.",
-    "5. Verify the result with the smallest meaningful test, rendered check, or file readback.",
-    "6. Summarize the outcome and cite the source reference when useful.",
-    "",
-    "## Source-Derived Notes",
-    ...args.notes.map((note) => `- ${note}`),
-    "",
-    "## Failure Modes",
-    "- If the source appears outdated or incomplete, say what is uncertain before acting.",
-    "- If the task requires secrets, credentials, account access, or destructive changes, use normal PeriCode permission and safety policy.",
-    "- If the source content is not enough to complete the task, ask for the missing artifact or inspect the live workspace."
-  ];
-  let body = lines.join("\n");
-  if (body.length <= BODY_TARGET_CHARS)
-    return body;
-  const shortNotes = args.notes.slice(0, 6).map((note) => `- ${note}`);
-  body = [
-    `Use this skill when the user asks about ${args.title} or work covered by the captured source.`,
-    "",
-    "## Source",
-    `- Kind: ${args.source.kind}`,
-    `- Reference: ${args.source.reference}`,
-    "",
-    "## Procedure",
-    "1. Match the task to the source-derived notes.",
-    "2. Inspect live workspace state when local implementation is requested.",
-    "3. Apply the relevant steps, verify the result, and summarize the outcome.",
-    "",
-    "## Source-Derived Notes",
-    ...shortNotes
-  ].join("\n");
-  return body.slice(0, BODY_TARGET_CHARS).trim();
-}
-var import_node_fs7, import_node_path20, DEFAULT_SOURCE_MAX_CHARS, SOURCE_MAX_CHARS_LIMIT, SOURCE_FILE_MAX_BYTES, DEFAULT_TIMEOUT_MS4, BODY_TARGET_CHARS, skillmintCreateTool;
-var init_skillmint = __esm({
-  "../../dist/src/tools/skillmint.js"() {
-    "use strict";
-    init_scoped_fetch();
-    import_node_fs7 = require("node:fs");
-    import_node_path20 = require("node:path");
-    init_base();
-    init_store4();
-    init_store3();
-    DEFAULT_SOURCE_MAX_CHARS = 5e4;
-    SOURCE_MAX_CHARS_LIMIT = 2e5;
-    SOURCE_FILE_MAX_BYTES = 2e6;
-    DEFAULT_TIMEOUT_MS4 = 1e4;
-    BODY_TARGET_CHARS = 5600;
-    skillmintCreateTool = {
-      readOnly: false,
-      definition: {
-        name: "skillmint_create",
-        description: "Native PeriCode source-to-skill synthesis. Capture inline text, a local text/markdown file, or an HTTP(S) page, distill it deterministically, and save it as a durable PeriCode skill. This is built in and does not call the separate SkillMint project.",
-        input_schema: {
-          type: "object",
-          properties: {
-            source: {
-              type: "string",
-              description: "Inline source text, local text/markdown file path, or http(s) URL."
-            },
-            source_type: {
-              type: "string",
-              enum: ["auto", "url", "file", "text"],
-              default: "auto"
-            },
-            title: { type: "string", description: "Optional skill title override." },
-            description: { type: "string", description: "Optional short skill description." },
-            triggers: {
-              oneOf: [
-                { type: "array", items: { type: "string" } },
-                { type: "string" }
-              ],
-              description: "Trigger phrases, array or comma-separated string."
-            },
-            tags: {
-              oneOf: [
-                { type: "array", items: { type: "string" } },
-                { type: "string" }
-              ],
-              description: "Tags to store with the skill."
-            },
-            trigger_description: {
-              type: "string",
-              description: "A natural-language hint for when this skill should match."
-            },
-            max_chars: {
-              type: "integer",
-              default: DEFAULT_SOURCE_MAX_CHARS,
-              description: "Maximum captured source characters before synthesis."
-            },
-            timeout_ms: {
-              type: "integer",
-              default: DEFAULT_TIMEOUT_MS4,
-              description: "HTTP source timeout in milliseconds."
-            }
-          },
-          required: ["source"],
-          additionalProperties: false
-        }
-      },
-      async execute(input, context = {}) {
-        try {
-          const source = await captureSource(input, context);
-          const title = deriveTitle(optionalString(input, "title"), source);
-          const description = clip(optionalString(input, "description") ?? `Source-derived skill from ${source.kind} source: ${source.reference}`, 500);
-          const triggerHint = optionalString(input, "trigger_description");
-          const triggers = normalizeListInput(input.triggers);
-          const tags = normalizeTagListInput(input.tags);
-          const notes = sourceNotes(source.text);
-          const record2 = addSkill({
-            title,
-            description,
-            triggers: triggers.length > 0 ? triggers : defaultTriggers2(title, source, triggerHint),
-            tags: [.../* @__PURE__ */ new Set(["skillmint", "source-derived", ...tags])],
-            body: buildBody({ title, description, source, notes })
-          });
-          return {
-            output: `created source-derived skill ${record2.id}
-skills file: ${skillsPath()}
-source: ${source.kind} ${source.reference}
-captured chars: ${source.text.length}${source.truncated ? " (truncated)" : ""}
-notes: ${notes.length}
-` + formatSkillRecord(record2),
-            isError: false
-          };
-        } catch (err) {
-          if (err instanceof SkillStoreError || err instanceof ToolValidationError) {
-            return { output: `skillmint_create error: ${err.message}`, isError: true };
-          }
-          return {
-            output: `skillmint_create error: ${err instanceof Error ? err.message : String(err)}`,
-            isError: true
-          };
-        }
-      }
-    };
-  }
-});
-
-// ../../dist/src/jobs/store.js
-function isObject3(value) {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-function iso(date3 = /* @__PURE__ */ new Date()) {
-  return date3.toISOString();
-}
-function oneLine4(text2) {
-  return text2.replace(/\s+/g, " ").trim();
-}
-function clampLimit3(limit, fallback) {
-  if (limit === void 0 || !Number.isFinite(limit))
-    return fallback;
-  return Math.max(1, Math.min(100, Math.round(limit)));
-}
-function requireSafeText2(value, label, maxChars) {
-  const text2 = value.trim();
-  if (!text2)
-    throw new JobStoreError(`${label} cannot be empty`);
-  if (text2.length > maxChars) {
-    throw new JobStoreError(`${label} is too long (${text2.length} chars; max ${maxChars})`);
-  }
-  const sensitive = detectSensitiveMemoryText(text2);
-  if (sensitive) {
-    throw new JobStoreError(`refusing to store likely secret in ${label} (${sensitive})`);
-  }
-  return text2;
-}
-function optionalSafeText2(value, label, maxChars) {
-  if (value === void 0 || value === null || value === "")
-    return void 0;
-  if (typeof value !== "string")
-    throw new JobStoreError(`${label} must be a string`);
-  return requireSafeText2(value, label, maxChars);
-}
-function normalizeTags2(value) {
-  if (value === void 0 || value === null || value === "")
-    return [];
-  const raw = Array.isArray(value) ? value : typeof value === "string" ? value.split(",") : null;
-  if (!raw)
-    throw new JobStoreError("job tags must be a string or string array");
-  const seen = /* @__PURE__ */ new Set();
-  const out = [];
-  for (const item of raw) {
-    if (typeof item !== "string") {
-      throw new JobStoreError("job tags must contain only strings");
-    }
-    const tag = item.trim().toLowerCase().replace(/\s+/g, "-");
-    if (!tag)
-      continue;
-    if (tag.length > 48)
-      throw new JobStoreError(`job tag is too long: ${tag}`);
-    if (!/^[a-z0-9._:-]+$/.test(tag)) {
-      throw new JobStoreError(`job tag '${tag}' may only contain letters, digits, dot, underscore, colon, or dash`);
-    }
-    if (!seen.has(tag)) {
-      seen.add(tag);
-      out.push(tag);
-    }
-  }
-  return out;
-}
-function normalizeDate(value, label) {
-  if (value instanceof Date) {
-    if (!Number.isFinite(value.getTime()))
-      throw new JobStoreError(`${label} is invalid`);
-    return value.toISOString();
-  }
-  if (typeof value !== "string" || value.trim().length === 0) {
-    throw new JobStoreError(`${label} must be an ISO date/time string`);
-  }
-  const date3 = new Date(value);
-  if (!Number.isFinite(date3.getTime())) {
-    throw new JobStoreError(`${label} is invalid: ${value}`);
-  }
-  return date3.toISOString();
-}
-function normalizeStoredDate(value, fallback) {
-  if (typeof value !== "string" || value.trim().length === 0)
-    return fallback;
-  const date3 = new Date(value);
-  return Number.isFinite(date3.getTime()) ? date3.toISOString() : fallback;
-}
-function normalizeEveryMinutes(value) {
-  if (value === void 0 || value === null || value === "")
-    return void 0;
-  const n = typeof value === "number" ? value : typeof value === "string" && /^-?\d+(\.\d+)?$/.test(value.trim()) ? Number(value.trim()) : NaN;
-  if (!Number.isFinite(n))
-    throw new JobStoreError("everyMinutes must be a number");
-  const minutes = Math.round(n);
-  if (minutes < 1)
-    throw new JobStoreError("everyMinutes must be at least 1");
-  if (minutes > 525600)
-    throw new JobStoreError("everyMinutes cannot exceed one year");
-  return minutes;
-}
-function normalizeEnabled(value, fallback = true) {
-  if (value === void 0 || value === null || value === "")
-    return fallback;
-  if (typeof value === "boolean")
-    return value;
-  if (typeof value === "string") {
-    const normalized = value.trim().toLowerCase();
-    if (["true", "yes", "1", "on", "enabled"].includes(normalized))
-      return true;
-    if (["false", "no", "0", "off", "disabled"].includes(normalized))
-      return false;
-  }
-  throw new JobStoreError("enabled must be a boolean");
-}
-function deriveSchedule(input) {
-  const everyMinutes = normalizeEveryMinutes(input.everyMinutes);
-  const hasRunAt = input.runAt !== void 0 && input.runAt !== null && input.runAt !== "";
-  if (everyMinutes !== void 0 && hasRunAt) {
-    throw new JobStoreError("specify either runAt or everyMinutes, not both");
-  }
-  if (everyMinutes !== void 0) {
-    const now = input.now ?? /* @__PURE__ */ new Date();
-    return {
-      schedule: { kind: "interval", everyMinutes },
-      nextRunAt: new Date(now.getTime() + everyMinutes * 6e4).toISOString()
-    };
-  }
-  if (hasRunAt) {
-    const runAt = normalizeDate(input.runAt, "runAt");
-    return {
-      schedule: { kind: "once", runAt },
-      nextRunAt: runAt
-    };
-  }
-  throw new JobStoreError("job requires either runAt or everyMinutes");
-}
-function jobsPath() {
-  return resolveOwnedPath({
-    ownedEnv: JOBS_PATH_ENV,
-    fileName: JOBS_FILE_NAME
-  }).path;
-}
-function emptyJobsFile() {
-  return { version: JOBS_VERSION, records: [] };
-}
-function normalizeRecord3(value, index) {
-  if (!isObject3(value))
-    throw new JobStoreError(`job record ${index} must be an object`);
-  const now = iso();
-  const id = typeof value.id === "string" ? value.id.trim() : "";
-  if (!/^job_[a-f0-9]{8}$/.test(id) && !/^[A-Za-z0-9._:-]{3,80}$/.test(id)) {
-    throw new JobStoreError(`job record ${index} has invalid id`);
-  }
-  const title = optionalSafeText2(value.title, "job title", 120);
-  const prompt = optionalSafeText2(value.prompt, "job prompt", JOB_PROMPT_MAX_CHARS);
-  if (!title || !prompt)
-    throw new JobStoreError(`job record ${id} is incomplete`);
-  if (!isObject3(value.schedule)) {
-    throw new JobStoreError(`job record ${id} has invalid schedule`);
-  }
-  const kind = value.schedule.kind;
-  let schedule;
-  if (kind === "interval") {
-    const everyMinutes = normalizeEveryMinutes(value.schedule.everyMinutes);
-    if (everyMinutes === void 0) {
-      throw new JobStoreError(`job record ${id} interval missing everyMinutes`);
-    }
-    schedule = { kind: "interval", everyMinutes };
-  } else if (kind === "once") {
-    schedule = { kind: "once", runAt: normalizeDate(value.schedule.runAt, "runAt") };
-  } else {
-    throw new JobStoreError(`job record ${id} schedule kind must be once or interval`);
-  }
-  const createdAt = normalizeStoredDate(value.createdAt, now);
-  return {
-    id,
-    title,
-    prompt,
-    schedule,
-    enabled: normalizeEnabled(value.enabled, true),
-    tags: normalizeTags2(value.tags),
-    createdAt,
-    updatedAt: normalizeStoredDate(value.updatedAt, createdAt),
-    nextRunAt: normalizeStoredDate(value.nextRunAt, schedule.kind === "once" ? schedule.runAt : createdAt),
-    lastRunAt: value.lastRunAt === void 0 ? void 0 : normalizeStoredDate(value.lastRunAt, createdAt),
-    lastStatus: value.lastStatus === "ok" || value.lastStatus === "error" ? value.lastStatus : void 0,
-    lastOutputPreview: optionalSafeText2(value.lastOutputPreview, "job output preview", 1e3),
-    runCount: typeof value.runCount === "number" && Number.isFinite(value.runCount) ? Math.max(0, Math.round(value.runCount)) : 0,
-    failureCount: typeof value.failureCount === "number" && Number.isFinite(value.failureCount) ? Math.max(0, Math.round(value.failureCount)) : 0
-  };
-}
-function readJobsFile() {
-  const path = jobsPath();
-  if (!(0, import_node_fs8.existsSync)(path))
-    return emptyJobsFile();
-  let parsed;
-  try {
-    const raw = (0, import_node_fs8.readFileSync)(path, "utf8");
-    if (!raw.trim())
-      return emptyJobsFile();
-    parsed = JSON.parse(raw);
-  } catch (err) {
-    throw new JobStoreError(`could not read jobs file ${path}: ${err instanceof Error ? err.message : String(err)}`);
-  }
-  if (!isObject3(parsed) || !Array.isArray(parsed.records)) {
-    throw new JobStoreError(`jobs file ${path} must contain a records array`);
-  }
-  return {
-    version: JOBS_VERSION,
-    records: parsed.records.map((record2, index) => normalizeRecord3(record2, index))
-  };
-}
-function writeJobsFile(file) {
-  const path = jobsPath();
-  (0, import_node_fs8.mkdirSync)((0, import_node_path21.dirname)(path), { recursive: true });
-  const tmp = `${path}.${process.pid}.${Date.now()}.tmp`;
-  (0, import_node_fs8.writeFileSync)(tmp, `${JSON.stringify(file, null, 2)}
-`, {
-    encoding: "utf8"
-  });
-  (0, import_node_fs8.renameSync)(tmp, path);
-}
-function nextJobId(existing) {
-  const used = new Set(existing.map((record2) => record2.id));
-  for (let i = 0; i < 100; i += 1) {
-    const id = `job_${(0, import_node_crypto6.randomUUID)().replace(/-/g, "").slice(0, 8)}`;
-    if (!used.has(id))
-      return id;
-  }
-  throw new JobStoreError("could not allocate a unique job id");
-}
-function defaultTitle(prompt) {
-  const text2 = oneLine4(prompt);
-  return text2.length <= 80 ? text2 : `${text2.slice(0, 77)}...`;
-}
-function sortJobs(records) {
-  return [...records].sort((a, b2) => {
-    const time3 = a.nextRunAt.localeCompare(b2.nextRunAt);
-    if (time3 !== 0)
-      return time3;
-    return b2.updatedAt.localeCompare(a.updatedAt);
-  });
-}
-function addJob(input) {
-  const file = readJobsFile();
-  const prompt = requireSafeText2(input.prompt, "job prompt", JOB_PROMPT_MAX_CHARS);
-  const title = requireSafeText2(input.title ?? defaultTitle(prompt), "job title", 120);
-  const { schedule, nextRunAt } = deriveSchedule(input);
-  const now = iso(input.now);
-  const record2 = {
-    id: nextJobId(file.records),
-    title,
-    prompt,
-    schedule,
-    enabled: normalizeEnabled(input.enabled, true),
-    tags: normalizeTags2(input.tags),
-    createdAt: now,
-    updatedAt: now,
-    nextRunAt,
-    runCount: 0,
-    failureCount: 0
-  };
-  file.records.push(record2);
-  writeJobsFile(file);
-  return record2;
-}
-function updateJob(input) {
-  const file = readJobsFile();
-  const index = file.records.findIndex((record2) => record2.id === input.id);
-  if (index === -1)
-    throw new JobStoreError(`job '${input.id}' not found`);
-  const current = file.records[index];
-  const next = {
-    ...current,
-    updatedAt: iso(input.now)
-  };
-  if (input.title !== void 0)
-    next.title = requireSafeText2(input.title, "job title", 120);
-  if (input.prompt !== void 0) {
-    next.prompt = requireSafeText2(input.prompt, "job prompt", JOB_PROMPT_MAX_CHARS);
-  }
-  if (input.tags !== void 0)
-    next.tags = normalizeTags2(input.tags);
-  if (input.enabled !== void 0)
-    next.enabled = normalizeEnabled(input.enabled);
-  if (input.runAt !== void 0 || input.everyMinutes !== void 0) {
-    const { schedule, nextRunAt } = deriveSchedule(input);
-    next.schedule = schedule;
-    next.nextRunAt = nextRunAt;
-  }
-  file.records[index] = next;
-  writeJobsFile(file);
-  return next;
-}
-function removeJob(id) {
-  const file = readJobsFile();
-  const index = file.records.findIndex((record2) => record2.id === id);
-  if (index === -1)
-    throw new JobStoreError(`job '${id}' not found`);
-  const [removed] = file.records.splice(index, 1);
-  writeJobsFile(file);
-  return removed;
-}
-function setJobEnabled(id, enabled) {
-  return updateJob({ id, enabled });
-}
-function isJobDue(record2, now = /* @__PURE__ */ new Date()) {
-  return record2.enabled && new Date(record2.nextRunAt).getTime() <= now.getTime();
-}
-function scoreJob(record2, query) {
-  const haystack = [
-    record2.id,
-    record2.title,
-    record2.prompt,
-    record2.tags.join(" ")
-  ].join(" ").toLowerCase();
-  const terms = query.toLowerCase().split(/\s+/).map((term) => term.trim()).filter(Boolean);
-  if (terms.length === 0)
-    return 1;
-  let score = 0;
-  for (const term of terms) {
-    if (haystack.includes(term))
-      score += 1;
-  }
-  return score;
-}
-function listJobs(options = {}) {
-  const limit = clampLimit3(options.limit, 50);
-  const now = options.now ?? /* @__PURE__ */ new Date();
-  const tag = options.tag?.trim().toLowerCase();
-  let records = readJobsFile().records.filter((record2) => {
-    if (!options.includeDisabled && !record2.enabled)
-      return false;
-    if (tag && !record2.tags.includes(tag))
-      return false;
-    if (options.dueOnly && !isJobDue(record2, now))
-      return false;
-    return true;
-  });
-  if (options.query?.trim()) {
-    records = records.map((record2) => ({ record: record2, score: scoreJob(record2, options.query) })).filter((entry) => entry.score > 0).sort((a, b2) => {
-      if (b2.score !== a.score)
-        return b2.score - a.score;
-      return a.record.nextRunAt.localeCompare(b2.record.nextRunAt);
-    }).map((entry) => entry.record);
-  } else {
-    records = sortJobs(records);
-  }
-  return records.slice(0, limit);
-}
-function listDueJobs(options = {}) {
-  return listJobs({ ...options, dueOnly: true });
-}
-function markJobRun(input) {
-  const file = readJobsFile();
-  const index = file.records.findIndex((record2) => record2.id === input.id);
-  if (index === -1)
-    throw new JobStoreError(`job '${input.id}' not found`);
-  const current = file.records[index];
-  const now = input.now ?? /* @__PURE__ */ new Date();
-  const next = {
-    ...current,
-    updatedAt: iso(now),
-    lastRunAt: iso(now),
-    lastStatus: input.status,
-    lastOutputPreview: optionalSafeText2(input.outputPreview, "job output preview", 1e3),
-    runCount: current.runCount + 1,
-    failureCount: current.failureCount + (input.status === "error" ? 1 : 0)
-  };
-  if (current.schedule.kind === "interval") {
-    next.nextRunAt = new Date(now.getTime() + current.schedule.everyMinutes * 6e4).toISOString();
-    next.enabled = true;
-  } else {
-    next.enabled = false;
-    next.nextRunAt = current.schedule.runAt ?? current.nextRunAt;
-  }
-  file.records[index] = next;
-  writeJobsFile(file);
-  return next;
-}
-function formatJobRecord(record2) {
-  const schedule = record2.schedule.kind === "interval" ? `every ${record2.schedule.everyMinutes}m` : `at ${record2.schedule.runAt}`;
-  const status = record2.enabled ? "enabled" : "disabled";
-  const runs = record2.runCount > 0 ? ` runs=${record2.runCount}` : "";
-  const failures = record2.failureCount > 0 ? ` failures=${record2.failureCount}` : "";
-  const tags = record2.tags.length > 0 ? ` tags=${record2.tags.join(",")}` : "";
-  return `- ${record2.id} "${oneLine4(record2.title)}" ${status} next=${record2.nextRunAt} schedule=${schedule}${runs}${failures}${tags}`;
-}
-var import_node_crypto6, import_node_fs8, import_node_path21, JOBS_PATH_ENV, JOBS_FILE_NAME, JOBS_VERSION, JOB_PROMPT_MAX_CHARS, JobStoreError;
-var init_store5 = __esm({
-  "../../dist/src/jobs/store.js"() {
-    "use strict";
-    init_scoped_fetch();
-    import_node_crypto6 = require("node:crypto");
-    import_node_fs8 = require("node:fs");
-    import_node_path21 = require("node:path");
-    init_store3();
-    init_paths();
-    JOBS_PATH_ENV = "PERICODE_JOBS_PATH";
-    JOBS_FILE_NAME = "jobs.json";
-    JOBS_VERSION = 1;
-    JOB_PROMPT_MAX_CHARS = 4e3;
-    JobStoreError = class extends Error {
-      constructor(message) {
-        super(message);
-        this.name = "JobStoreError";
-      }
-    };
-  }
-});
-
-// ../../dist/src/tools/jobs.js
-function formatError3(toolName, err) {
-  if (err instanceof JobStoreError) {
-    return { output: `${toolName} error: ${err.message}`, isError: true };
-  }
-  throw err;
-}
-function optionalBoolean4(input, key) {
-  const v2 = input[key];
-  if (v2 === void 0 || v2 === null || v2 === "")
-    return void 0;
-  if (typeof v2 === "boolean")
-    return v2;
-  if (typeof v2 === "string") {
-    const normalized = v2.trim().toLowerCase();
-    if (["true", "yes", "1", "on"].includes(normalized))
-      return true;
-    if (["false", "no", "0", "off"].includes(normalized))
-      return false;
-  }
-  throw new JobStoreError(`${key} must be a boolean`);
-}
-var jobReadTool, jobWriteTool;
-var init_jobs = __esm({
-  "../../dist/src/tools/jobs.js"() {
-    "use strict";
-    init_scoped_fetch();
-    init_base();
-    init_store5();
-    jobReadTool = {
-      readOnly: true,
-      definition: {
-        name: "job_read",
-        description: "List, search, or show due PeriCode scheduled jobs/background prompts.",
-        input_schema: {
-          type: "object",
-          properties: {
-            mode: {
-              type: "string",
-              enum: ["list", "due", "search"],
-              default: "list"
-            },
-            query: { type: "string", description: "Search query for mode=search." },
-            tag: { type: "string", description: "Optional tag filter." },
-            include_disabled: {
-              type: "boolean",
-              default: false,
-              description: "Include disabled jobs."
-            },
-            limit: { type: "integer", default: 20 }
-          },
-          additionalProperties: false
-        }
-      },
-      async execute(input) {
-        try {
-          const mode = (optionalString(input, "mode") ?? "list").trim().toLowerCase();
-          const query = optionalString(input, "query")?.trim();
-          const tag = optionalString(input, "tag")?.trim().toLowerCase();
-          const includeDisabled = optionalBoolean4(input, "include_disabled") ?? false;
-          const limit = Math.max(1, Math.min(50, Math.round(optionalNumber(input, "limit", 20))));
-          const records = mode === "due" ? listDueJobs({ tag, includeDisabled, limit }) : mode === "search" ? listJobs({ query, tag, includeDisabled, limit }) : mode === "list" ? listJobs({ tag, includeDisabled, limit }) : null;
-          if (!records)
-            throw new JobStoreError("mode must be list, due, or search");
-          const header = `jobs file: ${jobsPath()}`;
-          if (records.length === 0) {
-            return {
-              output: `${header}
-(no scheduled jobs${mode === "due" ? " are due" : ""})`,
-              isError: false
-            };
-          }
-          return {
-            output: `${header}
-${records.map(formatJobRecord).join("\n")}`,
-            isError: false
-          };
-        } catch (err) {
-          return formatError3("job_read", err);
-        }
-      }
-    };
-    jobWriteTool = {
-      readOnly: false,
-      definition: {
-        name: "job_write",
-        description: "Add, update, remove, enable/disable, or mark completed PeriCode scheduled jobs. Use for durable background prompts and monitors.",
-        input_schema: {
-          type: "object",
-          properties: {
-            action: {
-              type: "string",
-              enum: ["add", "update", "remove", "delete", "enable", "disable", "mark_run"]
-            },
-            id: { type: "string", description: "Required except for add." },
-            title: { type: "string" },
-            prompt: { type: "string", description: "Prompt to run when due." },
-            run_at: { type: "string", description: "ISO date/time for one-shot jobs." },
-            every_minutes: { type: "integer", description: "Interval schedule in minutes." },
-            tags: {
-              oneOf: [
-                { type: "array", items: { type: "string" } },
-                { type: "string" }
-              ]
-            },
-            enabled: { type: "boolean" },
-            status: {
-              type: "string",
-              enum: ["ok", "error"],
-              description: "For mark_run."
-            },
-            output_preview: { type: "string", description: "For mark_run." }
-          },
-          required: ["action"],
-          additionalProperties: false
-        }
-      },
-      async execute(input) {
-        try {
-          const rawAction = requireString(input, "action").trim().toLowerCase();
-          const action = rawAction === "delete" ? "remove" : rawAction;
-          if (action === "add") {
-            const record2 = addJob({
-              title: optionalString(input, "title"),
-              prompt: requireString(input, "prompt"),
-              runAt: input.run_at,
-              everyMinutes: input.every_minutes,
-              tags: input.tags,
-              enabled: input.enabled
-            });
-            return {
-              output: `scheduled job ${record2.id}
-${formatJobRecord(record2)}`,
-              isError: false
-            };
-          }
-          if (action === "update") {
-            const record2 = updateJob({
-              id: requireString(input, "id"),
-              title: optionalString(input, "title"),
-              prompt: optionalString(input, "prompt"),
-              runAt: input.run_at,
-              everyMinutes: input.every_minutes,
-              tags: input.tags,
-              enabled: input.enabled
-            });
-            return {
-              output: `updated job ${record2.id}
-${formatJobRecord(record2)}`,
-              isError: false
-            };
-          }
-          if (action === "remove") {
-            const removed = removeJob(requireString(input, "id"));
-            return {
-              output: `removed job ${removed.id}
-${formatJobRecord(removed)}`,
-              isError: false
-            };
-          }
-          if (action === "enable" || action === "disable") {
-            const record2 = setJobEnabled(requireString(input, "id"), action === "enable");
-            return {
-              output: `${action === "enable" ? "enabled" : "disabled"} job ${record2.id}
-${formatJobRecord(record2)}`,
-              isError: false
-            };
-          }
-          if (action === "mark_run") {
-            const status = optionalString(input, "status") ?? "ok";
-            if (status !== "ok" && status !== "error") {
-              throw new JobStoreError("status must be ok or error");
-            }
-            const record2 = markJobRun({
-              id: requireString(input, "id"),
-              status,
-              outputPreview: optionalString(input, "output_preview")
-            });
-            return {
-              output: `marked job ${record2.id} ${status}
-${formatJobRecord(record2)}`,
-              isError: false
-            };
-          }
-          throw new JobStoreError("action must be add, update, remove, delete, enable, disable, or mark_run");
-        } catch (err) {
-          return formatError3("job_write", err);
-        }
-      }
-    };
-  }
-});
-
 // ../../dist/src/tools/profiles.js
 function isPeriCodeDebugTool(name) {
   return PERICODE_DEBUG_PREFIXES.some((prefix) => name.startsWith(prefix)) || name.includes("debug") || name.includes("replay") || name.includes("policy");
-}
-function normalizeToolProfile(value) {
-  if (!value)
-    return "coding";
-  const normalized = value.trim().toLowerCase().replace(/_/g, "-");
-  if (TOOL_PROFILES.includes(normalized)) {
-    return normalized;
-  }
-  return "coding";
 }
 function isToolVisibleInProfile(profile, source, definition) {
   if (profile === "all")
@@ -12063,19 +922,11 @@ function isToolVisibleInProfile(profile, source, definition) {
   }
   return false;
 }
-var TOOL_PROFILES, BUILTIN_OBSERVE_TOOLS, DESKTOP_SOURCES2, PERICODE_OBSERVE_TOOLS, PERICODE_OCR_SUMMARY_TOOLS, PERICODE_IMAGE_CAPTURE_TOOLS, PERICODE_TAKEOVER_TOOLS, PERICODE_RAW_DESKTOP_TOOLS, PERICODE_CAPABILITY_TOOLS, PERICODE_SPATIAL_MEMORY_TOOLS, PERICODE_DEBUG_PREFIXES;
+var BUILTIN_OBSERVE_TOOLS, DESKTOP_SOURCES2, PERICODE_OBSERVE_TOOLS, PERICODE_OCR_SUMMARY_TOOLS, PERICODE_IMAGE_CAPTURE_TOOLS, PERICODE_TAKEOVER_TOOLS, PERICODE_RAW_DESKTOP_TOOLS, PERICODE_CAPABILITY_TOOLS, PERICODE_SPATIAL_MEMORY_TOOLS, PERICODE_DEBUG_PREFIXES;
 var init_profiles = __esm({
   "../../dist/src/tools/profiles.js"() {
     "use strict";
     init_scoped_fetch();
-    TOOL_PROFILES = [
-      "coding",
-      "observe",
-      "capability",
-      "takeover",
-      "debug",
-      "all"
-    ];
     BUILTIN_OBSERVE_TOOLS = /* @__PURE__ */ new Set([
       "agent_read",
       "code_index",
@@ -12212,1883 +1063,175 @@ var init_profiles = __esm({
   }
 });
 
-// ../../dist/src/agents/store.js
-function isObject4(value) {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
+// ../../dist/src/tools/registry-core.js
+function sleep(ms) {
+  return new Promise((resolve4) => setTimeout(resolve4, ms));
 }
-function isoNow3() {
-  return (/* @__PURE__ */ new Date()).toISOString();
-}
-function oneLine5(text2) {
-  return text2.replace(/\s+/g, " ").trim();
-}
-function clampLimit4(limit, fallback) {
-  if (limit === void 0 || !Number.isFinite(limit))
-    return fallback;
-  return Math.max(1, Math.min(100, Math.round(limit)));
-}
-function requireSafeText3(value, label, maxChars) {
-  const text2 = value.trim();
-  if (!text2)
-    throw new AgentStoreError(`${label} cannot be empty`);
-  if (text2.length > maxChars) {
-    throw new AgentStoreError(`${label} is too long (${text2.length} chars; max ${maxChars})`);
-  }
-  const sensitive = detectSensitiveMemoryText(text2);
-  if (sensitive) {
-    throw new AgentStoreError(`refusing to store likely secret in ${label} (${sensitive})`);
-  }
-  return text2;
-}
-function optionalSafeText3(value, label, maxChars) {
-  if (value === void 0 || value === null || value === "")
-    return void 0;
-  if (typeof value !== "string")
-    throw new AgentStoreError(`${label} must be a string`);
-  return requireSafeText3(value, label, maxChars);
-}
-function normalizeTags3(value) {
-  if (value === void 0 || value === null || value === "")
-    return [];
-  const raw = Array.isArray(value) ? value : typeof value === "string" ? value.split(",") : null;
+function sharedDesktopSettleMs() {
+  const raw = process.env.PERICODE_SHARED_DESKTOP_SETTLE_MS;
   if (!raw)
-    throw new AgentStoreError("agent tags must be a string or string array");
-  const seen = /* @__PURE__ */ new Set();
-  const out = [];
-  for (const item of raw) {
-    if (typeof item !== "string") {
-      throw new AgentStoreError("agent tags must contain only strings");
-    }
-    const tag = item.trim().toLowerCase().replace(/\s+/g, "-");
-    if (!tag)
-      continue;
-    if (tag.length > 48)
-      throw new AgentStoreError(`agent tag is too long: ${tag}`);
-    if (!/^[a-z0-9._:-]+$/.test(tag)) {
-      throw new AgentStoreError(`agent tag '${tag}' may only contain letters, digits, dot, underscore, colon, or dash`);
-    }
-    if (!seen.has(tag)) {
-      seen.add(tag);
-      out.push(tag);
-    }
-  }
-  return out;
+    return DEFAULT_SHARED_DESKTOP_SETTLE_MS;
+  const parsed = Number(raw);
+  if (!Number.isFinite(parsed) || parsed < 0)
+    return DEFAULT_SHARED_DESKTOP_SETTLE_MS;
+  return Math.round(parsed);
 }
-function normalizeProfile(value) {
-  if (value === void 0 || value === null || value === "")
-    return void 0;
-  if (typeof value !== "string")
-    throw new AgentStoreError("toolProfile must be a string");
-  const normalized = normalizeToolProfile(value);
-  if (normalized !== value.trim().toLowerCase().replace(/_/g, "-")) {
-    throw new AgentStoreError("toolProfile must be one of: coding, observe, capability, takeover, debug, all");
-  }
-  return normalized;
+function isSharedDesktopBlocked(result) {
+  if (!result.isError)
+    return false;
+  const output = result.output.toLowerCase();
+  return output.includes("operator is active on the shared desktop") || output.includes("waiting for the operator to go idle");
 }
-function normalizeStoredDate2(value, fallback) {
-  if (typeof value !== "string" || value.trim().length === 0)
-    return fallback;
-  const date3 = new Date(value);
-  return Number.isFinite(date3.getTime()) ? date3.toISOString() : fallback;
-}
-function agentsPath() {
-  return resolveOwnedPath({
-    ownedEnv: AGENTS_PATH_ENV,
-    fileName: AGENTS_FILE_NAME
-  }).path;
-}
-function emptyAgentsFile() {
-  return { version: AGENTS_VERSION, records: [] };
-}
-function normalizeRecord4(value, index) {
-  if (!isObject4(value))
-    throw new AgentStoreError(`agent record ${index} must be an object`);
-  const now = isoNow3();
-  const id = typeof value.id === "string" ? value.id.trim() : "";
-  if (!/^agent_[a-f0-9]{8}$/.test(id) && !/^[A-Za-z0-9._:-]{3,80}$/.test(id)) {
-    throw new AgentStoreError(`agent record ${index} has invalid id`);
-  }
-  const name = optionalSafeText3(value.name, "agent name", 120);
-  const instructions = optionalSafeText3(value.instructions, "agent instructions", AGENT_INSTRUCTIONS_MAX_CHARS);
-  if (!name || !instructions) {
-    throw new AgentStoreError(`agent record ${id} is incomplete`);
-  }
-  const createdAt = normalizeStoredDate2(value.createdAt, now);
-  return {
-    id,
-    name,
-    description: optionalSafeText3(value.description, "agent description", 500),
-    instructions,
-    toolProfile: normalizeProfile(value.toolProfile),
-    tags: normalizeTags3(value.tags),
-    createdAt,
-    updatedAt: normalizeStoredDate2(value.updatedAt, createdAt),
-    lastUsedAt: value.lastUsedAt === void 0 ? void 0 : normalizeStoredDate2(value.lastUsedAt, createdAt),
-    runCount: typeof value.runCount === "number" && Number.isFinite(value.runCount) ? Math.max(0, Math.round(value.runCount)) : 0
-  };
-}
-function readAgentsFile() {
-  const path = agentsPath();
-  if (!(0, import_node_fs9.existsSync)(path))
-    return emptyAgentsFile();
-  let parsed;
-  try {
-    const raw = (0, import_node_fs9.readFileSync)(path, "utf8");
-    if (!raw.trim())
-      return emptyAgentsFile();
-    parsed = JSON.parse(raw);
-  } catch (err) {
-    throw new AgentStoreError(`could not read agents file ${path}: ${err instanceof Error ? err.message : String(err)}`);
-  }
-  if (!isObject4(parsed) || !Array.isArray(parsed.records)) {
-    throw new AgentStoreError(`agents file ${path} must contain a records array`);
-  }
-  return {
-    version: AGENTS_VERSION,
-    records: parsed.records.map((record2, index) => normalizeRecord4(record2, index))
-  };
-}
-function writeAgentsFile(file) {
-  const path = agentsPath();
-  (0, import_node_fs9.mkdirSync)((0, import_node_path22.dirname)(path), { recursive: true });
-  const tmp = `${path}.${process.pid}.${Date.now()}.tmp`;
-  (0, import_node_fs9.writeFileSync)(tmp, `${JSON.stringify(file, null, 2)}
-`, {
-    encoding: "utf8"
-  });
-  (0, import_node_fs9.renameSync)(tmp, path);
-}
-function nextAgentId(existing) {
-  const used = new Set(existing.map((record2) => record2.id));
-  for (let i = 0; i < 100; i += 1) {
-    const id = `agent_${(0, import_node_crypto7.randomUUID)().replace(/-/g, "").slice(0, 8)}`;
-    if (!used.has(id))
-      return id;
-  }
-  throw new AgentStoreError("could not allocate a unique agent id");
-}
-function sortByUpdated3(records) {
-  return [...records].sort((a, b2) => b2.updatedAt.localeCompare(a.updatedAt));
-}
-function addAgent(input) {
-  const file = readAgentsFile();
-  const now = isoNow3();
-  const record2 = {
-    id: nextAgentId(file.records),
-    name: requireSafeText3(input.name, "agent name", 120),
-    description: optionalSafeText3(input.description, "agent description", 500),
-    instructions: requireSafeText3(input.instructions, "agent instructions", AGENT_INSTRUCTIONS_MAX_CHARS),
-    toolProfile: normalizeProfile(input.toolProfile),
-    tags: normalizeTags3(input.tags),
-    createdAt: now,
-    updatedAt: now,
-    runCount: 0
-  };
-  file.records.push(record2);
-  writeAgentsFile(file);
-  return record2;
-}
-function updateAgent(input) {
-  const file = readAgentsFile();
-  const index = file.records.findIndex((record2) => record2.id === input.id);
-  if (index === -1)
-    throw new AgentStoreError(`agent '${input.id}' not found`);
-  const current = file.records[index];
-  const next = {
-    ...current,
-    updatedAt: isoNow3()
-  };
-  if (input.name !== void 0)
-    next.name = requireSafeText3(input.name, "agent name", 120);
-  if (input.description !== void 0) {
-    next.description = optionalSafeText3(input.description, "agent description", 500);
-  }
-  if (input.instructions !== void 0) {
-    next.instructions = requireSafeText3(input.instructions, "agent instructions", AGENT_INSTRUCTIONS_MAX_CHARS);
-  }
-  if (input.toolProfile !== void 0)
-    next.toolProfile = normalizeProfile(input.toolProfile);
-  if (input.tags !== void 0)
-    next.tags = normalizeTags3(input.tags);
-  file.records[index] = next;
-  writeAgentsFile(file);
-  return next;
-}
-function removeAgent(id) {
-  const file = readAgentsFile();
-  const index = file.records.findIndex((record2) => record2.id === id);
-  if (index === -1)
-    throw new AgentStoreError(`agent '${id}' not found`);
-  const [removed] = file.records.splice(index, 1);
-  writeAgentsFile(file);
-  return removed;
-}
-function recordAgentRun(id) {
-  const file = readAgentsFile();
-  const index = file.records.findIndex((record2) => record2.id === id);
-  if (index === -1)
-    throw new AgentStoreError(`agent '${id}' not found`);
-  const next = {
-    ...file.records[index],
-    updatedAt: isoNow3(),
-    lastUsedAt: isoNow3(),
-    runCount: file.records[index].runCount + 1
-  };
-  file.records[index] = next;
-  writeAgentsFile(file);
-  return next;
-}
-function scoreAgent(record2, query) {
-  const haystack = [
-    record2.id,
-    record2.name,
-    record2.description ?? "",
-    record2.instructions,
-    record2.toolProfile ?? "",
-    record2.tags.join(" ")
-  ].join(" ").toLowerCase();
-  const terms = query.toLowerCase().split(/\s+/).map((term) => term.trim()).filter(Boolean);
-  if (terms.length === 0)
-    return 1;
-  let score = 0;
-  for (const term of terms) {
-    if (haystack.includes(term))
-      score += 1;
-  }
-  return score;
-}
-function listAgents(options = {}) {
-  const limit = clampLimit4(options.limit, AGENT_CONTEXT_MAX_RECORDS);
-  const tag = options.tag?.trim().toLowerCase();
-  let records = readAgentsFile().records.filter((record2) => tag ? record2.tags.includes(tag) : true);
-  if (options.query?.trim()) {
-    records = records.map((record2) => ({ record: record2, score: scoreAgent(record2, options.query) })).filter((entry) => entry.score > 0).sort((a, b2) => {
-      if (b2.score !== a.score)
-        return b2.score - a.score;
-      return b2.record.updatedAt.localeCompare(a.record.updatedAt);
-    }).map((entry) => entry.record);
-  } else {
-    records = sortByUpdated3(records);
-  }
-  return records.slice(0, limit);
-}
-function searchAgents(query, options = {}) {
-  return listAgents({ ...options, query });
-}
-function formatAgentRecord(record2) {
-  const profile = record2.toolProfile ? ` profile=${record2.toolProfile}` : "";
-  const tags = record2.tags.length > 0 ? ` tags=${record2.tags.join(",")}` : "";
-  const runs = record2.runCount > 0 ? ` runs=${record2.runCount}` : "";
-  const desc = record2.description ? ` - ${oneLine5(record2.description)}` : "";
-  return `- ${record2.id} "${oneLine5(record2.name)}"${profile}${tags}${runs}${desc}`;
-}
-var import_node_crypto7, import_node_fs9, import_node_path22, AGENTS_PATH_ENV, AGENTS_FILE_NAME, AGENTS_VERSION, AGENT_CONTEXT_MAX_RECORDS, AGENT_INSTRUCTIONS_MAX_CHARS, AgentStoreError;
-var init_store6 = __esm({
-  "../../dist/src/agents/store.js"() {
-    "use strict";
-    init_scoped_fetch();
-    import_node_crypto7 = require("node:crypto");
-    import_node_fs9 = require("node:fs");
-    import_node_path22 = require("node:path");
-    init_store3();
-    init_paths();
-    init_profiles();
-    AGENTS_PATH_ENV = "PERICODE_AGENTS_PATH";
-    AGENTS_FILE_NAME = "agents.json";
-    AGENTS_VERSION = 1;
-    AGENT_CONTEXT_MAX_RECORDS = 12;
-    AGENT_INSTRUCTIONS_MAX_CHARS = 4e3;
-    AgentStoreError = class extends Error {
-      constructor(message) {
-        super(message);
-        this.name = "AgentStoreError";
-      }
-    };
-  }
-});
-
-// ../../dist/src/tools/agents.js
-function formatError4(toolName, err) {
-  if (err instanceof AgentStoreError) {
-    return { output: `${toolName} error: ${err.message}`, isError: true };
-  }
-  throw err;
-}
-var agentReadTool, agentWriteTool;
-var init_agents = __esm({
-  "../../dist/src/tools/agents.js"() {
-    "use strict";
-    init_scoped_fetch();
-    init_base();
-    init_store6();
-    agentReadTool = {
-      readOnly: true,
-      definition: {
-        name: "agent_read",
-        description: "List or search saved PeriCode specialist agents that can be invoked through the task tool with agent_id.",
-        input_schema: {
-          type: "object",
-          properties: {
-            query: { type: "string", description: "Optional agent search query." },
-            tag: { type: "string", description: "Optional tag filter." },
-            limit: { type: "integer", default: 20 }
-          },
-          additionalProperties: false
-        }
-      },
-      async execute(input) {
-        try {
-          const query = optionalString(input, "query")?.trim();
-          const tag = optionalString(input, "tag")?.trim().toLowerCase();
-          const limit = Math.max(1, Math.min(50, Math.round(optionalNumber(input, "limit", 20))));
-          const records = query ? searchAgents(query, { tag, limit }) : listAgents({ tag, limit });
-          const header = `agents file: ${agentsPath()}`;
-          if (records.length === 0) {
-            return {
-              output: `${header}
-(no saved agents${query ? " match the query" : ""})`,
-              isError: false
-            };
-          }
-          return {
-            output: `${header}
-${records.map(formatAgentRecord).join("\n")}`,
-            isError: false
-          };
-        } catch (err) {
-          return formatError4("agent_read", err);
-        }
-      }
-    };
-    agentWriteTool = {
-      readOnly: false,
-      definition: {
-        name: "agent_write",
-        description: "Add, update, remove, or record usage for saved PeriCode specialist agents.",
-        input_schema: {
-          type: "object",
-          properties: {
-            action: {
-              type: "string",
-              enum: ["add", "update", "remove", "delete", "record_run"]
-            },
-            id: { type: "string", description: "Required except for add." },
-            name: { type: "string", description: "Agent display name. Required for add." },
-            description: { type: "string" },
-            instructions: {
-              type: "string",
-              description: "Specialist system instructions. Required for add."
-            },
-            tool_profile: {
-              type: "string",
-              enum: ["coding", "observe", "capability", "takeover", "debug", "all"]
-            },
-            tags: {
-              oneOf: [
-                { type: "array", items: { type: "string" } },
-                { type: "string" }
-              ]
-            }
-          },
-          required: ["action"],
-          additionalProperties: false
-        }
-      },
-      async execute(input) {
-        try {
-          const rawAction = requireString(input, "action").trim().toLowerCase();
-          const action = rawAction === "delete" ? "remove" : rawAction;
-          if (action === "add") {
-            const record2 = addAgent({
-              name: requireString(input, "name"),
-              instructions: requireString(input, "instructions"),
-              description: input.description,
-              toolProfile: input.tool_profile,
-              tags: input.tags
-            });
-            return {
-              output: `saved agent ${record2.id}
-${formatAgentRecord(record2)}`,
-              isError: false
-            };
-          }
-          if (action === "update") {
-            const record2 = updateAgent({
-              id: requireString(input, "id"),
-              name: optionalString(input, "name"),
-              instructions: optionalString(input, "instructions"),
-              description: input.description,
-              toolProfile: input.tool_profile,
-              tags: input.tags
-            });
-            return {
-              output: `updated agent ${record2.id}
-${formatAgentRecord(record2)}`,
-              isError: false
-            };
-          }
-          if (action === "remove") {
-            const removed = removeAgent(requireString(input, "id"));
-            return {
-              output: `removed agent ${removed.id}
-${formatAgentRecord(removed)}`,
-              isError: false
-            };
-          }
-          if (action === "record_run") {
-            const record2 = recordAgentRun(requireString(input, "id"));
-            return {
-              output: `recorded agent run ${record2.id}
-${formatAgentRecord(record2)}`,
-              isError: false
-            };
-          }
-          throw new AgentStoreError("action must be add, update, remove, delete, or record_run");
-        } catch (err) {
-          return formatError4("agent_write", err);
-        }
-      }
-    };
-  }
-});
-
-// ../../dist/src/missions/store.js
-function isObject5(value) {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-function isoNow4() {
-  return (/* @__PURE__ */ new Date()).toISOString();
-}
-function oneLine6(text2) {
-  return text2.replace(/\s+/g, " ").trim();
-}
-function clampLimit5(limit, fallback) {
-  if (limit === void 0 || !Number.isFinite(limit))
-    return fallback;
-  return Math.max(1, Math.min(100, Math.round(limit)));
-}
-function normalizeBoundedInteger(value, label, fallback, options) {
-  if (value === void 0 || value === null || value === "")
-    return fallback;
-  const raw = typeof value === "number" ? value : typeof value === "string" && /^\d+$/.test(value.trim()) ? Number.parseInt(value.trim(), 10) : Number.NaN;
-  if (!Number.isFinite(raw)) {
-    throw new MissionStoreError(`${label} must be an integer`);
-  }
-  const rounded = Math.floor(raw);
-  if (rounded < options.min) {
-    throw new MissionStoreError(`${label} must be at least ${options.min}`);
-  }
-  return Math.min(options.max, rounded);
-}
-function normalizeStoredDate3(value, fallback) {
-  if (typeof value !== "string" || value.trim().length === 0)
-    return fallback;
-  const date3 = new Date(value);
-  return Number.isFinite(date3.getTime()) ? date3.toISOString() : fallback;
-}
-function requireSafeText4(value, label, maxChars) {
-  if (typeof value !== "string")
-    throw new MissionStoreError(`${label} must be a string`);
-  const text2 = value.trim();
-  if (!text2)
-    throw new MissionStoreError(`${label} cannot be empty`);
-  if (text2.length > maxChars) {
-    throw new MissionStoreError(`${label} is too long (${text2.length} chars; max ${maxChars})`);
-  }
-  const sensitive = detectSensitiveMemoryText(text2);
-  if (sensitive) {
-    throw new MissionStoreError(`refusing to store likely secret in ${label} (${sensitive})`);
-  }
-  return text2;
-}
-function optionalSafeText4(value, label, maxChars) {
-  if (value === void 0 || value === null || value === "")
-    return void 0;
-  return requireSafeText4(value, label, maxChars);
-}
-function normalizeTags4(value) {
-  if (value === void 0 || value === null || value === "")
-    return [];
-  const raw = Array.isArray(value) ? value : typeof value === "string" ? value.split(",") : null;
-  if (!raw)
-    throw new MissionStoreError("mission tags must be a string or string array");
-  const seen = /* @__PURE__ */ new Set();
-  const out = [];
-  for (const item of raw) {
-    if (typeof item !== "string") {
-      throw new MissionStoreError("mission tags must contain only strings");
-    }
-    const tag = item.trim().toLowerCase().replace(/\s+/g, "-");
-    if (!tag)
-      continue;
-    if (tag.length > 48)
-      throw new MissionStoreError(`mission tag is too long: ${tag}`);
-    if (!/^[a-z0-9._:-]+$/.test(tag)) {
-      throw new MissionStoreError(`mission tag '${tag}' may only contain letters, digits, dot, underscore, colon, or dash`);
-    }
-    if (!seen.has(tag)) {
-      seen.add(tag);
-      out.push(tag);
-    }
-  }
-  return out;
-}
-function normalizeStringList(value, label, maxItems, maxItemChars) {
-  if (value === void 0 || value === null || value === "")
-    return [];
-  const raw = Array.isArray(value) ? value : typeof value === "string" ? value.split(/\r?\n|,/) : null;
-  if (!raw)
-    throw new MissionStoreError(`${label} must be a string or string array`);
-  const out = [];
-  for (const item of raw) {
-    if (typeof item !== "string")
-      throw new MissionStoreError(`${label} must contain only strings`);
-    const text2 = requireSafeText4(item, `${label} item`, maxItemChars);
-    if (!out.includes(text2))
-      out.push(text2);
-    if (out.length > maxItems)
-      throw new MissionStoreError(`${label} cannot exceed ${maxItems} items`);
-  }
-  return out;
-}
-function normalizeStatus(value, fallback = "active") {
-  if (value === void 0 || value === null || value === "")
-    return fallback;
-  if (typeof value !== "string")
-    throw new MissionStoreError("mission status must be a string");
-  const normalized = value.trim().toLowerCase().replace(/[\s_]+/g, "-");
-  if (normalized === "complete" || normalized === "completed")
-    return "done";
-  if (MISSION_STATUSES.includes(normalized))
-    return normalized;
-  throw new MissionStoreError(`mission status must be one of: ${MISSION_STATUSES.join(", ")}`);
-}
-function normalizePriority(value, fallback = "normal") {
-  if (value === void 0 || value === null || value === "")
-    return fallback;
-  if (typeof value !== "string")
-    throw new MissionStoreError("mission priority must be a string");
-  const normalized = value.trim().toLowerCase();
-  if (MISSION_PRIORITIES.includes(normalized)) {
-    return normalized;
-  }
-  throw new MissionStoreError(`mission priority must be one of: ${MISSION_PRIORITIES.join(", ")}`);
-}
-function normalizeCheckpointStatus(value, fallback = "pending") {
-  if (value === void 0 || value === null || value === "")
-    return fallback;
-  if (typeof value !== "string")
-    throw new MissionStoreError("checkpoint status must be a string");
-  const normalized = value.trim().toLowerCase().replace(/[\s-]+/g, "_");
-  if (normalized === "complete" || normalized === "completed")
-    return "done";
-  if (MISSION_CHECKPOINT_STATUSES.includes(normalized)) {
-    return normalized;
-  }
-  throw new MissionStoreError(`checkpoint status must be one of: ${MISSION_CHECKPOINT_STATUSES.join(", ")}`);
-}
-function normalizeIdList(value, label) {
-  const ids = normalizeStringList(value, label, 50, 80);
-  for (const id of ids) {
-    if (!/^[A-Za-z0-9._:-]+$/.test(id)) {
-      throw new MissionStoreError(`${label} item has invalid id: ${id}`);
-    }
-  }
-  return ids;
-}
-function missionsPath() {
-  return resolveOwnedPath({
-    ownedEnv: MISSIONS_PATH_ENV,
-    fileName: MISSIONS_FILE_NAME
-  }).path;
-}
-function emptyMissionsFile() {
-  return { version: MISSIONS_VERSION, records: [] };
-}
-function normalizeStoredCheckpoint(value, index, fallbackDate) {
-  if (!isObject5(value))
-    throw new MissionStoreError(`checkpoint ${index} must be an object`);
-  const id = typeof value.id === "string" ? value.id.trim() : "";
-  if (!/^chk_[a-f0-9]{8}$/.test(id) && !/^[A-Za-z0-9._:-]{3,80}$/.test(id)) {
-    throw new MissionStoreError(`checkpoint ${index} has invalid id`);
-  }
-  const title = requireSafeText4(value.title, `checkpoint ${id} title`, 240);
-  const createdAt = normalizeStoredDate3(value.createdAt, fallbackDate);
-  return {
-    id,
-    title,
-    status: normalizeCheckpointStatus(value.status),
-    evidence: optionalSafeText4(value.evidence, `checkpoint ${id} evidence`, MISSION_EVIDENCE_MAX_CHARS),
-    createdAt,
-    updatedAt: normalizeStoredDate3(value.updatedAt, createdAt)
-  };
-}
-function normalizeRecord5(value, index) {
-  if (!isObject5(value))
-    throw new MissionStoreError(`mission record ${index} must be an object`);
-  const now = isoNow4();
-  const id = typeof value.id === "string" ? value.id.trim() : "";
-  if (!/^mission_[a-f0-9]{8}$/.test(id) && !/^[A-Za-z0-9._:-]{3,80}$/.test(id)) {
-    throw new MissionStoreError(`mission record ${index} has invalid id`);
-  }
-  const title = requireSafeText4(value.title, `mission ${id} title`, 160);
-  const objective = requireSafeText4(value.objective, `mission ${id} objective`, MISSION_OBJECTIVE_MAX_CHARS);
-  const createdAt = normalizeStoredDate3(value.createdAt, now);
-  return {
-    id,
-    title,
-    objective,
-    status: normalizeStatus(value.status),
-    priority: normalizePriority(value.priority),
-    successCriteria: normalizeStringList(value.successCriteria, `mission ${id} success criteria`, 20, 300),
-    checkpoints: Array.isArray(value.checkpoints) ? value.checkpoints.map((checkpoint, checkpointIndex) => normalizeStoredCheckpoint(checkpoint, checkpointIndex, createdAt)) : [],
-    evidence: normalizeStringList(value.evidence, `mission ${id} evidence`, 50, MISSION_EVIDENCE_MAX_CHARS),
-    agentIds: normalizeIdList(value.agentIds, `mission ${id} agentIds`),
-    jobIds: normalizeIdList(value.jobIds, `mission ${id} jobIds`),
-    tags: normalizeTags4(value.tags),
-    createdAt,
-    updatedAt: normalizeStoredDate3(value.updatedAt, createdAt),
-    lastWorkedAt: value.lastWorkedAt === void 0 ? void 0 : normalizeStoredDate3(value.lastWorkedAt, createdAt)
-  };
-}
-function readMissionsFile() {
-  const path = missionsPath();
-  if (!(0, import_node_fs10.existsSync)(path))
-    return emptyMissionsFile();
-  let parsed;
-  try {
-    const raw = (0, import_node_fs10.readFileSync)(path, "utf8");
-    if (!raw.trim())
-      return emptyMissionsFile();
-    parsed = JSON.parse(raw);
-  } catch (err) {
-    throw new MissionStoreError(`could not read missions file ${path}: ${err instanceof Error ? err.message : String(err)}`);
-  }
-  if (!isObject5(parsed) || !Array.isArray(parsed.records)) {
-    throw new MissionStoreError(`missions file ${path} must contain a records array`);
-  }
-  return {
-    version: MISSIONS_VERSION,
-    records: parsed.records.map((record2, index) => normalizeRecord5(record2, index))
-  };
-}
-function writeMissionsFile(file) {
-  const path = missionsPath();
-  (0, import_node_fs10.mkdirSync)((0, import_node_path23.dirname)(path), { recursive: true });
-  const tmp = `${path}.${process.pid}.${Date.now()}.tmp`;
-  (0, import_node_fs10.writeFileSync)(tmp, `${JSON.stringify(file, null, 2)}
-`, "utf8");
-  (0, import_node_fs10.renameSync)(tmp, path);
-}
-function nextMissionId(existing) {
-  const used = new Set(existing.map((record2) => record2.id));
-  for (let i = 0; i < 100; i += 1) {
-    const id = `mission_${(0, import_node_crypto8.randomUUID)().replace(/-/g, "").slice(0, 8)}`;
-    if (!used.has(id))
-      return id;
-  }
-  throw new MissionStoreError("could not allocate a unique mission id");
-}
-function nextCheckpointId(record2) {
-  const used = new Set(record2.checkpoints.map((checkpoint) => checkpoint.id));
-  for (let i = 0; i < 100; i += 1) {
-    const id = `chk_${(0, import_node_crypto8.randomUUID)().replace(/-/g, "").slice(0, 8)}`;
-    if (!used.has(id))
-      return id;
-  }
-  throw new MissionStoreError("could not allocate a unique checkpoint id");
-}
-function titleFromObjective(objective) {
-  const text2 = oneLine6(objective);
-  return text2.length <= 80 ? text2 : `${text2.slice(0, 77).trimEnd()}...`;
-}
-function createCheckpoint(record2, input, now) {
-  return {
-    id: nextCheckpointId(record2),
-    title: requireSafeText4(input.title, "checkpoint title", 240),
-    status: normalizeCheckpointStatus(input.status),
-    evidence: optionalSafeText4(input.evidence, "checkpoint evidence", MISSION_EVIDENCE_MAX_CHARS),
-    createdAt: now,
-    updatedAt: now
-  };
-}
-function normalizeNewCheckpoints(value, record2, now) {
-  if (value === void 0 || value === null || value === "")
-    return [];
-  const raw = Array.isArray(value) ? value : typeof value === "string" ? value.split(/\r?\n/) : null;
-  if (!raw)
-    throw new MissionStoreError("mission checkpoints must be a string or array");
-  const out = [];
-  let current = record2;
-  for (const item of raw) {
-    const checkpoint = isObject5(item) ? createCheckpoint(current, {
-      title: requireSafeText4(item.title, "checkpoint title", 240),
-      status: item.status,
-      evidence: item.evidence
-    }, now) : createCheckpoint(current, { title: requireSafeText4(item, "checkpoint title", 240) }, now);
-    out.push(checkpoint);
-    current = { ...current, checkpoints: [...current.checkpoints, checkpoint] };
-  }
-  return out;
-}
-function sortMissions(records) {
-  const priorityRank = {
-    critical: 0,
-    high: 1,
-    normal: 2,
-    low: 3
-  };
-  const statusRank = {
-    active: 0,
-    blocked: 1,
-    done: 2,
-    archived: 3
-  };
-  return [...records].sort((a, b2) => {
-    const status = statusRank[a.status] - statusRank[b2.status];
-    if (status !== 0)
-      return status;
-    const priority = priorityRank[a.priority] - priorityRank[b2.priority];
-    if (priority !== 0)
-      return priority;
-    return b2.updatedAt.localeCompare(a.updatedAt);
-  });
-}
-function matchesQuery(record2, query) {
-  const needle = query.trim().toLowerCase();
-  if (!needle)
+function shouldSettleBeforeMcpTool(serverId, name) {
+  if (serverId !== "pericode_desktop")
+    return false;
+  if (SHARED_DESKTOP_TOOLS.has(name))
     return true;
-  const haystack = [
-    record2.id,
-    record2.title,
-    record2.objective,
-    record2.status,
-    record2.priority,
-    ...record2.tags,
-    ...record2.successCriteria,
-    ...record2.evidence,
-    ...record2.agentIds,
-    ...record2.jobIds,
-    ...record2.checkpoints.flatMap((checkpoint) => [
-      checkpoint.id,
-      checkpoint.title,
-      checkpoint.status,
-      checkpoint.evidence ?? ""
-    ])
-  ].join("\n").toLowerCase();
-  return haystack.includes(needle);
+  return SHARED_DESKTOP_TOOL_PREFIXES.some((prefix) => name.startsWith(prefix));
 }
-function replaceMission(record2) {
-  const file = readMissionsFile();
-  const index = file.records.findIndex((item) => item.id === record2.id);
-  if (index === -1)
-    throw new MissionStoreError(`mission not found: ${record2.id}`);
-  file.records[index] = record2;
-  writeMissionsFile({ version: MISSIONS_VERSION, records: sortMissions(file.records) });
-}
-function addMission(input) {
-  const file = readMissionsFile();
-  const now = isoNow4();
-  const objective = requireSafeText4(input.objective, "mission objective", MISSION_OBJECTIVE_MAX_CHARS);
-  const base = {
-    id: nextMissionId(file.records),
-    title: optionalSafeText4(input.title, "mission title", 160) ?? titleFromObjective(objective),
-    objective,
-    status: normalizeStatus(input.status),
-    priority: normalizePriority(input.priority),
-    successCriteria: normalizeStringList(input.successCriteria, "mission success criteria", 20, 300),
-    checkpoints: [],
-    evidence: normalizeStringList(input.evidence, "mission evidence", 50, MISSION_EVIDENCE_MAX_CHARS),
-    agentIds: normalizeIdList(input.agentIds, "mission agentIds"),
-    jobIds: normalizeIdList(input.jobIds, "mission jobIds"),
-    tags: normalizeTags4(input.tags),
-    createdAt: now,
-    updatedAt: now,
-    lastWorkedAt: now
-  };
-  const record2 = {
-    ...base,
-    checkpoints: normalizeNewCheckpoints(input.checkpoints, base, now)
-  };
-  writeMissionsFile({ version: MISSIONS_VERSION, records: sortMissions([record2, ...file.records]) });
-  return record2;
-}
-function updateMission(input) {
-  const file = readMissionsFile();
-  const record2 = file.records.find((item) => item.id === input.id);
-  if (!record2)
-    throw new MissionStoreError(`mission not found: ${input.id}`);
-  const now = isoNow4();
-  const updated = {
-    ...record2,
-    title: input.title === void 0 ? record2.title : requireSafeText4(input.title, "mission title", 160),
-    objective: input.objective === void 0 ? record2.objective : requireSafeText4(input.objective, "mission objective", MISSION_OBJECTIVE_MAX_CHARS),
-    status: input.status === void 0 ? record2.status : normalizeStatus(input.status, record2.status),
-    priority: input.priority === void 0 ? record2.priority : normalizePriority(input.priority, record2.priority),
-    successCriteria: input.successCriteria === void 0 ? record2.successCriteria : normalizeStringList(input.successCriteria, "mission success criteria", 20, 300),
-    agentIds: input.agentIds === void 0 ? record2.agentIds : normalizeIdList(input.agentIds, "mission agentIds"),
-    jobIds: input.jobIds === void 0 ? record2.jobIds : normalizeIdList(input.jobIds, "mission jobIds"),
-    tags: input.tags === void 0 ? record2.tags : normalizeTags4(input.tags),
-    updatedAt: now,
-    lastWorkedAt: now
-  };
-  replaceMission(updated);
-  return updated;
-}
-function requireMission(id) {
-  const record2 = readMissionsFile().records.find((item) => item.id === id);
-  if (!record2)
-    throw new MissionStoreError(`mission not found: ${id}`);
-  return record2;
-}
-function listMissions(options = {}) {
-  const tag = options.tag?.trim().toLowerCase();
-  const query = options.query?.trim();
-  const limit = clampLimit5(options.limit, MISSION_CONTEXT_MAX_RECORDS);
-  return sortMissions(readMissionsFile().records).filter((record2) => options.status ? record2.status === options.status : true).filter((record2) => options.includeArchived ? true : record2.status !== "archived").filter((record2) => tag ? record2.tags.includes(tag) : true).filter((record2) => query ? matchesQuery(record2, query) : true).slice(0, limit);
-}
-function searchMissions(query, options = {}) {
-  return listMissions({ ...options, query });
-}
-function addMissionCheckpoint(input) {
-  const record2 = requireMission(input.missionId);
-  const now = isoNow4();
-  const checkpoint = createCheckpoint(record2, { title: input.title, status: input.status, evidence: input.evidence }, now);
-  const updated = {
-    ...record2,
-    checkpoints: [...record2.checkpoints, checkpoint],
-    updatedAt: now,
-    lastWorkedAt: now
-  };
-  replaceMission(updated);
-  return updated;
-}
-function updateMissionCheckpoint(input) {
-  const record2 = requireMission(input.missionId);
-  const index = record2.checkpoints.findIndex((checkpoint2) => checkpoint2.id === input.checkpointId);
-  if (index === -1) {
-    throw new MissionStoreError(`checkpoint not found: ${input.checkpointId}`);
-  }
-  const now = isoNow4();
-  const checkpoint = record2.checkpoints[index];
-  const next = {
-    ...checkpoint,
-    title: input.title === void 0 ? checkpoint.title : requireSafeText4(input.title, "checkpoint title", 240),
-    status: input.status === void 0 ? checkpoint.status : normalizeCheckpointStatus(input.status, checkpoint.status),
-    evidence: input.evidence === void 0 ? checkpoint.evidence : optionalSafeText4(input.evidence, "checkpoint evidence", MISSION_EVIDENCE_MAX_CHARS),
-    updatedAt: now
-  };
-  const checkpoints = [...record2.checkpoints];
-  checkpoints[index] = next;
-  const updated = {
-    ...record2,
-    checkpoints,
-    updatedAt: now,
-    lastWorkedAt: now
-  };
-  replaceMission(updated);
-  return updated;
-}
-function recordMissionEvidence(id, evidence) {
-  const record2 = requireMission(id);
-  const now = isoNow4();
-  const text2 = requireSafeText4(evidence, "mission evidence", MISSION_EVIDENCE_MAX_CHARS);
-  const updated = {
-    ...record2,
-    evidence: [text2, ...record2.evidence].slice(0, 50),
-    updatedAt: now,
-    lastWorkedAt: now
-  };
-  replaceMission(updated);
-  return updated;
-}
-function nextMissionCheckpoint(record2) {
-  return record2.checkpoints.find((checkpoint) => checkpoint.status === "in_progress") ?? record2.checkpoints.find((checkpoint) => checkpoint.status === "pending") ?? record2.checkpoints.find((checkpoint) => checkpoint.status === "blocked");
-}
-function selectedMissionCheckpoint(record2, checkpointId) {
-  if (!checkpointId)
-    return nextMissionCheckpoint(record2);
-  const checkpoint = record2.checkpoints.find((item) => item.id === checkpointId);
-  if (!checkpoint)
-    throw new MissionStoreError(`checkpoint not found: ${checkpointId}`);
-  return checkpoint;
-}
-function formatMissionList(title, items) {
-  if (items.length === 0)
-    return [];
-  return [title, ...items.map((item, index) => `${index + 1}. ${item}`)];
-}
-function resolveMissionRunBounds(options = {}) {
-  const autonomous = options.autonomous === true;
-  return {
-    autonomous,
-    maxIterations: normalizeBoundedInteger(options.maxIterations, "mission run max iterations", autonomous ? MISSION_AUTONOMY_DEFAULT_MAX_ITERATIONS : MISSION_RUN_DEFAULT_MAX_ITERATIONS, { min: 1, max: MISSION_RUN_MAX_ITERATIONS }),
-    maxRetries: normalizeBoundedInteger(options.maxRetries, "mission run max retries", autonomous ? MISSION_AUTONOMY_DEFAULT_MAX_RETRIES : 0, { min: 0, max: MISSION_RUN_MAX_RETRIES })
-  };
-}
-function buildMissionRunPrompt(record2, options = {}) {
-  const checkpoint = selectedMissionCheckpoint(record2, options.checkpointId);
-  const extra = optionalSafeText4(options.extra, "mission run extra context", MISSION_EVIDENCE_MAX_CHARS);
-  const date3 = (options.now ?? /* @__PURE__ */ new Date()).toISOString();
-  const bounds = resolveMissionRunBounds(options);
-  const lines = [
-    bounds.autonomous ? `Autonomous PeriCode mission run ${record2.id}: ${record2.title}` : `Work on PeriCode mission ${record2.id}: ${record2.title}`,
-    "",
-    `Generated: ${date3}`,
-    `Status: ${record2.status}`,
-    `Priority: ${record2.priority}`,
-    "",
-    "Objective:",
-    record2.objective
-  ];
-  if (record2.successCriteria.length > 0) {
-    lines.push("", ...formatMissionList("Success criteria:", record2.successCriteria));
-  }
-  if (checkpoint) {
-    lines.push("", "Target checkpoint:", `${checkpoint.id} [${checkpoint.status}] ${checkpoint.title}`);
-    if (checkpoint.evidence)
-      lines.push(`Checkpoint evidence so far: ${checkpoint.evidence}`);
-  } else {
-    lines.push("", "Target checkpoint:", "No pending checkpoint is recorded. Derive the highest-leverage next step from the objective, success criteria, and current repo/runtime evidence.");
-  }
-  if (record2.evidence.length > 0) {
-    lines.push("", ...formatMissionList("Recent mission evidence:", record2.evidence.slice(0, 5)));
-  }
-  if (record2.agentIds.length > 0 || record2.jobIds.length > 0) {
-    lines.push("");
-    if (record2.agentIds.length > 0)
-      lines.push(`Linked agents: ${record2.agentIds.join(", ")}`);
-    if (record2.jobIds.length > 0)
-      lines.push(`Linked jobs: ${record2.jobIds.join(", ")}`);
-  }
-  if (extra) {
-    lines.push("", "Extra operator context:", extra);
-  }
-  if (bounds.autonomous) {
-    lines.push("", "Autonomous run bounds:", `- Hard stop after ${bounds.maxIterations} agent iterations or when the current permission/abort policy stops the turn.`, `- Retry a failed tactic at most ${bounds.maxRetries} time${bounds.maxRetries === 1 ? "" : "s"} before changing approach or reporting blocked.`, "- Continue plan -> act -> verify cycles until the target checkpoint is proven, a blocker requires operator input, or the bounds are reached.", "- Permission prompts, destructive-action safeguards, secret handling, and shared-desktop safety remain mandatory; autonomy does not bypass them.", "", "Execution rules:", "1. Inspect the current repo/runtime/desktop state before making claims.", "2. State the immediate plan briefly, then make concrete progress without waiting for extra confirmation unless policy requires it.", "3. Use existing PeriCode tools, tests, scorecards, evals, and visible verification as proof where relevant.", "4. Keep progress updates concise after meaningful state changes or retries.", "5. Do not mark the mission or checkpoint done unless the success criteria are actually proven.", "6. End with outcome: completed, blocked, or stopped; include concise evidence and the next ledger command to record it.");
-  } else {
-    lines.push("", "Execution rules:", "1. Inspect the current repo/runtime state before making claims.", "2. Make concrete progress toward the target checkpoint or the next best mission step.", "3. Use existing PeriCode tools, tests, scorecard, and evals as proof where relevant.", "4. Do not mark the mission done unless the success criteria are actually proven.", "5. End with concise evidence that can be recorded back to the mission ledger.");
-  }
-  return lines.join("\n");
-}
-function buildMissionRunTarget(id, options = {}) {
-  const mission = id?.trim() ? requireMission(id.trim()) : listMissions({ status: "active", limit: 1 })[0] ?? listMissions({ status: "blocked", limit: 1 })[0];
-  if (!mission)
-    throw new MissionStoreError("no active or blocked mission to run");
-  const checkpoint = selectedMissionCheckpoint(mission, options.checkpointId);
-  return {
-    mission,
-    checkpoint,
-    prompt: buildMissionRunPrompt(mission, options),
-    bounds: resolveMissionRunBounds(options)
-  };
-}
-function removeMission(id) {
-  const file = readMissionsFile();
-  const index = file.records.findIndex((record2) => record2.id === id);
-  if (index === -1)
-    throw new MissionStoreError(`mission not found: ${id}`);
-  const [removed] = file.records.splice(index, 1);
-  writeMissionsFile({ version: MISSIONS_VERSION, records: file.records });
-  return removed;
-}
-function truncate(text2, maxChars) {
-  const one = oneLine6(text2);
-  return one.length <= maxChars ? one : `${one.slice(0, maxChars - 3).trimEnd()}...`;
-}
-function formatMissionRecord(record2) {
-  const lines = [
-    `${record2.id} [${record2.status}/${record2.priority}] ${record2.title}`,
-    `  Objective: ${truncate(record2.objective, 220)}`
-  ];
-  if (record2.successCriteria.length > 0) {
-    lines.push(`  Success: ${record2.successCriteria.map((item) => truncate(item, 90)).join("; ")}`);
-  }
-  if (record2.checkpoints.length > 0) {
-    lines.push(`  Checkpoints: ${record2.checkpoints.map((checkpoint) => `${checkpoint.id} ${checkpoint.status} - ${truncate(checkpoint.title, 80)}`).join("; ")}`);
-  }
-  if (record2.evidence.length > 0) {
-    lines.push(`  Evidence: ${truncate(record2.evidence[0], 160)}`);
-  }
-  const links = [
-    record2.agentIds.length > 0 ? `agents=${record2.agentIds.join(",")}` : "",
-    record2.jobIds.length > 0 ? `jobs=${record2.jobIds.join(",")}` : ""
-  ].filter(Boolean);
-  if (links.length > 0)
-    lines.push(`  Links: ${links.join(" ")}`);
-  if (record2.tags.length > 0)
-    lines.push(`  Tags: ${record2.tags.join(", ")}`);
-  return lines.join("\n");
-}
-function buildMissionContext(limit = MISSION_CONTEXT_MAX_RECORDS) {
-  const records = listMissions({ limit, status: void 0 }).filter((record2) => record2.status === "active" || record2.status === "blocked");
-  if (records.length === 0)
-    return "";
-  const lines = ["PeriCode Active Missions:"];
-  let chars = lines[0].length;
-  for (const record2 of records) {
-    const pending = record2.checkpoints.filter((checkpoint) => checkpoint.status === "pending" || checkpoint.status === "in_progress").slice(0, 3).map((checkpoint) => `${checkpoint.status}: ${truncate(checkpoint.title, 90)}`);
-    const missionLines = [
-      `- ${record2.id} [${record2.status}/${record2.priority}] ${truncate(record2.title, 100)}`,
-      `  Objective: ${truncate(record2.objective, 280)}`
-    ];
-    if (record2.successCriteria.length > 0) {
-      missionLines.push(`  Success: ${record2.successCriteria.map((item) => truncate(item, 100)).join("; ")}`);
-    }
-    if (pending.length > 0)
-      missionLines.push(`  Next: ${pending.join("; ")}`);
-    if (record2.evidence.length > 0)
-      missionLines.push(`  Latest evidence: ${truncate(record2.evidence[0], 180)}`);
-    const block = missionLines.join("\n");
-    if (chars + block.length + 1 > MISSION_CONTEXT_MAX_CHARS)
-      break;
-    lines.push(block);
-    chars += block.length + 1;
-  }
-  return lines.length > 1 ? lines.join("\n") : "";
-}
-var import_node_crypto8, import_node_fs10, import_node_path23, MISSIONS_PATH_ENV, MISSIONS_FILE_NAME, MISSIONS_VERSION, MISSION_CONTEXT_MAX_RECORDS, MISSION_CONTEXT_MAX_CHARS, MISSION_OBJECTIVE_MAX_CHARS, MISSION_EVIDENCE_MAX_CHARS, MISSION_RUN_DEFAULT_MAX_ITERATIONS, MISSION_AUTONOMY_DEFAULT_MAX_ITERATIONS, MISSION_AUTONOMY_DEFAULT_MAX_RETRIES, MISSION_RUN_MAX_ITERATIONS, MISSION_RUN_MAX_RETRIES, MISSION_STATUSES, MISSION_PRIORITIES, MISSION_CHECKPOINT_STATUSES, MissionStoreError;
-var init_store7 = __esm({
-  "../../dist/src/missions/store.js"() {
-    "use strict";
-    init_scoped_fetch();
-    import_node_crypto8 = require("node:crypto");
-    import_node_fs10 = require("node:fs");
-    import_node_path23 = require("node:path");
-    init_store3();
-    init_paths();
-    MISSIONS_PATH_ENV = "PERICODE_MISSIONS_PATH";
-    MISSIONS_FILE_NAME = "missions.json";
-    MISSIONS_VERSION = 1;
-    MISSION_CONTEXT_MAX_RECORDS = 8;
-    MISSION_CONTEXT_MAX_CHARS = 6e3;
-    MISSION_OBJECTIVE_MAX_CHARS = 2e3;
-    MISSION_EVIDENCE_MAX_CHARS = 1e3;
-    MISSION_RUN_DEFAULT_MAX_ITERATIONS = 50;
-    MISSION_AUTONOMY_DEFAULT_MAX_ITERATIONS = 80;
-    MISSION_AUTONOMY_DEFAULT_MAX_RETRIES = 2;
-    MISSION_RUN_MAX_ITERATIONS = 500;
-    MISSION_RUN_MAX_RETRIES = 10;
-    MISSION_STATUSES = ["active", "blocked", "done", "archived"];
-    MISSION_PRIORITIES = ["low", "normal", "high", "critical"];
-    MISSION_CHECKPOINT_STATUSES = [
-      "pending",
-      "in_progress",
-      "done",
-      "blocked"
-    ];
-    MissionStoreError = class extends Error {
-      constructor(message) {
-        super(message);
-        this.name = "MissionStoreError";
-      }
-    };
-  }
-});
-
-// ../../dist/src/tools/missions.js
-function formatError5(toolName, err) {
-  if (err instanceof MissionStoreError) {
-    return { output: `${toolName} error: ${err.message}`, isError: true };
-  }
-  throw err;
-}
-function optionalBoolean5(input, key, fallback = false) {
-  const value = input[key];
-  if (value === void 0 || value === null || value === "")
-    return fallback;
-  if (typeof value === "boolean")
-    return value;
-  if (typeof value === "string") {
-    const normalized = value.trim().toLowerCase();
-    if (["true", "yes", "1", "on"].includes(normalized))
-      return true;
-    if (["false", "no", "0", "off"].includes(normalized))
-      return false;
-  }
-  throw new MissionStoreError(`${key} must be a boolean`);
-}
-var missionReadTool, missionWriteTool;
-var init_missions = __esm({
-  "../../dist/src/tools/missions.js"() {
+var DEFAULT_SHARED_DESKTOP_SETTLE_MS, SHARED_DESKTOP_TOOL_PREFIXES, SHARED_DESKTOP_TOOLS, ToolRegistry;
+var init_registry_core = __esm({
+  "../../dist/src/tools/registry-core.js"() {
     "use strict";
     init_scoped_fetch();
     init_base();
-    init_store7();
-    missionReadTool = {
-      readOnly: true,
-      definition: {
-        name: "mission_read",
-        description: "List, search, or inspect durable PeriCode missions with objectives, checkpoints, and evidence.",
-        input_schema: {
-          type: "object",
-          properties: {
-            id: { type: "string", description: "Optional mission id to inspect." },
-            query: { type: "string", description: "Optional mission search query." },
-            tag: { type: "string", description: "Optional tag filter." },
-            status: {
-              type: "string",
-              enum: ["active", "blocked", "done", "archived"]
-            },
-            include_archived: { type: "boolean", default: false },
-            context: {
-              type: "boolean",
-              description: "Return the compact prompt-context view instead of records."
-            },
-            run_prompt: {
-              type: "boolean",
-              description: "Return a mission execution prompt for the selected or first active mission."
-            },
-            checkpoint_id: { type: "string", description: "Optional checkpoint id for run_prompt." },
-            extra: { type: "string", description: "Optional extra context for run_prompt." },
-            limit: { type: "integer", default: 20 }
-          },
-          additionalProperties: false
-        }
-      },
-      async execute(input) {
-        try {
-          const id = optionalString(input, "id")?.trim();
-          const limit = Math.max(1, Math.min(50, Math.round(optionalNumber(input, "limit", 20))));
-          const header = `missions file: ${missionsPath()}`;
-          if (optionalBoolean5(input, "context", false)) {
-            return {
-              output: `${header}
-${buildMissionContext(limit) || "(no active missions)"}`,
-              isError: false
-            };
-          }
-          if (optionalBoolean5(input, "run_prompt", false)) {
-            const target = buildMissionRunTarget(id, {
-              checkpointId: optionalString(input, "checkpoint_id"),
-              extra: optionalString(input, "extra")
-            });
-            const checkpoint = target.checkpoint ? ` checkpoint=${target.checkpoint.id}` : "";
-            return {
-              output: `${header}
-mission=${target.mission.id}${checkpoint}
-
-${target.prompt}`,
-              isError: false
-            };
-          }
-          if (id) {
-            return {
-              output: `${header}
-${formatMissionRecord(requireMission(id))}`,
-              isError: false
-            };
-          }
-          const query = optionalString(input, "query")?.trim();
-          const status = optionalString(input, "status")?.trim();
-          const tag = optionalString(input, "tag")?.trim().toLowerCase();
-          const includeArchived = optionalBoolean5(input, "include_archived", false);
-          const records = query ? searchMissions(query, { tag, status, includeArchived, limit }) : listMissions({ tag, status, includeArchived, limit });
-          if (records.length === 0) {
-            return {
-              output: `${header}
-(no missions${query ? " match the query" : ""})`,
-              isError: false
-            };
-          }
-          return {
-            output: `${header}
-${records.map(formatMissionRecord).join("\n")}`,
-            isError: false
-          };
-        } catch (err) {
-          return formatError5("mission_read", err);
-        }
+    init_profiles();
+    DEFAULT_SHARED_DESKTOP_SETTLE_MS = 300;
+    SHARED_DESKTOP_TOOL_PREFIXES = [
+      "click_",
+      "double_click_",
+      "drag_",
+      "move_",
+      "press_",
+      "send_",
+      "set_clipboard",
+      "type_"
+    ];
+    SHARED_DESKTOP_TOOLS = /* @__PURE__ */ new Set([
+      "arrange_apps_side_by_side",
+      "browser_click_anchor",
+      "browser_navigate",
+      "browser_type_text",
+      "click_element",
+      "click_element_by_text",
+      "click_mouse",
+      "focus_window",
+      "launch_app_from_start",
+      "move_window_to_monitor",
+      "open_or_focus_app",
+      "press_keys",
+      "send_prompt_now",
+      "send_prompt_to_window",
+      "snap_window",
+      "type_text",
+      "type_text_human"
+    ]);
+    ToolRegistry = class {
+      builtins = /* @__PURE__ */ new Map();
+      mcp = /* @__PURE__ */ new Map();
+      mcpCaller = null;
+      registerBuiltin(tool) {
+        this.builtins.set(tool.definition.name, tool);
       }
-    };
-    missionWriteTool = {
-      readOnly: false,
-      definition: {
-        name: "mission_write",
-        description: "Create, update, remove, checkpoint, or record evidence for durable PeriCode missions.",
-        input_schema: {
-          type: "object",
-          properties: {
-            action: {
-              type: "string",
-              enum: [
-                "add",
-                "update",
-                "remove",
-                "delete",
-                "add_checkpoint",
-                "update_checkpoint",
-                "record_evidence"
-              ]
-            },
-            id: { type: "string", description: "Mission id; required except for add." },
-            title: { type: "string" },
-            objective: { type: "string", description: "Mission objective; required for add." },
-            status: {
-              type: "string",
-              enum: ["active", "blocked", "done", "archived"]
-            },
-            priority: {
-              type: "string",
-              enum: ["low", "normal", "high", "critical"]
-            },
-            success_criteria: {
-              oneOf: [
-                { type: "array", items: { type: "string" } },
-                { type: "string" }
-              ]
-            },
-            checkpoint_id: { type: "string" },
-            checkpoint_title: { type: "string" },
-            checkpoint_status: {
-              type: "string",
-              enum: ["pending", "in_progress", "done", "blocked"]
-            },
-            evidence: {
-              type: "string",
-              description: "Mission evidence, or checkpoint evidence with update_checkpoint."
-            },
-            agent_ids: {
-              oneOf: [
-                { type: "array", items: { type: "string" } },
-                { type: "string" }
-              ]
-            },
-            job_ids: {
-              oneOf: [
-                { type: "array", items: { type: "string" } },
-                { type: "string" }
-              ]
-            },
-            tags: {
-              oneOf: [
-                { type: "array", items: { type: "string" } },
-                { type: "string" }
-              ]
-            }
-          },
-          required: ["action"],
-          additionalProperties: false
-        }
-      },
-      async execute(input) {
-        try {
-          const rawAction = requireString(input, "action").trim().toLowerCase();
-          const action = rawAction === "delete" ? "remove" : rawAction;
-          if (action === "add") {
-            const record2 = addMission({
-              title: optionalString(input, "title"),
-              objective: requireString(input, "objective"),
-              status: input.status,
-              priority: input.priority,
-              successCriteria: input.success_criteria,
-              evidence: input.evidence,
-              agentIds: input.agent_ids,
-              jobIds: input.job_ids,
-              tags: input.tags
-            });
-            return {
-              output: `saved mission ${record2.id}
-${formatMissionRecord(record2)}`,
-              isError: false
-            };
-          }
-          if (action === "update") {
-            const record2 = updateMission({
-              id: requireString(input, "id"),
-              title: input.title,
-              objective: input.objective,
-              status: input.status,
-              priority: input.priority,
-              successCriteria: input.success_criteria,
-              agentIds: input.agent_ids,
-              jobIds: input.job_ids,
-              tags: input.tags
-            });
-            return {
-              output: `updated mission ${record2.id}
-${formatMissionRecord(record2)}`,
-              isError: false
-            };
-          }
-          if (action === "remove") {
-            const removed = removeMission(requireString(input, "id"));
-            return {
-              output: `removed mission ${removed.id}
-${formatMissionRecord(removed)}`,
-              isError: false
-            };
-          }
-          if (action === "add_checkpoint") {
-            const record2 = addMissionCheckpoint({
-              missionId: requireString(input, "id"),
-              title: requireString(input, "checkpoint_title"),
-              status: input.checkpoint_status,
-              evidence: input.evidence
-            });
-            return {
-              output: `added checkpoint to mission ${record2.id}
-${formatMissionRecord(record2)}`,
-              isError: false
-            };
-          }
-          if (action === "update_checkpoint") {
-            const record2 = updateMissionCheckpoint({
-              missionId: requireString(input, "id"),
-              checkpointId: requireString(input, "checkpoint_id"),
-              title: input.checkpoint_title,
-              status: input.checkpoint_status,
-              evidence: input.evidence
-            });
-            return {
-              output: `updated checkpoint on mission ${record2.id}
-${formatMissionRecord(record2)}`,
-              isError: false
-            };
-          }
-          if (action === "record_evidence") {
-            const record2 = recordMissionEvidence(requireString(input, "id"), requireString(input, "evidence"));
-            return {
-              output: `recorded evidence for mission ${record2.id}
-${formatMissionRecord(record2)}`,
-              isError: false
-            };
-          }
-          throw new MissionStoreError("action must be add, update, remove, delete, add_checkpoint, update_checkpoint, or record_evidence");
-        } catch (err) {
-          return formatError5("mission_write", err);
-        }
-      }
-    };
-  }
-});
-
-// ../../dist/src/util/project-context.js
-function readOne(dir, name, ancestorDepth) {
-  const path = (0, import_node_path24.join)(dir, name);
-  if (!(0, import_node_fs11.existsSync)(path))
-    return null;
-  let stat5;
-  try {
-    stat5 = (0, import_node_fs11.statSync)(path);
-  } catch {
-    return null;
-  }
-  if (!stat5.isFile())
-    return null;
-  let raw;
-  try {
-    raw = (0, import_node_fs11.readFileSync)(path, "utf8");
-  } catch {
-    return null;
-  }
-  const truncated = raw.length > PROJECT_CONTEXT_MAX_BYTES;
-  const text2 = truncated ? raw.slice(0, PROJECT_CONTEXT_MAX_BYTES) : raw;
-  return { name, path, text: text2, truncated, ancestorDepth };
-}
-function readProjectContext(cwd) {
-  const seen = /* @__PURE__ */ new Map();
-  let dir = cwd;
-  const root = (0, import_node_path24.parse)(dir).root;
-  for (let depth = 0; depth <= PROJECT_CONTEXT_MAX_ANCESTORS; depth += 1) {
-    for (const name of PROJECT_CONTEXT_FILES) {
-      if (seen.has(name))
-        continue;
-      const file = readOne(dir, name, depth);
-      if (file)
-        seen.set(name, file);
-    }
-    if (dir === root)
-      break;
-    const parent = (0, import_node_path24.dirname)(dir);
-    if (parent === dir)
-      break;
-    dir = parent;
-  }
-  const files = [...seen.values()].sort((a, b2) => {
-    if (a.ancestorDepth !== b2.ancestorDepth) {
-      return a.ancestorDepth - b2.ancestorDepth;
-    }
-    return PROJECT_CONTEXT_FILES.indexOf(a.name) - PROJECT_CONTEXT_FILES.indexOf(b2.name);
-  });
-  if (files.length === 0)
-    return { files, text: "" };
-  const sections = files.map((f2) => {
-    const origin = f2.ancestorDepth === 0 ? "cwd" : `${f2.ancestorDepth} dir(s) up`;
-    const header = `### ${f2.name} (${origin})` + (f2.truncated ? " \u2014 truncated" : "");
-    return `${header}
-
-${f2.text.trim()}`;
-  });
-  const text2 = "Project instructions discovered in the working directory and its parents. Closer-to-cwd files appear first and override more general ancestor guidance when they conflict.\n\n" + sections.join("\n\n---\n\n");
-  return { files, text: text2 };
-}
-var import_node_fs11, import_node_path24, PROJECT_CONTEXT_FILES, PROJECT_CONTEXT_MAX_BYTES, PROJECT_CONTEXT_MAX_ANCESTORS;
-var init_project_context = __esm({
-  "../../dist/src/util/project-context.js"() {
-    "use strict";
-    init_scoped_fetch();
-    import_node_fs11 = require("node:fs");
-    import_node_path24 = require("node:path");
-    PROJECT_CONTEXT_FILES = ["CLAUDE.md", "AGENTS.md", "PERICODE.md"];
-    PROJECT_CONTEXT_MAX_BYTES = 64 * 1024;
-    PROJECT_CONTEXT_MAX_ANCESTORS = 6;
-  }
-});
-
-// ../../dist/src/workspace/map.js
-function normalizedRelative(root, path) {
-  const rel = (0, import_node_path25.relative)(root, path);
-  return rel.split(import_node_path25.sep).join("/");
-}
-function fileName(path) {
-  const name = (0, import_node_path25.basename)(path);
-  const index = name.lastIndexOf(".");
-  return index === -1 ? "" : name.slice(index).toLowerCase();
-}
-function isIgnoredDir(name) {
-  return IGNORE_DIRS.has(name);
-}
-function safeReadJson(path) {
-  try {
-    return JSON.parse((0, import_node_fs12.readFileSync)(path, "utf8"));
-  } catch {
-    return null;
-  }
-}
-function detectPackageManager(root) {
-  if ((0, import_node_fs12.existsSync)((0, import_node_path25.join)(root, "pnpm-lock.yaml")))
-    return "pnpm";
-  if ((0, import_node_fs12.existsSync)((0, import_node_path25.join)(root, "yarn.lock")))
-    return "yarn";
-  if ((0, import_node_fs12.existsSync)((0, import_node_path25.join)(root, "package-lock.json")))
-    return "npm";
-  if ((0, import_node_fs12.existsSync)((0, import_node_path25.join)(root, "bun.lockb")) || (0, import_node_fs12.existsSync)((0, import_node_path25.join)(root, "bun.lock")))
-    return "bun";
-  if ((0, import_node_fs12.existsSync)((0, import_node_path25.join)(root, "package.json")))
-    return "npm";
-  if ((0, import_node_fs12.existsSync)((0, import_node_path25.join)(root, "pyproject.toml")))
-    return "python";
-  if ((0, import_node_fs12.existsSync)((0, import_node_path25.join)(root, "Cargo.toml")))
-    return "cargo";
-  if ((0, import_node_fs12.existsSync)((0, import_node_path25.join)(root, "go.mod")))
-    return "go";
-  return void 0;
-}
-function readPackageScripts(root) {
-  const pkg = safeReadJson((0, import_node_path25.join)(root, "package.json"));
-  const scripts = pkg?.scripts;
-  if (!scripts || typeof scripts !== "object" || Array.isArray(scripts))
-    return [];
-  return Object.entries(scripts).filter((entry) => typeof entry[1] === "string").sort(([a], [b2]) => a.localeCompare(b2)).map(([name, command]) => ({ name, command }));
-}
-function collectFiles(root, maxFiles) {
-  const files = [];
-  const queue = [root];
-  let truncated = false;
-  while (queue.length > 0) {
-    const dir = queue.shift();
-    let entries;
-    try {
-      entries = (0, import_node_fs12.readdirSync)(dir, { withFileTypes: true });
-    } catch {
-      continue;
-    }
-    for (const entry of entries.sort((a, b2) => a.name.localeCompare(b2.name))) {
-      const path = (0, import_node_path25.join)(dir, entry.name);
-      if (entry.isDirectory()) {
-        if (!isIgnoredDir(entry.name))
-          queue.push(path);
-        continue;
-      }
-      if (!entry.isFile())
-        continue;
-      if (IGNORE_EXTENSIONS.has(fileName(path)))
-        continue;
-      files.push(path);
-      if (files.length >= maxFiles) {
-        truncated = true;
-        return { files, truncated };
-      }
-    }
-  }
-  return { files, truncated };
-}
-function firstExistingPaths(root, paths) {
-  const out = [];
-  for (const candidate of paths) {
-    const path = (0, import_node_path25.join)(root, candidate);
-    if ((0, import_node_fs12.existsSync)(path))
-      out.push(candidate.split(import_node_path25.sep).join("/"));
-  }
-  return out;
-}
-function summarizeLanguages(files) {
-  const counts = /* @__PURE__ */ new Map();
-  for (const file of files) {
-    const language = EXTENSION_LANGUAGES[fileName(file)];
-    if (!language)
-      continue;
-    counts.set(language, (counts.get(language) ?? 0) + 1);
-  }
-  return [...counts.entries()].map(([name, count]) => ({ name, files: count })).sort((a, b2) => b2.files - a.files || a.name.localeCompare(b2.name)).slice(0, WORKSPACE_MAP_MAX_ENTRIES);
-}
-function summarizeRoots(root, relFiles, names) {
-  const roots = /* @__PURE__ */ new Set();
-  for (const name of names) {
-    if ((0, import_node_fs12.existsSync)((0, import_node_path25.join)(root, name)))
-      roots.add(name);
-  }
-  for (const rel of relFiles) {
-    const top = rel.split("/")[0] ?? "";
-    if (names.includes(top))
-      roots.add(top);
-  }
-  return [...roots].sort();
-}
-function isTestFile(rel) {
-  return /(^|\/)(test|tests|spec|__tests__)\//i.test(rel) || /\.(test|spec)\.[cm]?[jt]sx?$/i.test(rel);
-}
-function detectEntrypoints(root, relFiles) {
-  const candidates = [
-    "bin/pericode.ts",
-    "src/index.ts",
-    "src/app.tsx",
-    "src/main.ts",
-    "src/main.tsx",
-    "src/index.js",
-    "index.js",
-    "main.py"
-  ];
-  const present = new Set(relFiles);
-  const entrypoints = candidates.filter((candidate) => present.has(candidate));
-  const pkg = safeReadJson((0, import_node_path25.join)(root, "package.json"));
-  for (const field of ["bin", "main", "module"]) {
-    const value = pkg?.[field];
-    if (typeof value === "string")
-      entrypoints.push(value.replace(/\\/g, "/"));
-    if (value && typeof value === "object" && !Array.isArray(value)) {
-      for (const item of Object.values(value)) {
-        if (typeof item === "string")
-          entrypoints.push(item.replace(/\\/g, "/"));
-      }
-    }
-  }
-  return [...new Set(entrypoints)].sort().slice(0, WORKSPACE_MAP_MAX_ENTRIES);
-}
-function gitExec2(root, args) {
-  try {
-    const r = (0, import_node_child_process7.spawnSync)("git", args, {
-      cwd: root,
-      windowsHide: true,
-      encoding: "utf8",
-      timeout: 8e3
-    });
-    if (r.status !== 0 || r.error)
-      return { ok: false, stdout: "" };
-    return { ok: true, stdout: r.stdout.trim() };
-  } catch {
-    return { ok: false, stdout: "" };
-  }
-}
-function detectGitState(root) {
-  if (!(0, import_node_fs12.existsSync)((0, import_node_path25.join)(root, ".git"))) {
-    const revParse = gitExec2(root, ["rev-parse", "--is-inside-work-tree"]);
-    if (!revParse.ok || revParse.stdout !== "true")
-      return EMPTY_GIT_STATE;
-  }
-  const branchResult = gitExec2(root, ["rev-parse", "--abbrev-ref", "HEAD"]);
-  const branch = branchResult.ok ? branchResult.stdout : null;
-  const statusResult = gitExec2(root, ["status", "--porcelain=v1"]);
-  const staged = [];
-  const unstaged = [];
-  const untracked = [];
-  let dirty = false;
-  if (statusResult.ok && statusResult.stdout.length > 0) {
-    dirty = true;
-    for (const line of statusResult.stdout.split("\n")) {
-      if (line.length < 3)
-        continue;
-      const xy = line.slice(0, 2);
-      const file = line.slice(3).trim().replace(/"/g, "");
-      if (xy === "?") {
-        untracked.push(file);
-        continue;
-      }
-      const stagedStatus = xy[0];
-      const unstagedStatus = xy[1];
-      if (stagedStatus !== " " && stagedStatus !== "?") {
-        staged.push({ status: stagedStatus, file });
-      }
-      if (unstagedStatus !== " " && unstagedStatus !== "?") {
-        unstaged.push({ status: unstagedStatus, file });
-      }
-    }
-  }
-  const aheadBehind = gitExec2(root, [
-    "rev-list",
-    "--left-right",
-    "--count",
-    "@{upstream}...HEAD"
-  ]);
-  let ahead = 0;
-  let behind = 0;
-  if (aheadBehind.ok && aheadBehind.stdout.includes("	")) {
-    const [behindStr, aheadStr] = aheadBehind.stdout.split("	");
-    behind = Math.max(0, Number.parseInt(behindStr ?? "0", 10) || 0);
-    ahead = Math.max(0, Number.parseInt(aheadStr ?? "0", 10) || 0);
-  }
-  const logResult = gitExec2(root, [
-    "log",
-    "-10",
-    "--pretty=format:%h%x1f%s%x1f%an%x1f%aI"
-  ]);
-  const recentCommits = [];
-  if (logResult.ok && logResult.stdout.length > 0) {
-    for (const line of logResult.stdout.split("\n")) {
-      const parts = line.split("");
-      if (parts.length >= 4) {
-        recentCommits.push({
-          hash: parts[0].trim(),
-          subject: parts[1].trim(),
-          author: parts[2].trim(),
-          date: parts[3].trim()
+      registerMcp(serverId, definition, options = {}) {
+        this.mcp.set(definition.name, {
+          serverId,
+          definition,
+          readOnly: Boolean(options.readOnly)
         });
       }
-    }
-  }
-  return {
-    isRepo: true,
-    branch,
-    dirty,
-    ahead,
-    behind,
-    staged,
-    unstaged,
-    untracked,
-    recentCommits
-  };
-}
-function createWorkspaceMap(cwd = process.cwd(), options = {}) {
-  const root = (0, import_node_path25.resolve)(cwd);
-  const maxFiles = Math.max(1, options.maxFiles ?? WORKSPACE_MAP_MAX_FILES);
-  const { files, truncated } = collectFiles(root, maxFiles);
-  const relFiles = files.map((file) => normalizedRelative(root, file));
-  const projectContext = readProjectContext(root);
-  const contextFiles = projectContext.files.map((file) => ({
-    name: file.name,
-    path: normalizedRelative(root, file.path),
-    ancestorDepth: file.ancestorDepth,
-    truncated: file.truncated
-  }));
-  const testFiles = relFiles.filter(isTestFile).sort().slice(0, WORKSPACE_MAP_MAX_ENTRIES);
-  return {
-    version: WORKSPACE_MAP_VERSION,
-    root,
-    name: (0, import_node_path25.basename)(root),
-    generatedAt: (options.now ?? /* @__PURE__ */ new Date()).toISOString(),
-    packageManager: detectPackageManager(root),
-    scripts: readPackageScripts(root).slice(0, WORKSPACE_MAP_MAX_ENTRIES),
-    contextFiles,
-    importantFiles: firstExistingPaths(root, IMPORTANT_FILES),
-    languages: summarizeLanguages(files),
-    sourceRoots: summarizeRoots(root, relFiles, ["src", "lib", "bin", "packages", "apps", "plugins"]),
-    testRoots: summarizeRoots(root, relFiles, ["test", "tests", "spec", "__tests__"]),
-    testFiles,
-    entrypoints: detectEntrypoints(root, relFiles),
-    fileCount: files.length,
-    truncated,
-    git: detectGitState(root)
-  };
-}
-function formatWorkspaceMap(map) {
-  const scripts = map.scripts.length > 0 ? map.scripts.map((script) => `${script.name}=${script.command}`).join(", ") : "(none)";
-  const languages = map.languages.length > 0 ? map.languages.map((language) => `${language.name} ${language.files}`).join(", ") : "(none detected)";
-  const context = map.contextFiles.length > 0 ? map.contextFiles.map((file) => file.name).join(", ") : "(none)";
-  const lines = [
-    `PeriCode workspace map: ${map.name}`,
-    `root: ${map.root}`,
-    `package manager: ${map.packageManager ?? "(none detected)"}`,
-    `files scanned: ${map.fileCount}${map.truncated ? " (truncated)" : ""}`,
-    `languages: ${languages}`,
-    `source roots: ${map.sourceRoots.length > 0 ? map.sourceRoots.join(", ") : "(none)"}`,
-    `test roots: ${map.testRoots.length > 0 ? map.testRoots.join(", ") : "(none)"}`,
-    `context files: ${context}`,
-    `entrypoints: ${map.entrypoints.length > 0 ? map.entrypoints.join(", ") : "(none)"}`,
-    `scripts: ${scripts}`
-  ];
-  if (map.git.isRepo) {
-    const gitParts = [];
-    if (map.git.branch)
-      gitParts.push(`branch: ${map.git.branch}`);
-    gitParts.push(map.git.dirty ? "dirty" : "clean");
-    if (map.git.ahead > 0)
-      gitParts.push(`ahead ${map.git.ahead}`);
-    if (map.git.behind > 0)
-      gitParts.push(`behind ${map.git.behind}`);
-    if (map.git.staged.length > 0)
-      gitParts.push(`staged ${map.git.staged.length}`);
-    if (map.git.unstaged.length > 0)
-      gitParts.push(`unstaged ${map.git.unstaged.length}`);
-    if (map.git.untracked.length > 0)
-      gitParts.push(`untracked ${map.git.untracked.length}`);
-    lines.push(`git: ${gitParts.join(", ")}`);
-    if (map.git.recentCommits.length > 0) {
-      const commits = map.git.recentCommits.slice(0, 5).map((c) => `  ${c.hash} ${c.subject} (${c.author}, ${c.date})`).join("\n");
-      lines.push(`recent commits:
-${commits}`);
-    }
-  } else {
-    lines.push("git: (not a repo)");
-  }
-  return lines.join("\n");
-}
-function buildWorkspaceMapContext(cwd = process.cwd(), options = {}) {
-  const map = createWorkspaceMap(cwd, options);
-  const lines = [
-    "PeriCode Workspace Map",
-    "A deterministic read-only scan of the current workspace. Use it to orient before repo work, then inspect specific files before editing.",
-    "",
-    formatWorkspaceMap(map)
-  ];
-  return lines.join("\n");
-}
-var import_node_fs12, import_node_path25, import_node_child_process7, WORKSPACE_MAP_VERSION, WORKSPACE_MAP_MAX_FILES, WORKSPACE_MAP_MAX_ENTRIES, IGNORE_DIRS, IGNORE_EXTENSIONS, EXTENSION_LANGUAGES, IMPORTANT_FILES, EMPTY_GIT_STATE;
-var init_map = __esm({
-  "../../dist/src/workspace/map.js"() {
-    "use strict";
-    init_scoped_fetch();
-    import_node_fs12 = require("node:fs");
-    import_node_path25 = require("node:path");
-    import_node_child_process7 = require("node:child_process");
-    init_project_context();
-    WORKSPACE_MAP_VERSION = 1;
-    WORKSPACE_MAP_MAX_FILES = 800;
-    WORKSPACE_MAP_MAX_ENTRIES = 80;
-    IGNORE_DIRS = /* @__PURE__ */ new Set([
-      ".git",
-      ".hg",
-      ".svn",
-      ".turbo",
-      ".next",
-      ".cache",
-      ".mypy_cache",
-      ".pytest_cache",
-      ".ruff_cache",
-      ".venv",
-      "__pycache__",
-      "build",
-      "coverage",
-      "dist",
-      "env",
-      "node_modules",
-      "out",
-      "venv"
-    ]);
-    IGNORE_EXTENSIONS = /* @__PURE__ */ new Set([".pyc", ".pyo"]);
-    EXTENSION_LANGUAGES = {
-      ".c": "C",
-      ".cpp": "C++",
-      ".cs": "C#",
-      ".css": "CSS",
-      ".go": "Go",
-      ".html": "HTML",
-      ".java": "Java",
-      ".js": "JavaScript",
-      ".jsx": "JavaScript",
-      ".json": "JSON",
-      ".md": "Markdown",
-      ".php": "PHP",
-      ".ps1": "PowerShell",
-      ".py": "Python",
-      ".rb": "Ruby",
-      ".rs": "Rust",
-      ".sh": "Shell",
-      ".sql": "SQL",
-      ".tsx": "TypeScript",
-      ".ts": "TypeScript",
-      ".vue": "Vue",
-      ".yaml": "YAML",
-      ".yml": "YAML"
-    };
-    IMPORTANT_FILES = [
-      "package.json",
-      "tsconfig.json",
-      "pyproject.toml",
-      "requirements.txt",
-      "Cargo.toml",
-      "go.mod",
-      "README.md",
-      "AGENTS.md",
-      "PERICODE.md",
-      "CLAUDE.md",
-      "Dockerfile",
-      "docker-compose.yml",
-      ".github/workflows"
-    ];
-    EMPTY_GIT_STATE = {
-      isRepo: false,
-      branch: null,
-      dirty: false,
-      ahead: 0,
-      behind: 0,
-      staged: [],
-      unstaged: [],
-      untracked: [],
-      recentCommits: []
-    };
-  }
-});
-
-// ../../dist/src/tools/workspace.js
-var import_node_path26, workspaceReadTool;
-var init_workspace = __esm({
-  "../../dist/src/tools/workspace.js"() {
-    "use strict";
-    init_scoped_fetch();
-    import_node_path26 = require("node:path");
-    init_map();
-    init_base();
-    workspaceReadTool = {
-      readOnly: true,
-      definition: {
-        name: "workspace_read",
-        description: "Build a deterministic read-only map of the current workspace: package manager, scripts, context files, languages, source roots, tests, and entrypoints. Use this before non-trivial repo work to orient from current state.",
-        input_schema: {
-          type: "object",
-          properties: {
-            path: {
-              type: "string",
-              description: "Workspace root to scan. Defaults to the current working directory."
-            },
-            format: {
-              type: "string",
-              enum: ["text", "json", "context"],
-              description: "Output format. `context` is the compact prompt block used by PeriCode."
-            },
-            max_files: {
-              type: "number",
-              description: "Maximum number of files to scan before truncating. Defaults to 800."
+      setMcpCaller(caller) {
+        this.mcpCaller = caller;
+      }
+      unregisterMcpServer(serverId) {
+        for (const [name, entry] of this.mcp.entries()) {
+          if (entry.serverId === serverId)
+            this.mcp.delete(name);
+        }
+      }
+      has(name) {
+        return this.builtins.has(name) || this.mcp.has(name);
+      }
+      getAllDefinitions(profile = "all") {
+        return this.getAllWithSource(profile).map((t) => t.definition);
+      }
+      getAllWithSource(profile = "all") {
+        const all = [];
+        const seen = /* @__PURE__ */ new Set();
+        for (const t of this.builtins.values()) {
+          if (isToolVisibleInProfile(profile, "builtin", t.definition)) {
+            all.push({ definition: t.definition, source: "builtin" });
+            seen.add(t.definition.name);
+          }
+        }
+        for (const t of this.mcp.values()) {
+          if (seen.has(t.definition.name))
+            continue;
+          if (isToolVisibleInProfile(profile, t.serverId, t.definition)) {
+            all.push({ definition: t.definition, source: t.serverId });
+            seen.add(t.definition.name);
+          }
+        }
+        return all;
+      }
+      source(name) {
+        if (this.builtins.has(name))
+          return "builtin";
+        const entry = this.mcp.get(name);
+        return entry ? entry.serverId : null;
+      }
+      isReadOnly(name) {
+        const t = this.builtins.get(name);
+        if (t)
+          return t.readOnly;
+        return this.mcp.get(name)?.readOnly ?? false;
+      }
+      describe(profile = "all") {
+        return {
+          builtin: [...this.builtins.values()].filter((t) => isToolVisibleInProfile(profile, "builtin", t.definition)).map((t) => t.definition.name).sort(),
+          mcp: [...this.mcp.values()].filter((e) => isToolVisibleInProfile(profile, e.serverId, e.definition)).map((e) => ({ server: e.serverId, name: e.definition.name })).sort((a, b2) => a.name.localeCompare(b2.name))
+        };
+      }
+      async execute(name, input, options = {}) {
+        const builtin = this.builtins.get(name);
+        if (builtin) {
+          try {
+            return await builtin.execute(input, options.context);
+          } catch (err) {
+            if (err instanceof ToolValidationError) {
+              return { output: `error: ${err.message}`, isError: true };
             }
-          },
-          additionalProperties: false
+            return {
+              output: `error: ${err instanceof Error ? err.message : String(err)}`,
+              isError: true
+            };
+          }
         }
-      },
-      async execute(input) {
-        const cwd = (0, import_node_path26.resolve)(optionalString(input, "path") ?? process.cwd());
-        const maxFiles = optionalNumber(input, "max_files", 800);
-        const format = optionalString(input, "format") ?? "text";
-        if (format !== "text" && format !== "json" && format !== "context") {
-          return { output: "error: format must be one of text, json, or context", isError: true };
+        const entry = this.mcp.get(name);
+        if (!entry) {
+          return { output: `error: unknown tool '${name}'`, isError: true };
         }
-        const map = createWorkspaceMap(cwd, { maxFiles });
-        if (format === "json") {
-          return { output: JSON.stringify(map, null, 2), isError: false };
+        if (!this.mcpCaller) {
+          return {
+            output: `error: MCP tool '${name}' requested but no MCP caller is wired`,
+            isError: true
+          };
         }
-        if (format === "context") {
-          return { output: buildWorkspaceMapContext(cwd, { maxFiles }), isError: false };
+        const allowMutating = options.toolProfile === "takeover" || options.toolProfile === "all";
+        if (!shouldSettleBeforeMcpTool(entry.serverId, name)) {
+          return this.mcpCaller.call(entry.serverId, name, input, { allowMutating });
         }
-        return { output: formatWorkspaceMap(map), isError: false };
+        const settleMs = sharedDesktopSettleMs();
+        if (settleMs > 0)
+          await sleep(settleMs);
+        const first = await this.mcpCaller.call(entry.serverId, name, input, {
+          allowMutating
+        });
+        if (!isSharedDesktopBlocked(first))
+          return first;
+        if (settleMs > 0)
+          await sleep(settleMs);
+        return this.mcpCaller.call(entry.serverId, name, input, { allowMutating });
       }
     };
   }
@@ -14350,6 +1493,65 @@ var init_risk_policy = __esm({
   }
 });
 
+// ../../dist/src/tools/secret-guard.js
+function classifySecretPath2(path) {
+  const name = (0, import_node_path2.basename)(path);
+  for (const rule of SECRET_RULES2) {
+    if (rule.test(name))
+      return { matched: true, reason: rule.reason };
+  }
+  return { matched: false };
+}
+function isConfirmedSecretOverride(input, key = "confirm_secret") {
+  const v2 = input[key];
+  if (v2 === true)
+    return true;
+  if (typeof v2 === "string") {
+    const lower = v2.toLowerCase();
+    return lower === "true" || lower === "yes" || lower === "1";
+  }
+  return false;
+}
+var import_node_path2, lowercased2, SECRET_RULES2;
+var init_secret_guard = __esm({
+  "../../dist/src/tools/secret-guard.js"() {
+    "use strict";
+    init_scoped_fetch();
+    import_node_path2 = require("node:path");
+    lowercased2 = (predicate) => (name) => predicate(name.toLowerCase());
+    SECRET_RULES2 = [
+      {
+        reason: ".env file (environment secrets)",
+        test: lowercased2((n) => n === ".env" || n.startsWith(".env.") || n.endsWith(".env"))
+      },
+      {
+        reason: "PEM key material",
+        test: lowercased2((n) => n.endsWith(".pem"))
+      },
+      {
+        reason: "PKCS#12 keystore",
+        test: lowercased2((n) => n.endsWith(".pfx") || n.endsWith(".p12"))
+      },
+      {
+        reason: "SSH private key",
+        test: lowercased2((n) => n === "id_rsa" || n === "id_dsa" || n === "id_ecdsa" || n === "id_ed25519")
+      },
+      {
+        reason: "filename contains 'secret'",
+        test: lowercased2((n) => n.includes("secret"))
+      },
+      {
+        reason: "filename contains 'credentials'",
+        test: lowercased2((n) => n.includes("credentials"))
+      },
+      {
+        reason: "KeePass database",
+        test: lowercased2((n) => n.endsWith(".kdbx") || n.endsWith(".kdb"))
+      }
+    ];
+  }
+});
+
 // ../../dist/src/permissions/secret-policy.js
 function isSecretReadOperation(toolName, input) {
   if (toolName !== "read_file")
@@ -14357,7 +1559,7 @@ function isSecretReadOperation(toolName, input) {
   const rawPath = input.path;
   if (typeof rawPath !== "string" || rawPath.length === 0)
     return NOT_SECRET_READ;
-  const classification = classifySecretPath(rawPath);
+  const classification = classifySecretPath2(rawPath);
   if (!classification.matched)
     return NOT_SECRET_READ;
   const confirmed = isConfirmedSecretOverride(input);
@@ -14379,434 +1581,6 @@ var init_secret_policy = __esm({
       isSecretRead: false,
       confirmed: false,
       reason: ""
-    };
-  }
-});
-
-// ../../dist/src/policy/audit.js
-function resolvedProfile(action, fallback) {
-  return normalizeToolProfile(String(action.profile ?? fallback));
-}
-function isVisible(source, tool, profile, registered) {
-  if (!registered && source === "unknown")
-    return false;
-  return isToolVisibleInProfile(profile, source, {
-    name: tool,
-    description: "policy audit",
-    input_schema: {}
-  });
-}
-function auditPolicyAction(action, options = {}) {
-  const registry2 = createDefaultRegistry();
-  const input = action.input ?? {};
-  const registered = registry2.has(action.tool);
-  const source = action.source ?? registry2.source(action.tool) ?? "unknown";
-  const profile = resolvedProfile(action, options.defaultProfile ?? "coding");
-  const readOnly = action.readOnly ?? (registered ? registry2.isReadOnly(action.tool) : false);
-  const visibleInProfile = isVisible(source, action.tool, profile, registered);
-  const deleteVerdict = isDeleteOperation(action.tool, input);
-  const riskVerdict = isHighRiskOperation(action.tool, input);
-  const secretReadVerdict = isSecretReadOperation(action.tool, input);
-  const reasons = [];
-  let decision = "allow";
-  if (!registered && !action.source) {
-    decision = "block";
-    reasons.push(`tool '${action.tool}' is not registered in the current PeriCode registry`);
-  }
-  if (!visibleInProfile) {
-    decision = "block";
-    reasons.push(`tool '${action.tool}' is not visible in the ${profile} profile`);
-  }
-  if (secretReadVerdict.isSecretRead && !secretReadVerdict.confirmed) {
-    decision = "block";
-    reasons.push(secretReadVerdict.reason);
-  }
-  if (deleteVerdict.isDelete) {
-    if (decision !== "block")
-      decision = "prompt";
-    reasons.push(deleteVerdict.reason);
-  }
-  if (riskVerdict.isHighRisk) {
-    if (decision !== "block")
-      decision = "prompt";
-    reasons.push(riskVerdict.reason);
-  }
-  if (secretReadVerdict.isSecretRead && secretReadVerdict.confirmed) {
-    if (decision !== "block")
-      decision = "prompt";
-    reasons.push(secretReadVerdict.reason);
-  }
-  if (!readOnly && decision === "allow") {
-    decision = "prompt";
-    reasons.push("mutating tool calls require operator approval under the default gate");
-  }
-  if (reasons.length === 0) {
-    reasons.push("read-only tool is registered, visible in profile, and has no delete/risk/secret override flags");
-  }
-  return {
-    tool: action.tool,
-    source,
-    profile,
-    readOnly,
-    registered,
-    visibleInProfile,
-    decision,
-    reasons,
-    deleteVerdict,
-    riskVerdict,
-    secretReadVerdict
-  };
-}
-function auditPolicyActions(actions, options = {}) {
-  const items = actions.map((action) => auditPolicyAction(action, options));
-  const allow = items.filter((item) => item.decision === "allow").length;
-  const prompt = items.filter((item) => item.decision === "prompt").length;
-  const block = items.filter((item) => item.decision === "block").length;
-  return {
-    product: "pericode",
-    version: POLICY_AUDIT_VERSION,
-    generatedAt: (options.now ?? /* @__PURE__ */ new Date()).toISOString(),
-    status: block > 0 ? "fail" : prompt > 0 ? "warn" : "pass",
-    summary: {
-      total: items.length,
-      allow,
-      prompt,
-      block
-    },
-    actions: items
-  };
-}
-function formatPolicyAuditReport(report) {
-  const lines = [
-    `PeriCode policy audit: ${report.status}`,
-    `Generated: ${report.generatedAt}`,
-    `Summary: ${report.summary.allow} allow, ${report.summary.prompt} prompt, ${report.summary.block} block / ${report.summary.total} total`,
-    ""
-  ];
-  for (const item of report.actions) {
-    lines.push(`${item.decision.toUpperCase()} ${item.tool} (${item.source}, ${item.profile}, ${item.readOnly ? "read-only" : "mutating"})`);
-    for (const reason of item.reasons)
-      lines.push(`  - ${reason}`);
-  }
-  return lines.join("\n");
-}
-var POLICY_AUDIT_VERSION;
-var init_audit = __esm({
-  "../../dist/src/policy/audit.js"() {
-    "use strict";
-    init_scoped_fetch();
-    init_delete_guard();
-    init_risk_policy();
-    init_secret_policy();
-    init_registry();
-    init_profiles();
-    POLICY_AUDIT_VERSION = 1;
-  }
-});
-
-// ../../dist/src/tools/policy.js
-function actionsFromInput(input) {
-  if (Array.isArray(input.actions)) {
-    return input.actions.filter((item) => Boolean(item) && typeof item === "object" && typeof item.tool === "string").map((item) => ({
-      tool: item.tool,
-      input: item.input && typeof item.input === "object" && !Array.isArray(item.input) ? item.input : {},
-      source: item.source,
-      profile: item.profile,
-      readOnly: item.readOnly
-    }));
-  }
-  const tool = optionalString(input, "tool");
-  if (!tool)
-    return [];
-  return [{
-    tool,
-    input: input.input && typeof input.input === "object" && !Array.isArray(input.input) ? input.input : {},
-    source: optionalString(input, "source"),
-    profile: optionalString(input, "profile"),
-    readOnly: typeof input.read_only === "boolean" ? input.read_only : void 0
-  }];
-}
-var policyReadTool;
-var init_policy = __esm({
-  "../../dist/src/tools/policy.js"() {
-    "use strict";
-    init_scoped_fetch();
-    init_audit();
-    init_base();
-    policyReadTool = {
-      readOnly: true,
-      definition: {
-        name: "policy_read",
-        description: "Dry-run PeriCode governance for proposed tool calls. Reports allow/prompt/block decisions using the same delete, high-risk, secret-read, read-only, and tool-profile classifiers as execution.",
-        input_schema: {
-          type: "object",
-          properties: {
-            tool: { type: "string", description: "Single tool name to audit" },
-            input: { type: "object", description: "Input object for the single tool" },
-            source: { type: "string", description: "Optional source for a hypothetical MCP tool" },
-            profile: { type: "string", description: "Tool profile to test, default coding" },
-            read_only: { type: "boolean", description: "Optional read-only classification for a hypothetical tool" },
-            actions: {
-              type: "array",
-              description: "Optional list of {tool,input,source,profile,readOnly} actions to audit together",
-              items: { type: "object" }
-            },
-            format: {
-              type: "string",
-              enum: ["text", "json"],
-              description: "Output format. Defaults to text."
-            }
-          },
-          additionalProperties: false
-        }
-      },
-      async execute(input) {
-        const actions = actionsFromInput(input);
-        if (actions.length === 0) {
-          return { output: "error: provide either tool or actions[]", isError: true };
-        }
-        const report = auditPolicyActions(actions, {
-          defaultProfile: optionalString(input, "profile") ?? "coding"
-        });
-        if ((optionalString(input, "format") ?? "text") === "json") {
-          return { output: JSON.stringify(report, null, 2), isError: false };
-        }
-        return { output: formatPolicyAuditReport(report), isError: false };
-      }
-    };
-  }
-});
-
-// ../../dist/src/tools/registry.js
-function sleep(ms) {
-  return new Promise((resolve19) => setTimeout(resolve19, ms));
-}
-function sharedDesktopSettleMs() {
-  const raw = process.env.PERICODE_SHARED_DESKTOP_SETTLE_MS;
-  if (!raw)
-    return DEFAULT_SHARED_DESKTOP_SETTLE_MS;
-  const parsed = Number(raw);
-  if (!Number.isFinite(parsed) || parsed < 0)
-    return DEFAULT_SHARED_DESKTOP_SETTLE_MS;
-  return Math.round(parsed);
-}
-function isSharedDesktopBlocked(result) {
-  if (!result.isError)
-    return false;
-  const output = result.output.toLowerCase();
-  return output.includes("operator is active on the shared desktop") || output.includes("waiting for the operator to go idle");
-}
-function shouldSettleBeforeMcpTool(serverId, name) {
-  if (serverId !== "pericode_desktop")
-    return false;
-  if (SHARED_DESKTOP_TOOLS.has(name))
-    return true;
-  return SHARED_DESKTOP_TOOL_PREFIXES.some((prefix) => name.startsWith(prefix));
-}
-function createDefaultRegistry() {
-  const registry2 = new ToolRegistry();
-  registry2.registerBuiltin(bashTool);
-  registry2.registerBuiltin(readFileTool);
-  registry2.registerBuiltin(writeFileTool);
-  registry2.registerBuiltin(deleteFileTool);
-  registry2.registerBuiltin(editFileTool);
-  registry2.registerBuiltin(multiEditTool);
-  registry2.registerBuiltin(listDirTool);
-  registry2.registerBuiltin(searchFilesTool);
-  registry2.registerBuiltin(codeIndexTool);
-  registry2.registerBuiltin(gitStatusTool);
-  registry2.registerBuiltin(gitDiffTool);
-  registry2.registerBuiltin(testRunTool);
-  registry2.registerBuiltin(todoReadTool);
-  registry2.registerBuiltin(todoWriteTool);
-  registry2.registerBuiltin(rollbackReadTool);
-  registry2.registerBuiltin(rollbackApplyTool);
-  registry2.registerBuiltin(knowledgeReadTool);
-  registry2.registerBuiltin(knowledgeWriteTool);
-  registry2.registerBuiltin(webFetchTool);
-  registry2.registerBuiltin(memoryReadTool);
-  registry2.registerBuiltin(memoryWriteTool);
-  registry2.registerBuiltin(skillReadTool);
-  registry2.registerBuiltin(skillWriteTool);
-  registry2.registerBuiltin(skillmintCreateTool);
-  registry2.registerBuiltin(jobReadTool);
-  registry2.registerBuiltin(jobWriteTool);
-  registry2.registerBuiltin(agentReadTool);
-  registry2.registerBuiltin(agentWriteTool);
-  registry2.registerBuiltin(missionReadTool);
-  registry2.registerBuiltin(missionWriteTool);
-  registry2.registerBuiltin(workspaceReadTool);
-  registry2.registerBuiltin(policyReadTool);
-  return registry2;
-}
-var DEFAULT_SHARED_DESKTOP_SETTLE_MS, SHARED_DESKTOP_TOOL_PREFIXES, SHARED_DESKTOP_TOOLS, ToolRegistry;
-var init_registry = __esm({
-  "../../dist/src/tools/registry.js"() {
-    "use strict";
-    init_scoped_fetch();
-    init_base();
-    init_bash();
-    init_read_file();
-    init_write_file();
-    init_delete_file();
-    init_edit_file();
-    init_list_dir();
-    init_search_files();
-    init_code_index();
-    init_git_status();
-    init_git_diff();
-    init_multi_edit();
-    init_test_run();
-    init_todo();
-    init_rollback();
-    init_knowledge();
-    init_web_fetch();
-    init_memory();
-    init_skills();
-    init_skillmint();
-    init_jobs();
-    init_agents();
-    init_missions();
-    init_workspace();
-    init_policy();
-    init_profiles();
-    DEFAULT_SHARED_DESKTOP_SETTLE_MS = 300;
-    SHARED_DESKTOP_TOOL_PREFIXES = [
-      "click_",
-      "double_click_",
-      "drag_",
-      "move_",
-      "press_",
-      "send_",
-      "set_clipboard",
-      "type_"
-    ];
-    SHARED_DESKTOP_TOOLS = /* @__PURE__ */ new Set([
-      "arrange_apps_side_by_side",
-      "browser_click_anchor",
-      "browser_navigate",
-      "browser_type_text",
-      "click_element",
-      "click_element_by_text",
-      "click_mouse",
-      "focus_window",
-      "launch_app_from_start",
-      "move_window_to_monitor",
-      "open_or_focus_app",
-      "press_keys",
-      "send_prompt_now",
-      "send_prompt_to_window",
-      "snap_window",
-      "type_text",
-      "type_text_human"
-    ]);
-    ToolRegistry = class {
-      builtins = /* @__PURE__ */ new Map();
-      mcp = /* @__PURE__ */ new Map();
-      mcpCaller = null;
-      registerBuiltin(tool) {
-        this.builtins.set(tool.definition.name, tool);
-      }
-      registerMcp(serverId, definition, options = {}) {
-        this.mcp.set(definition.name, {
-          serverId,
-          definition,
-          readOnly: Boolean(options.readOnly)
-        });
-      }
-      setMcpCaller(caller) {
-        this.mcpCaller = caller;
-      }
-      unregisterMcpServer(serverId) {
-        for (const [name, entry] of this.mcp.entries()) {
-          if (entry.serverId === serverId)
-            this.mcp.delete(name);
-        }
-      }
-      has(name) {
-        return this.builtins.has(name) || this.mcp.has(name);
-      }
-      getAllDefinitions(profile = "all") {
-        return this.getAllWithSource(profile).map((t) => t.definition);
-      }
-      getAllWithSource(profile = "all") {
-        const all = [];
-        const seen = /* @__PURE__ */ new Set();
-        for (const t of this.builtins.values()) {
-          if (isToolVisibleInProfile(profile, "builtin", t.definition)) {
-            all.push({ definition: t.definition, source: "builtin" });
-            seen.add(t.definition.name);
-          }
-        }
-        for (const t of this.mcp.values()) {
-          if (seen.has(t.definition.name))
-            continue;
-          if (isToolVisibleInProfile(profile, t.serverId, t.definition)) {
-            all.push({ definition: t.definition, source: t.serverId });
-            seen.add(t.definition.name);
-          }
-        }
-        return all;
-      }
-      source(name) {
-        if (this.builtins.has(name))
-          return "builtin";
-        const entry = this.mcp.get(name);
-        return entry ? entry.serverId : null;
-      }
-      isReadOnly(name) {
-        const t = this.builtins.get(name);
-        if (t)
-          return t.readOnly;
-        return this.mcp.get(name)?.readOnly ?? false;
-      }
-      describe(profile = "all") {
-        return {
-          builtin: [...this.builtins.values()].filter((t) => isToolVisibleInProfile(profile, "builtin", t.definition)).map((t) => t.definition.name).sort(),
-          mcp: [...this.mcp.values()].filter((e) => isToolVisibleInProfile(profile, e.serverId, e.definition)).map((e) => ({ server: e.serverId, name: e.definition.name })).sort((a, b2) => a.name.localeCompare(b2.name))
-        };
-      }
-      async execute(name, input, options = {}) {
-        const builtin = this.builtins.get(name);
-        if (builtin) {
-          try {
-            return await builtin.execute(input, options.context);
-          } catch (err) {
-            if (err instanceof ToolValidationError) {
-              return { output: `error: ${err.message}`, isError: true };
-            }
-            return {
-              output: `error: ${err instanceof Error ? err.message : String(err)}`,
-              isError: true
-            };
-          }
-        }
-        const entry = this.mcp.get(name);
-        if (!entry) {
-          return { output: `error: unknown tool '${name}'`, isError: true };
-        }
-        if (!this.mcpCaller) {
-          return {
-            output: `error: MCP tool '${name}' requested but no MCP caller is wired`,
-            isError: true
-          };
-        }
-        const allowMutating = options.toolProfile === "takeover" || options.toolProfile === "all";
-        if (!shouldSettleBeforeMcpTool(entry.serverId, name)) {
-          return this.mcpCaller.call(entry.serverId, name, input, { allowMutating });
-        }
-        const settleMs = sharedDesktopSettleMs();
-        if (settleMs > 0)
-          await sleep(settleMs);
-        const first = await this.mcpCaller.call(entry.serverId, name, input, {
-          allowMutating
-        });
-        if (!isSharedDesktopBlocked(first))
-          return first;
-        if (settleMs > 0)
-          await sleep(settleMs);
-        return this.mcpCaller.call(entry.serverId, name, input, { allowMutating });
-      }
     };
   }
 });
@@ -14910,6 +1684,30 @@ var init_base2 = __esm({
   }
 });
 
+// ../../dist/src/paths.js
+function pericodeHome() {
+  return process.env[PERICODE_HOME_ENV] ?? (0, import_node_path3.join)((0, import_node_os.homedir)(), ".pericode");
+}
+function ownedPath(fileName) {
+  return (0, import_node_path3.join)(pericodeHome(), fileName);
+}
+function resolveOwnedPath(options) {
+  const ownedOverride = process.env[options.ownedEnv];
+  if (ownedOverride)
+    return { path: ownedOverride, source: "env" };
+  return { path: ownedPath(options.fileName), source: "owned" };
+}
+var import_node_os, import_node_path3, PERICODE_HOME_ENV;
+var init_paths = __esm({
+  "../../dist/src/paths.js"() {
+    "use strict";
+    init_scoped_fetch();
+    import_node_os = require("node:os");
+    import_node_path3 = require("node:path");
+    PERICODE_HOME_ENV = "PERICODE_HOME";
+  }
+});
+
 // ../../dist/src/auth/store.js
 function authPath() {
   return process.env[AUTH_PATH_ENV] ?? ownedPath("auth.json");
@@ -14922,10 +1720,10 @@ function authReadPath() {
 }
 function readRaw() {
   const path = authReadPath();
-  if (!(0, import_node_fs13.existsSync)(path))
+  if (!(0, import_node_fs.existsSync)(path))
     return { providers: {} };
   try {
-    const data = JSON.parse((0, import_node_fs13.readFileSync)(path, "utf8"));
+    const data = JSON.parse((0, import_node_fs.readFileSync)(path, "utf8"));
     if (!data || typeof data !== "object")
       return { providers: {} };
     if (!data.providers || typeof data.providers !== "object") {
@@ -14938,10 +1736,10 @@ function readRaw() {
 }
 function writeRaw(data) {
   const path = authPath();
-  (0, import_node_fs13.mkdirSync)((0, import_node_path27.dirname)(path), { recursive: true });
-  (0, import_node_fs13.writeFileSync)(path, JSON.stringify(data, null, 2), "utf8");
+  (0, import_node_fs.mkdirSync)((0, import_node_path4.dirname)(path), { recursive: true });
+  (0, import_node_fs.writeFileSync)(path, JSON.stringify(data, null, 2), "utf8");
   try {
-    (0, import_node_fs13.chmodSync)(path, 384);
+    (0, import_node_fs.chmodSync)(path, 384);
   } catch {
   }
 }
@@ -14982,13 +1780,13 @@ function listAuth() {
     }
   ]));
 }
-var import_node_fs13, import_node_path27, AUTH_PATH_ENV;
-var init_store8 = __esm({
+var import_node_fs, import_node_path4, AUTH_PATH_ENV;
+var init_store = __esm({
   "../../dist/src/auth/store.js"() {
     "use strict";
     init_scoped_fetch();
-    import_node_fs13 = require("node:fs");
-    import_node_path27 = require("node:path");
+    import_node_fs = require("node:fs");
+    import_node_path4 = require("node:path");
     init_paths();
     AUTH_PATH_ENV = "PERICODE_AUTH_PATH";
   }
@@ -14999,19 +1797,19 @@ function base64UrlEncode(buf) {
   return buf.toString("base64").replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
 }
 function generatePkce() {
-  const verifier = base64UrlEncode((0, import_node_crypto9.randomBytes)(32));
-  const challenge = base64UrlEncode((0, import_node_crypto9.createHash)("sha256").update(verifier).digest());
+  const verifier = base64UrlEncode((0, import_node_crypto2.randomBytes)(32));
+  const challenge = base64UrlEncode((0, import_node_crypto2.createHash)("sha256").update(verifier).digest());
   return { verifier, challenge };
 }
 function generateState(byteLen = 16) {
-  return base64UrlEncode((0, import_node_crypto9.randomBytes)(byteLen));
+  return base64UrlEncode((0, import_node_crypto2.randomBytes)(byteLen));
 }
-var import_node_crypto9;
+var import_node_crypto2;
 var init_pkce = __esm({
   "../../dist/src/auth/pkce.js"() {
     "use strict";
     init_scoped_fetch();
-    import_node_crypto9 = require("node:crypto");
+    import_node_crypto2 = require("node:crypto");
   }
 });
 
@@ -15066,7 +1864,7 @@ var init_anthropic_oauth = __esm({
   "../../dist/src/auth/anthropic-oauth.js"() {
     "use strict";
     init_scoped_fetch();
-    init_store8();
+    init_store();
     init_pkce();
     CLIENT_ID = "9d1c250a-e61b-44d9-88ed-5944d1962f5e";
     TOKEN_URL = "https://console.anthropic.com/v1/oauth/token";
@@ -15212,7 +2010,7 @@ var init_anthropic = __esm({
   "../../dist/src/providers/anthropic.js"() {
     "use strict";
     init_scoped_fetch();
-    init_store8();
+    init_store();
     init_anthropic_oauth();
     init_base2();
     init_sse();
@@ -15713,7 +2511,7 @@ var init_openai = __esm({
 
 // ../../dist/src/auth/oauth-loopback.js
 function captureOAuthCallback(opts) {
-  return new Promise((resolve19, reject) => {
+  return new Promise((resolve4, reject) => {
     const servers = [];
     let settled = false;
     let port = opts.port;
@@ -15753,7 +2551,7 @@ function captureOAuthCallback(opts) {
         }
         const received = Buffer.from(url.searchParams.get("state") ?? "");
         const expected = Buffer.from(opts.state);
-        const validState = url.searchParams.getAll("state").length === 1 && received.length === expected.length && (0, import_node_crypto10.timingSafeEqual)(received, expected);
+        const validState = url.searchParams.getAll("state").length === 1 && received.length === expected.length && (0, import_node_crypto3.timingSafeEqual)(received, expected);
         if (!validState) {
           res.writeHead(400).end("Invalid callback.");
           return;
@@ -15771,7 +2569,7 @@ function captureOAuthCallback(opts) {
         res.writeHead(200, { "Content-Type": "text/plain; charset=utf-8" }).end("Sign-in received. Return to PeriCode.");
         settled = true;
         cleanup();
-        resolve19({ code, redirectUri: `http://localhost:${port}/auth/callback` });
+        resolve4({ code, redirectUri: `http://localhost:${port}/auth/callback` });
       });
       servers.push(server);
       server.requestTimeout = 5e3;
@@ -15810,13 +2608,13 @@ function captureOAuthCallback(opts) {
     })().catch((e) => fail(e instanceof Error ? e : new Error(String(e))));
   });
 }
-var import_node_http, import_node_crypto10;
+var import_node_http, import_node_crypto3;
 var init_oauth_loopback = __esm({
   "../../dist/src/auth/oauth-loopback.js"() {
     "use strict";
     init_scoped_fetch();
     import_node_http = require("node:http");
-    import_node_crypto10 = require("node:crypto");
+    import_node_crypto3 = require("node:crypto");
   }
 });
 
@@ -15974,7 +2772,7 @@ var init_openai_codex_oauth = __esm({
     "use strict";
     init_scoped_fetch();
     init_oauth_loopback();
-    init_store8();
+    init_store();
     init_pkce();
     CLIENT_ID2 = "app_EMoamEEZ73f0CkXaXp7hrann";
     ISSUER = "https://auth.openai.com";
@@ -16355,7 +3153,7 @@ var init_copilot_oauth = __esm({
   "../../dist/src/auth/copilot-oauth.js"() {
     "use strict";
     init_scoped_fetch();
-    init_store8();
+    init_store();
     CLIENT_ID3 = "Ov23li8tweQw6odWQebz";
     SCOPE2 = "read:user";
     DEFAULT_DOMAIN = "github.com";
@@ -16410,10 +3208,10 @@ function configReadPath() {
   }).path;
 }
 function readConfigAt(path) {
-  if (!(0, import_node_fs14.existsSync)(path))
+  if (!(0, import_node_fs2.existsSync)(path))
     return {};
   try {
-    return JSON.parse(stripJsonBom((0, import_node_fs14.readFileSync)(path, "utf8")));
+    return JSON.parse(stripJsonBom((0, import_node_fs2.readFileSync)(path, "utf8")));
   } catch {
     return {};
   }
@@ -16428,14 +3226,14 @@ function configLayerPaths(cwd = process.cwd()) {
   const paths = [];
   const managed = process.env[MANAGED_CONFIG_PATH_ENV];
   if (managed) {
-    paths.push({ scope: "managed", path: managed, exists: (0, import_node_fs14.existsSync)(managed) });
+    paths.push({ scope: "managed", path: managed, exists: (0, import_node_fs2.existsSync)(managed) });
   }
   const user = configReadPath();
-  paths.push({ scope: "user", path: user, exists: (0, import_node_fs14.existsSync)(user) });
-  const project = (0, import_node_path28.join)(cwd, PROJECT_CONFIG_DIR, PROJECT_CONFIG_FILE);
-  paths.push({ scope: "project", path: project, exists: (0, import_node_fs14.existsSync)(project) });
-  const local = (0, import_node_path28.join)(cwd, PROJECT_CONFIG_DIR, LOCAL_PROJECT_CONFIG_FILE);
-  paths.push({ scope: "local", path: local, exists: (0, import_node_fs14.existsSync)(local) });
+  paths.push({ scope: "user", path: user, exists: (0, import_node_fs2.existsSync)(user) });
+  const project = (0, import_node_path5.join)(cwd, PROJECT_CONFIG_DIR, PROJECT_CONFIG_FILE);
+  paths.push({ scope: "project", path: project, exists: (0, import_node_fs2.existsSync)(project) });
+  const local = (0, import_node_path5.join)(cwd, PROJECT_CONFIG_DIR, LOCAL_PROJECT_CONFIG_FILE);
+  paths.push({ scope: "local", path: local, exists: (0, import_node_fs2.existsSync)(local) });
   return paths;
 }
 function resolveConfig(opts = {}) {
@@ -16486,13 +3284,13 @@ function parseEnvInt(raw) {
   const parsed = Number.parseInt(raw, 10);
   return Number.isFinite(parsed) ? parsed : void 0;
 }
-var import_node_fs14, import_node_path28, CONFIG_PATH_ENV, MANAGED_CONFIG_PATH_ENV, PROJECT_CONFIG_DIR, PROJECT_CONFIG_FILE, LOCAL_PROJECT_CONFIG_FILE, DEFAULT_CONFIG;
+var import_node_fs2, import_node_path5, CONFIG_PATH_ENV, MANAGED_CONFIG_PATH_ENV, PROJECT_CONFIG_DIR, PROJECT_CONFIG_FILE, LOCAL_PROJECT_CONFIG_FILE, DEFAULT_CONFIG;
 var init_loader = __esm({
   "../../dist/src/config/loader.js"() {
     "use strict";
     init_scoped_fetch();
-    import_node_fs14 = require("node:fs");
-    import_node_path28 = require("node:path");
+    import_node_fs2 = require("node:fs");
+    import_node_path5 = require("node:path");
     init_paths();
     init_token_economy();
     init_agent_loop();
@@ -16791,6 +3589,79 @@ var init_system_prompt = __esm({
   }
 });
 
+// ../../dist/src/util/project-context.js
+function readOne(dir, name, ancestorDepth) {
+  const path = (0, import_node_path6.join)(dir, name);
+  if (!(0, import_node_fs3.existsSync)(path))
+    return null;
+  let stat;
+  try {
+    stat = (0, import_node_fs3.statSync)(path);
+  } catch {
+    return null;
+  }
+  if (!stat.isFile())
+    return null;
+  let raw;
+  try {
+    raw = (0, import_node_fs3.readFileSync)(path, "utf8");
+  } catch {
+    return null;
+  }
+  const truncated = raw.length > PROJECT_CONTEXT_MAX_BYTES;
+  const text2 = truncated ? raw.slice(0, PROJECT_CONTEXT_MAX_BYTES) : raw;
+  return { name, path, text: text2, truncated, ancestorDepth };
+}
+function readProjectContext(cwd) {
+  const seen = /* @__PURE__ */ new Map();
+  let dir = cwd;
+  const root = (0, import_node_path6.parse)(dir).root;
+  for (let depth = 0; depth <= PROJECT_CONTEXT_MAX_ANCESTORS; depth += 1) {
+    for (const name of PROJECT_CONTEXT_FILES) {
+      if (seen.has(name))
+        continue;
+      const file = readOne(dir, name, depth);
+      if (file)
+        seen.set(name, file);
+    }
+    if (dir === root)
+      break;
+    const parent = (0, import_node_path6.dirname)(dir);
+    if (parent === dir)
+      break;
+    dir = parent;
+  }
+  const files = [...seen.values()].sort((a, b2) => {
+    if (a.ancestorDepth !== b2.ancestorDepth) {
+      return a.ancestorDepth - b2.ancestorDepth;
+    }
+    return PROJECT_CONTEXT_FILES.indexOf(a.name) - PROJECT_CONTEXT_FILES.indexOf(b2.name);
+  });
+  if (files.length === 0)
+    return { files, text: "" };
+  const sections = files.map((f2) => {
+    const origin = f2.ancestorDepth === 0 ? "cwd" : `${f2.ancestorDepth} dir(s) up`;
+    const header = `### ${f2.name} (${origin})` + (f2.truncated ? " \u2014 truncated" : "");
+    return `${header}
+
+${f2.text.trim()}`;
+  });
+  const text2 = "Project instructions discovered in the working directory and its parents. Closer-to-cwd files appear first and override more general ancestor guidance when they conflict.\n\n" + sections.join("\n\n---\n\n");
+  return { files, text: text2 };
+}
+var import_node_fs3, import_node_path6, PROJECT_CONTEXT_FILES, PROJECT_CONTEXT_MAX_BYTES, PROJECT_CONTEXT_MAX_ANCESTORS;
+var init_project_context = __esm({
+  "../../dist/src/util/project-context.js"() {
+    "use strict";
+    init_scoped_fetch();
+    import_node_fs3 = require("node:fs");
+    import_node_path6 = require("node:path");
+    PROJECT_CONTEXT_FILES = ["CLAUDE.md", "AGENTS.md", "PERICODE.md"];
+    PROJECT_CONTEXT_MAX_BYTES = 64 * 1024;
+    PROJECT_CONTEXT_MAX_ANCESTORS = 6;
+  }
+});
+
 // ../../node_modules/zod/v4/core/core.js
 // @__NO_SIDE_EFFECTS__
 function $constructor(name, initializer3, params) {
@@ -16887,7 +3758,7 @@ __export(util_exports, {
   getLengthableOrigin: () => getLengthableOrigin,
   getParsedType: () => getParsedType,
   getSizableOrigin: () => getSizableOrigin,
-  isObject: () => isObject6,
+  isObject: () => isObject,
   isPlainObject: () => isPlainObject,
   issue: () => issue,
   joinValues: () => joinValues,
@@ -17010,26 +3881,26 @@ function promiseAllObject(promisesObj) {
 }
 function randomString(length = 10) {
   const chars = "abcdefghijklmnopqrstuvwxyz";
-  let str = "";
+  let str2 = "";
   for (let i = 0; i < length; i++) {
-    str += chars[Math.floor(Math.random() * chars.length)];
+    str2 += chars[Math.floor(Math.random() * chars.length)];
   }
-  return str;
+  return str2;
 }
-function esc(str) {
-  return JSON.stringify(str);
+function esc(str2) {
+  return JSON.stringify(str2);
 }
-function isObject6(data) {
+function isObject(data) {
   return typeof data === "object" && data !== null && !Array.isArray(data);
 }
 function isPlainObject(o) {
-  if (isObject6(o) === false)
+  if (isObject(o) === false)
     return false;
   const ctor = o.constructor;
   if (ctor === void 0)
     return true;
   const prot = ctor.prototype;
-  if (isObject6(prot) === false)
+  if (isObject(prot) === false)
     return false;
   if (Object.prototype.hasOwnProperty.call(prot, "isPrototypeOf") === false) {
     return false;
@@ -17045,8 +3916,8 @@ function numKeys(data) {
   }
   return keyCount;
 }
-function escapeRegex(str) {
-  return str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+function escapeRegex(str2) {
+  return str2.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 function clone(inst, def, params) {
   const cl = new inst._zod.constr(def ?? inst._zod.def);
@@ -17397,7 +4268,7 @@ function flattenError(error2, mapper = (issue2) => issue2.message) {
   }
   return { formErrors, fieldErrors };
 }
-function formatError6(error2, _mapper) {
+function formatError(error2, _mapper) {
   const mapper = _mapper || function(issue2) {
     return issue2.message;
   };
@@ -18785,7 +5656,7 @@ var init_schemas = __esm({
         return (payload, ctx) => fn(shape, payload, ctx);
       };
       let fastpass;
-      const isObject7 = isObject6;
+      const isObject2 = isObject;
       const jit = !globalConfig.jitless;
       const allowsEval2 = allowsEval;
       const fastEnabled = jit && allowsEval2.value;
@@ -18794,7 +5665,7 @@ var init_schemas = __esm({
       inst._zod.parse = (payload, ctx) => {
         value ?? (value = _normalized.value);
         const input = payload.value;
-        if (!isObject7(input)) {
+        if (!isObject2(input)) {
           payload.issues.push({
             expected: "object",
             code: "invalid_type",
@@ -18938,7 +5809,7 @@ var init_schemas = __esm({
       });
       inst._zod.parse = (payload, ctx) => {
         const input = payload.value;
-        if (!isObject6(input)) {
+        if (!isObject(input)) {
           payload.issues.push({
             code: "invalid_type",
             expected: "object",
@@ -20169,7 +7040,7 @@ var init_errors2 = __esm({
       inst.name = "ZodError";
       Object.defineProperties(inst, {
         format: {
-          value: (mapper) => formatError6(inst, mapper)
+          value: (mapper) => formatError(inst, mapper)
           // enumerable: false,
         },
         flatten: {
@@ -22565,7 +9436,7 @@ var init_record = __esm({
 });
 
 // ../../node_modules/zod-to-json-schema/dist/esm/parsers/map.js
-var init_map2 = __esm({
+var init_map = __esm({
   "../../node_modules/zod-to-json-schema/dist/esm/parsers/map.js"() {
     init_scoped_fetch();
     init_parseDef();
@@ -22711,7 +9582,7 @@ var init_selectParser = __esm({
     init_enum();
     init_intersection();
     init_literal();
-    init_map2();
+    init_map();
     init_nativeEnum();
     init_never();
     init_null();
@@ -22782,7 +9653,7 @@ var init_esm = __esm({
     init_enum();
     init_intersection();
     init_literal();
-    init_map2();
+    init_map();
     init_nativeEnum();
     init_never();
     init_null();
@@ -23361,7 +10232,7 @@ var init_protocol = __esm({
               return;
             }
             const pollInterval = task2.pollInterval ?? this._options?.defaultTaskPollInterval ?? 1e3;
-            await new Promise((resolve19) => setTimeout(resolve19, pollInterval));
+            await new Promise((resolve4) => setTimeout(resolve4, pollInterval));
             options?.signal?.throwIfAborted();
           }
         } catch (error2) {
@@ -23378,7 +10249,7 @@ var init_protocol = __esm({
        */
       request(request, resultSchema, options) {
         const { relatedRequestId, resumptionToken, onresumptiontoken, task, relatedTask } = options ?? {};
-        return new Promise((resolve19, reject) => {
+        return new Promise((resolve4, reject) => {
           const earlyReject = (error2) => {
             reject(error2);
           };
@@ -23456,7 +10327,7 @@ var init_protocol = __esm({
               if (!parseResult.success) {
                 reject(parseResult.error);
               } else {
-                resolve19(parseResult.data);
+                resolve4(parseResult.data);
               }
             } catch (error2) {
               reject(error2);
@@ -23717,12 +10588,12 @@ var init_protocol = __esm({
           }
         } catch {
         }
-        return new Promise((resolve19, reject) => {
+        return new Promise((resolve4, reject) => {
           if (signal.aborted) {
             reject(new McpError(ErrorCode.InvalidRequest, "Request cancelled"));
             return;
           }
-          const timeoutId = setTimeout(resolve19, interval);
+          const timeoutId = setTimeout(resolve4, interval);
           signal.addEventListener("abort", () => {
             clearTimeout(timeoutId);
             reject(new McpError(ErrorCode.InvalidRequest, "Request cancelled"));
@@ -23867,7 +10738,7 @@ var require_code = __commonJS({
     }
     exports2._ = _2;
     var plus = new _Code("+");
-    function str(strs, ...args) {
+    function str2(strs, ...args) {
       const expr = [safeStringify(strs[0])];
       let i = 0;
       while (i < args.length) {
@@ -23878,7 +10749,7 @@ var require_code = __commonJS({
       optimize(expr);
       return new _Code(expr);
     }
-    exports2.str = str;
+    exports2.str = str2;
     function addCodeArg(code, arg) {
       if (arg instanceof _Code)
         code.push(...arg._items);
@@ -23921,7 +10792,7 @@ var require_code = __commonJS({
       return;
     }
     function strConcat(c1, c2) {
-      return c2.emptyStr() ? c1 : c1.emptyStr() ? c2 : str`${c1}${c2}`;
+      return c2.emptyStr() ? c1 : c1.emptyStr() ? c2 : str2`${c1}${c2}`;
     }
     exports2.strConcat = strConcat;
     function interpolate(x2) {
@@ -24886,22 +11757,22 @@ var require_util = __commonJS({
       return (0, codegen_1._)`${topSchemaRef}${schemaPath}${(0, codegen_1.getProperty)(keyword)}`;
     }
     exports2.schemaRefOrVal = schemaRefOrVal;
-    function unescapeFragment(str) {
-      return unescapeJsonPointer(decodeURIComponent(str));
+    function unescapeFragment(str2) {
+      return unescapeJsonPointer(decodeURIComponent(str2));
     }
     exports2.unescapeFragment = unescapeFragment;
-    function escapeFragment(str) {
-      return encodeURIComponent(escapeJsonPointer(str));
+    function escapeFragment(str2) {
+      return encodeURIComponent(escapeJsonPointer(str2));
     }
     exports2.escapeFragment = escapeFragment;
-    function escapeJsonPointer(str) {
-      if (typeof str == "number")
-        return `${str}`;
-      return str.replace(/~/g, "~0").replace(/\//g, "~1");
+    function escapeJsonPointer(str2) {
+      if (typeof str2 == "number")
+        return `${str2}`;
+      return str2.replace(/~/g, "~0").replace(/\//g, "~1");
     }
     exports2.escapeJsonPointer = escapeJsonPointer;
-    function unescapeJsonPointer(str) {
-      return str.replace(/~1/g, "/").replace(/~0/g, "~");
+    function unescapeJsonPointer(str2) {
+      return str2.replace(/~1/g, "/").replace(/~0/g, "~");
     }
     exports2.unescapeJsonPointer = unescapeJsonPointer;
     function eachItem(xs, f2) {
@@ -25938,8 +12809,8 @@ var require_json_schema_traverse = __commonJS({
         post(schema, jsonPtr, rootSchema, parentJsonPtr, parentKeyword, parentSchema, keyIndex);
       }
     }
-    function escapeJsonPtr(str) {
-      return str.replace(/~/g, "~0").replace(/\//g, "~1");
+    function escapeJsonPtr(str2) {
+      return str2.replace(/~/g, "~0").replace(/\//g, "~1");
     }
   }
 });
@@ -26646,7 +13517,7 @@ var require_ref_error = __commonJS({
 });
 
 // ../../node_modules/ajv/dist/compile/index.js
-var require_compile2 = __commonJS({
+var require_compile = __commonJS({
   "../../node_modules/ajv/dist/compile/index.js"(exports2) {
     "use strict";
     init_scoped_fetch();
@@ -26770,7 +13641,7 @@ var require_compile2 = __commonJS({
       const schOrFunc = root.refs[ref];
       if (schOrFunc)
         return schOrFunc;
-      let _sch = resolve19.call(this, root, ref);
+      let _sch = resolve4.call(this, root, ref);
       if (_sch === void 0) {
         const schema = (_a = root.localRefs) === null || _a === void 0 ? void 0 : _a[ref];
         const { schemaId } = this.opts;
@@ -26797,7 +13668,7 @@ var require_compile2 = __commonJS({
     function sameSchemaEnv(s1, s2) {
       return s1.schema === s2.schema && s1.root === s2.root && s1.baseId === s2.baseId;
     }
-    function resolve19(root, ref) {
+    function resolve4(root, ref) {
       let sch;
       while (typeof (sch = this.refs[ref]) == "string")
         ref = sch;
@@ -26890,7 +13761,7 @@ var require_data = __commonJS({
 });
 
 // ../../node_modules/fast-uri/lib/utils.js
-var require_utils5 = __commonJS({
+var require_utils = __commonJS({
   "../../node_modules/fast-uri/lib/utils.js"(exports2, module2) {
     "use strict";
     init_scoped_fetch();
@@ -27042,10 +13913,10 @@ var require_utils5 = __commonJS({
         isIPV6: true
       };
     }
-    function findToken(str, token) {
+    function findToken(str2, token) {
       let ind = 0;
-      for (let i = 0; i < str.length; i++) {
-        if (str[i] === token) ind++;
+      for (let i = 0; i < str2.length; i++) {
+        if (str2[i] === token) ind++;
       }
       return ind;
     }
@@ -27397,7 +14268,7 @@ var require_schemes = __commonJS({
   "../../node_modules/fast-uri/lib/schemes.js"(exports2, module2) {
     "use strict";
     init_scoped_fetch();
-    var { isUUID } = require_utils5();
+    var { isUUID } = require_utils();
     var URN_REG = /^([\da-z][\d\-a-z]{0,31}):((?:[\w!$'()*+,\-./:;=@]|%[\da-f]{2})+)$/iu;
     var supportedSchemeNames = (
       /** @type {const} */
@@ -27609,7 +14480,7 @@ var require_fast_uri = __commonJS({
   "../../node_modules/fast-uri/index.js"(exports2, module2) {
     "use strict";
     init_scoped_fetch();
-    var { normalizeIPv6, removeDotSegments, recomposeAuthority, normalizePercentEncoding, normalizePathEncoding, serializePathEncoding, normalizeQueryFragmentEncoding, encodeQuery, encodeFragment, reescapeHostDelimiters, isIPv4, nonSimpleDomain } = require_utils5();
+    var { normalizeIPv6, removeDotSegments, recomposeAuthority, normalizePercentEncoding, normalizePathEncoding, serializePathEncoding, normalizeQueryFragmentEncoding, encodeQuery, encodeFragment, reescapeHostDelimiters, isIPv4, nonSimpleDomain } = require_utils();
     var { SCHEMES, getSchemeHandler } = require_schemes();
     var VALID_SCHEME = /^[A-Za-z][A-Za-z0-9+.-]*$/u;
     var MALFORMED_SCHEME_ERROR = "URI scheme is malformed.";
@@ -27630,7 +14501,7 @@ var require_fast_uri = __commonJS({
       }
       return uri;
     }
-    function resolve19(baseURI, relativeURI, options) {
+    function resolve4(baseURI, relativeURI, options) {
       const schemelessOptions = options ? Object.assign({ scheme: "null" }, options) : { scheme: "null" };
       const {
         parsed: baseParsed,
@@ -27663,49 +14534,49 @@ var require_fast_uri = __commonJS({
       schemelessOptions.skipEscape = true;
       return serialize(resolved, schemelessOptions);
     }
-    function resolveComponent(base, relative6, options, skipNormalization) {
+    function resolveComponent(base, relative4, options, skipNormalization) {
       const target = {};
       if (!skipNormalization) {
         base = parse4(serialize(base, options), options);
-        relative6 = parse4(serialize(relative6, options), options);
+        relative4 = parse4(serialize(relative4, options), options);
       }
       options = options || {};
-      if (!options.tolerant && relative6.scheme) {
-        target.scheme = relative6.scheme;
-        target.userinfo = relative6.userinfo;
-        target.host = relative6.host;
-        target.port = relative6.port;
-        target.path = removeDotSegments(relative6.path || "");
-        target.query = relative6.query;
+      if (!options.tolerant && relative4.scheme) {
+        target.scheme = relative4.scheme;
+        target.userinfo = relative4.userinfo;
+        target.host = relative4.host;
+        target.port = relative4.port;
+        target.path = removeDotSegments(relative4.path || "");
+        target.query = relative4.query;
       } else {
-        if (relative6.userinfo !== void 0 || relative6.host !== void 0 || relative6.port !== void 0) {
-          target.userinfo = relative6.userinfo;
-          target.host = relative6.host;
-          target.port = relative6.port;
-          target.path = removeDotSegments(relative6.path || "");
-          target.query = relative6.query;
+        if (relative4.userinfo !== void 0 || relative4.host !== void 0 || relative4.port !== void 0) {
+          target.userinfo = relative4.userinfo;
+          target.host = relative4.host;
+          target.port = relative4.port;
+          target.path = removeDotSegments(relative4.path || "");
+          target.query = relative4.query;
         } else {
-          if (!relative6.path) {
+          if (!relative4.path) {
             target.path = base.path;
-            if (relative6.query !== void 0) {
-              target.query = relative6.query;
+            if (relative4.query !== void 0) {
+              target.query = relative4.query;
             } else {
               target.query = base.query;
             }
           } else {
-            if (relative6.path[0] === "/") {
-              target.path = removeDotSegments(relative6.path);
+            if (relative4.path[0] === "/") {
+              target.path = removeDotSegments(relative4.path);
             } else {
               if ((base.userinfo !== void 0 || base.host !== void 0 || base.port !== void 0) && !base.path) {
-                target.path = "/" + relative6.path;
+                target.path = "/" + relative4.path;
               } else if (!base.path) {
-                target.path = relative6.path;
+                target.path = relative4.path;
               } else {
-                target.path = base.path.slice(0, base.path.lastIndexOf("/") + 1) + relative6.path;
+                target.path = base.path.slice(0, base.path.lastIndexOf("/") + 1) + relative4.path;
               }
               target.path = removeDotSegments(target.path);
             }
-            target.query = relative6.query;
+            target.query = relative4.query;
           }
           target.userinfo = base.userinfo;
           target.host = base.host;
@@ -27713,7 +14584,7 @@ var require_fast_uri = __commonJS({
         }
         target.scheme = base.scheme;
       }
-      target.fragment = relative6.fragment;
+      target.fragment = relative4.fragment;
       return target;
     }
     function equal(uriA, uriB, options) {
@@ -27998,7 +14869,7 @@ var require_fast_uri = __commonJS({
     var fastUri = {
       SCHEMES,
       normalize,
-      resolve: resolve19,
+      resolve: resolve4,
       resolveComponent,
       equal,
       serialize,
@@ -28055,14 +14926,14 @@ var require_core = __commonJS({
     var validation_error_1 = require_validation_error();
     var ref_error_1 = require_ref_error();
     var rules_1 = require_rules();
-    var compile_1 = require_compile2();
+    var compile_1 = require_compile();
     var codegen_2 = require_codegen();
     var resolve_1 = require_resolve();
     var dataType_1 = require_dataType();
     var util_1 = require_util();
     var $dataRefSchema = require_data();
     var uri_1 = require_uri();
-    var defaultRegExp = (str, flags) => new RegExp(str, flags);
+    var defaultRegExp = (str2, flags) => new RegExp(str2, flags);
     defaultRegExp.code = "new RegExp";
     var META_IGNORE_OPTIONS = ["removeAdditional", "useDefaults", "coerceTypes"];
     var EXT_SCOPE_NAMES = /* @__PURE__ */ new Set([
@@ -28661,7 +15532,7 @@ var require_ref = __commonJS({
     var code_1 = require_code2();
     var codegen_1 = require_codegen();
     var names_1 = require_names();
-    var compile_1 = require_compile2();
+    var compile_1 = require_compile();
     var util_1 = require_util();
     var def = {
       keyword: "$ref",
@@ -28863,16 +15734,16 @@ var require_ucs2length = __commonJS({
     "use strict";
     init_scoped_fetch();
     Object.defineProperty(exports2, "__esModule", { value: true });
-    function ucs2length(str) {
-      const len = str.length;
+    function ucs2length(str2) {
+      const len = str2.length;
       let length = 0;
       let pos = 0;
       let value;
       while (pos < len) {
         length++;
-        value = str.charCodeAt(pos++);
+        value = str2.charCodeAt(pos++);
         if (value >= 55296 && value <= 56319 && pos < len) {
-          value = str.charCodeAt(pos);
+          value = str2.charCodeAt(pos);
           if ((value & 64512) === 56320)
             pos++;
         }
@@ -28918,7 +15789,7 @@ var require_limitLength = __commonJS({
 });
 
 // ../../node_modules/ajv/dist/vocabularies/validation/pattern.js
-var require_pattern2 = __commonJS({
+var require_pattern = __commonJS({
   "../../node_modules/ajv/dist/vocabularies/validation/pattern.js"(exports2) {
     "use strict";
     init_scoped_fetch();
@@ -29267,7 +16138,7 @@ var require_validation = __commonJS({
     var limitNumber_1 = require_limitNumber();
     var multipleOf_1 = require_multipleOf();
     var limitLength_1 = require_limitLength();
-    var pattern_1 = require_pattern2();
+    var pattern_1 = require_pattern();
     var limitProperties_1 = require_limitProperties();
     var required_1 = require_required();
     var limitItems_1 = require_limitItems();
@@ -30386,7 +17257,7 @@ var require_discriminator = __commonJS({
     Object.defineProperty(exports2, "__esModule", { value: true });
     var codegen_1 = require_codegen();
     var types_1 = require_types();
-    var compile_1 = require_compile2();
+    var compile_1 = require_compile();
     var ref_error_1 = require_ref_error();
     var util_1 = require_util();
     var error2 = {
@@ -30790,8 +17661,8 @@ var require_formats = __commonJS({
     }
     var DATE = /^(\d\d\d\d)-(\d\d)-(\d\d)$/;
     var DAYS = [0, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
-    function date3(str) {
-      const matches = DATE.exec(str);
+    function date3(str2) {
+      const matches = DATE.exec(str2);
       if (!matches)
         return false;
       const year = +matches[1];
@@ -30810,8 +17681,8 @@ var require_formats = __commonJS({
     }
     var TIME = /^(\d\d):(\d\d):(\d\d(?:\.\d+)?)(z|([+-])(\d\d)(?::?(\d\d))?)?$/i;
     function getTime(strictTimeZone) {
-      return function time3(str) {
-        const matches = TIME.exec(str);
+      return function time3(str2) {
+        const matches = TIME.exec(str2);
         if (!matches)
           return false;
         const hr = +matches[1];
@@ -30857,8 +17728,8 @@ var require_formats = __commonJS({
     var DATE_TIME_SEPARATOR = /t|\s/i;
     function getDateTime(strictTimeZone) {
       const time3 = getTime(strictTimeZone);
-      return function date_time(str) {
-        const dateTime = str.split(DATE_TIME_SEPARATOR);
+      return function date_time(str2) {
+        const dateTime = str2.split(DATE_TIME_SEPARATOR);
         return dateTime.length === 2 && date3(dateTime[0]) && time3(dateTime[1]);
       };
     }
@@ -30883,13 +17754,13 @@ var require_formats = __commonJS({
     }
     var NOT_URI_FRAGMENT = /\/|:/;
     var URI = /^(?:[a-z][a-z0-9+\-.]*:)(?:\/?\/(?:(?:[a-z0-9\-._~!$&'()*+,;=:]|%[0-9a-f]{2})*@)?(?:\[(?:(?:(?:(?:[0-9a-f]{1,4}:){6}|::(?:[0-9a-f]{1,4}:){5}|(?:[0-9a-f]{1,4})?::(?:[0-9a-f]{1,4}:){4}|(?:(?:[0-9a-f]{1,4}:){0,1}[0-9a-f]{1,4})?::(?:[0-9a-f]{1,4}:){3}|(?:(?:[0-9a-f]{1,4}:){0,2}[0-9a-f]{1,4})?::(?:[0-9a-f]{1,4}:){2}|(?:(?:[0-9a-f]{1,4}:){0,3}[0-9a-f]{1,4})?::[0-9a-f]{1,4}:|(?:(?:[0-9a-f]{1,4}:){0,4}[0-9a-f]{1,4})?::)(?:[0-9a-f]{1,4}:[0-9a-f]{1,4}|(?:(?:25[0-5]|2[0-4]\d|[01]?\d\d?)\.){3}(?:25[0-5]|2[0-4]\d|[01]?\d\d?))|(?:(?:[0-9a-f]{1,4}:){0,5}[0-9a-f]{1,4})?::[0-9a-f]{1,4}|(?:(?:[0-9a-f]{1,4}:){0,6}[0-9a-f]{1,4})?::)|[Vv][0-9a-f]+\.[a-z0-9\-._~!$&'()*+,;=:]+)\]|(?:(?:25[0-5]|2[0-4]\d|[01]?\d\d?)\.){3}(?:25[0-5]|2[0-4]\d|[01]?\d\d?)|(?:[a-z0-9\-._~!$&'()*+,;=]|%[0-9a-f]{2})*)(?::\d*)?(?:\/(?:[a-z0-9\-._~!$&'()*+,;=:@]|%[0-9a-f]{2})*)*|\/(?:(?:[a-z0-9\-._~!$&'()*+,;=:@]|%[0-9a-f]{2})+(?:\/(?:[a-z0-9\-._~!$&'()*+,;=:@]|%[0-9a-f]{2})*)*)?|(?:[a-z0-9\-._~!$&'()*+,;=:@]|%[0-9a-f]{2})+(?:\/(?:[a-z0-9\-._~!$&'()*+,;=:@]|%[0-9a-f]{2})*)*)(?:\?(?:[a-z0-9\-._~!$&'()*+,;=:@/?]|%[0-9a-f]{2})*)?(?:#(?:[a-z0-9\-._~!$&'()*+,;=:@/?]|%[0-9a-f]{2})*)?$/i;
-    function uri(str) {
-      return NOT_URI_FRAGMENT.test(str) && URI.test(str);
+    function uri(str2) {
+      return NOT_URI_FRAGMENT.test(str2) && URI.test(str2);
     }
     var BYTE = /^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/gm;
-    function byte(str) {
+    function byte(str2) {
       BYTE.lastIndex = 0;
-      return BYTE.test(str);
+      return BYTE.test(str2);
     }
     var MIN_INT32 = -(2 ** 31);
     var MAX_INT32 = 2 ** 31 - 1;
@@ -30903,11 +17774,11 @@ var require_formats = __commonJS({
       return true;
     }
     var Z_ANCHOR = /[^\\]\\Z/;
-    function regex(str) {
-      if (Z_ANCHOR.test(str))
+    function regex(str2) {
+      if (Z_ANCHOR.test(str2))
         return false;
       try {
-        new RegExp(str);
+        new RegExp(str2);
         return true;
       } catch (e) {
         return false;
@@ -31863,15 +18734,15 @@ var require_windows = __commonJS({
       }
       return false;
     }
-    function checkStat(stat5, path, options) {
-      if (!stat5.isSymbolicLink() && !stat5.isFile()) {
+    function checkStat(stat, path, options) {
+      if (!stat.isSymbolicLink() && !stat.isFile()) {
         return false;
       }
       return checkPathExt(path, options);
     }
     function isexe(path, options, cb) {
-      fs11.stat(path, function(er, stat5) {
-        cb(er, er ? false : checkStat(stat5, path, options));
+      fs11.stat(path, function(er, stat) {
+        cb(er, er ? false : checkStat(stat, path, options));
       });
     }
     function sync(path, options) {
@@ -31888,20 +18759,20 @@ var require_mode = __commonJS({
     isexe.sync = sync;
     var fs11 = require("fs");
     function isexe(path, options, cb) {
-      fs11.stat(path, function(er, stat5) {
-        cb(er, er ? false : checkStat(stat5, options));
+      fs11.stat(path, function(er, stat) {
+        cb(er, er ? false : checkStat(stat, options));
       });
     }
     function sync(path, options) {
       return checkStat(fs11.statSync(path), options);
     }
-    function checkStat(stat5, options) {
-      return stat5.isFile() && checkMode(stat5, options);
+    function checkStat(stat, options) {
+      return stat.isFile() && checkMode(stat, options);
     }
-    function checkMode(stat5, options) {
-      var mod = stat5.mode;
-      var uid = stat5.uid;
-      var gid = stat5.gid;
+    function checkMode(stat, options) {
+      var mod = stat.mode;
+      var uid = stat.uid;
+      var gid = stat.gid;
       var myUid = options.uid !== void 0 ? options.uid : process.getuid && process.getuid();
       var myGid = options.gid !== void 0 ? options.gid : process.getgid && process.getgid();
       var u3 = parseInt("100", 8);
@@ -31936,12 +18807,12 @@ var require_isexe = __commonJS({
         if (typeof Promise !== "function") {
           throw new TypeError("callback not provided");
         }
-        return new Promise(function(resolve19, reject) {
+        return new Promise(function(resolve4, reject) {
           isexe(path, options || {}, function(er, is) {
             if (er) {
               reject(er);
             } else {
-              resolve19(is);
+              resolve4(is);
             }
           });
         });
@@ -32008,27 +18879,27 @@ var require_which = __commonJS({
         opt = {};
       const { pathEnv, pathExt, pathExtExe } = getPathInfo(cmd, opt);
       const found = [];
-      const step = (i) => new Promise((resolve19, reject) => {
+      const step = (i) => new Promise((resolve4, reject) => {
         if (i === pathEnv.length)
-          return opt.all && found.length ? resolve19(found) : reject(getNotFoundError(cmd));
+          return opt.all && found.length ? resolve4(found) : reject(getNotFoundError(cmd));
         const ppRaw = pathEnv[i];
         const pathPart = /^".*"$/.test(ppRaw) ? ppRaw.slice(1, -1) : ppRaw;
         const pCmd = path.join(pathPart, cmd);
         const p = !pathPart && /^\.[\\\/]/.test(cmd) ? cmd.slice(0, 2) + pCmd : pCmd;
-        resolve19(subStep(p, i, 0));
+        resolve4(subStep(p, i, 0));
       });
-      const subStep = (p, i, ii) => new Promise((resolve19, reject) => {
+      const subStep = (p, i, ii) => new Promise((resolve4, reject) => {
         if (ii === pathExt.length)
-          return resolve19(step(i + 1));
+          return resolve4(step(i + 1));
         const ext = pathExt[ii];
         isexe(p + ext, { pathExt: pathExtExe }, (er, is) => {
           if (!er && is) {
             if (opt.all)
               found.push(p + ext);
             else
-              return resolve19(p + ext);
+              return resolve4(p + ext);
           }
-          return resolve19(subStep(p, i, ii + 1));
+          return resolve4(subStep(p, i, ii + 1));
         });
       });
       return cb ? step(0).then((res) => cb(null, res), cb) : step(0);
@@ -32208,7 +19079,7 @@ var require_readShebang = __commonJS({
 });
 
 // ../../node_modules/cross-spawn/lib/parse.js
-var require_parse3 = __commonJS({
+var require_parse = __commonJS({
   "../../node_modules/cross-spawn/lib/parse.js"(exports2, module2) {
     "use strict";
     init_scoped_fetch();
@@ -32327,23 +19198,23 @@ var require_cross_spawn = __commonJS({
     "use strict";
     init_scoped_fetch();
     var cp = require("child_process");
-    var parse4 = require_parse3();
+    var parse4 = require_parse();
     var enoent = require_enoent();
-    function spawn7(command, args, options) {
+    function spawn5(command, args, options) {
       const parsed = parse4(command, args, options);
       const spawned = cp.spawn(parsed.command, parsed.args, parsed.options);
       enoent.hookChildProcess(spawned, parsed);
       return spawned;
     }
-    function spawnSync6(command, args, options) {
+    function spawnSync(command, args, options) {
       const parsed = parse4(command, args, options);
       const result = cp.spawnSync(parsed.command, parsed.args, parsed.options);
       result.error = result.error || enoent.verifyENOENTSync(result.status, parsed);
       return result;
     }
-    module2.exports = spawn7;
-    module2.exports.spawn = spawn7;
-    module2.exports.sync = spawnSync6;
+    module2.exports = spawn5;
+    module2.exports.spawn = spawn5;
+    module2.exports.sync = spawnSync;
     module2.exports._parse = parse4;
     module2.exports._enoent = enoent;
   }
@@ -32440,7 +19311,7 @@ var init_stdio2 = __esm({
         if (this._process) {
           throw new Error("StdioClientTransport already started! If using Client class, note that connect() calls start() automatically.");
         }
-        return new Promise((resolve19, reject) => {
+        return new Promise((resolve4, reject) => {
           this._process = (0, import_cross_spawn.default)(this._serverParams.command, this._serverParams.args ?? [], {
             // merge default env with server env because mcp server needs some env vars
             env: {
@@ -32457,7 +19328,7 @@ var init_stdio2 = __esm({
             this.onerror?.(error2);
           });
           this._process.on("spawn", () => {
-            resolve19();
+            resolve4();
           });
           this._process.on("close", (_code) => {
             this._process = void 0;
@@ -32516,22 +19387,22 @@ var init_stdio2 = __esm({
         if (this._process) {
           const processToClose = this._process;
           this._process = void 0;
-          const closePromise = new Promise((resolve19) => {
+          const closePromise = new Promise((resolve4) => {
             processToClose.once("close", () => {
-              resolve19();
+              resolve4();
             });
           });
           try {
             processToClose.stdin?.end();
           } catch {
           }
-          await Promise.race([closePromise, new Promise((resolve19) => setTimeout(resolve19, 2e3).unref())]);
+          await Promise.race([closePromise, new Promise((resolve4) => setTimeout(resolve4, 2e3).unref())]);
           if (processToClose.exitCode === null) {
             try {
               processToClose.kill("SIGTERM");
             } catch {
             }
-            await Promise.race([closePromise, new Promise((resolve19) => setTimeout(resolve19, 2e3).unref())]);
+            await Promise.race([closePromise, new Promise((resolve4) => setTimeout(resolve4, 2e3).unref())]);
           }
           if (processToClose.exitCode === null) {
             try {
@@ -32543,15 +19414,15 @@ var init_stdio2 = __esm({
         this._readBuffer.clear();
       }
       send(message) {
-        return new Promise((resolve19) => {
+        return new Promise((resolve4) => {
           if (!this._process?.stdin) {
             throw new Error("Not connected");
           }
           const json = serializeMessage(message);
           if (this._process.stdin.write(json)) {
-            resolve19();
+            resolve4();
           } else {
-            this._process.stdin.once("drain", resolve19);
+            this._process.stdin.once("drain", resolve4);
           }
         });
       }
@@ -32575,6 +19446,9 @@ function isReadOnlyByName(rawName) {
       return true;
   return false;
 }
+function mcpProcessEnvironment(config2, inherit = true) {
+  return { ...inherit ? process.env : {}, ...config2.env ?? {} };
+}
 function unique(values) {
   return Array.from(new Set(values.filter(Boolean)));
 }
@@ -32585,7 +19459,7 @@ function maybeResolveFallback(config2, errorMsg) {
     return void 0;
   if (!config2.command)
     return void 0;
-  const cmdBase = (0, import_node_path29.basename)(config2.command).toLowerCase();
+  const cmdBase = (0, import_node_path7.basename)(config2.command).toLowerCase();
   if (!PYTHON_BASENAMES.has(cmdBase))
     return void 0;
   const args = config2.args ?? [];
@@ -32603,33 +19477,33 @@ function resolveConsoleScript(pythonPath, moduleName, envOverrides) {
   const dashed = moduleName.replace(/_/g, "-");
   const stems = unique([moduleName, `${moduleName}-mcp`, dashed, `${dashed}-mcp`]);
   const candidates = stems.map((s) => `${s}.exe`);
-  const scriptsDir = (0, import_node_path29.dirname)(pythonPath);
+  const scriptsDir = (0, import_node_path7.dirname)(pythonPath);
   for (const c of candidates) {
-    const p = (0, import_node_path29.join)(scriptsDir, c);
-    if ((0, import_node_fs15.existsSync)(p))
+    const p = (0, import_node_path7.join)(scriptsDir, c);
+    if ((0, import_node_fs4.existsSync)(p))
       return p;
   }
   const merged = { ...process.env, ...envOverrides ?? {} };
   const pathStr = merged.PATH ?? merged.Path ?? "";
-  const sep3 = process.platform === "win32" ? ";" : ":";
-  for (const dir of pathStr.split(sep3)) {
+  const sep2 = process.platform === "win32" ? ";" : ":";
+  for (const dir of pathStr.split(sep2)) {
     if (!dir)
       continue;
     for (const c of candidates) {
-      const p = (0, import_node_path29.join)(dir, c);
-      if ((0, import_node_fs15.existsSync)(p))
+      const p = (0, import_node_path7.join)(dir, c);
+      if ((0, import_node_fs4.existsSync)(p))
         return p;
     }
   }
   return void 0;
 }
-var import_node_fs15, import_node_path29, READ_ONLY_PREFIXES, READ_ONLY_SUFFIXES, READ_ONLY_EXACT, MUTATING_PREFIXES, McpClient, PYTHON_BASENAMES;
+var import_node_fs4, import_node_path7, READ_ONLY_PREFIXES, READ_ONLY_SUFFIXES, READ_ONLY_EXACT, MUTATING_PREFIXES, McpClient, PYTHON_BASENAMES;
 var init_client3 = __esm({
   "../../dist/src/mcp/client.js"() {
     "use strict";
     init_scoped_fetch();
-    import_node_fs15 = require("node:fs");
-    import_node_path29 = require("node:path");
+    import_node_fs4 = require("node:fs");
+    import_node_path7 = require("node:path");
     init_client2();
     init_stdio2();
     READ_ONLY_PREFIXES = [
@@ -32717,6 +19591,10 @@ var init_client3 = __esm({
       "render_"
     ];
     McpClient = class {
+      options;
+      constructor(options = {}) {
+        this.options = options;
+      }
       servers = /* @__PURE__ */ new Map();
       /** Connect to one server and register its tools in the registry. */
       async connect(config2, registry2) {
@@ -32737,7 +19615,7 @@ var init_client3 = __esm({
         const buildTransport = (command, args) => new StdioClientTransport({
           command,
           args,
-          env: { ...process.env, ...config2.env ?? {} },
+          env: mcpProcessEnvironment(config2, this.options.inheritEnvironment !== false),
           // Discard the MCP server's stderr so its log output (e.g.
           // "Processing request of type ListToolsRequest", "Dropping
           // released DXCamera instance") doesn't bleed into the TUI.
@@ -32753,7 +19631,7 @@ var init_client3 = __esm({
           firstError = err instanceof Error ? err.message : String(err);
         }
         if (firstError) {
-          const fallback = maybeResolveFallback(config2, firstError);
+          const fallback = this.options.allowCommandFallback === false ? null : maybeResolveFallback(config2, firstError);
           if (fallback) {
             try {
               await client.close();
@@ -32875,181 +19753,6 @@ var init_client3 = __esm({
       "python3",
       "python3.exe"
     ]);
-  }
-});
-
-// ../../dist/src/desktop/engine.js
-var CompositeToolCaller, WORKER_SCRIPT;
-var init_engine = __esm({
-  "../../dist/src/desktop/engine.js"() {
-    "use strict";
-    init_scoped_fetch();
-    CompositeToolCaller = class {
-      callers;
-      constructor(callers) {
-        this.callers = callers;
-      }
-      async call(serverId, name, input, options) {
-        let lastError = null;
-        for (const caller of this.callers) {
-          const result = await caller.call(serverId, name, input, options);
-          if (!result.isError || !/cannot route source|not connected/i.test(result.output)) {
-            return result;
-          }
-          lastError = result;
-        }
-        return lastError ?? {
-          output: `error: no tool caller could route source '${serverId}'`,
-          isError: true
-        };
-      }
-    };
-    WORKER_SCRIPT = String.raw`
-import asyncio
-import json
-import sys
-import traceback
-
-from pericode_desktop.server import mcp
-
-READ_ONLY = {
-    "client_preflight",
-    "client_postflight_confirmation",
-    "get_policy_state",
-    "scan_installed_apps",
-    "classify_desktop_intent",
-    "get_audit_log",
-    "replay_status",
-    "read_replay_events",
-    "replay_manifest",
-    "list_monitors",
-    "monitor_topology_status",
-    "list_windows",
-    "list_window_topology",
-    "resolve_relative_monitor",
-    "get_cursor_position",
-    "get_shared_desktop_state",
-    "get_emergency_stop_state",
-    "list_desktop_icons",
-    "list_taskbar_icons",
-    "find_taskbar_icon",
-    "read_taskbar_icon_tooltip",
-    "resolve_window_playbook",
-    "list_playbooks",
-    "pericode_status",
-    "cache_debug_status",
-    "quick_monitor_summary",
-    "quick_all_monitors_summary",
-    "quick_desktop_summary",
-    "quick_monitor_screen_model",
-    "thorough_all_monitors_summary",
-    "read_visible_window_text",
-    "wait_for_window_text",
-    "read_latest_chat_reply",
-    "wait_for_latest_chat_reply",
-    "list_browser_dom_targets",
-    "list_browser_dom_elements",
-    "read_browser_dom_text",
-    "read_browser_latest_reply",
-    "wait_browser_latest_reply",
-    "browser_dom_status",
-    "list_visible_elements",
-    "audio_capture_status",
-    "virtual_desktop_status",
-    "win_event_observer_status",
-}
-
-
-async def handle_list():
-    tools = await mcp.list_tools()
-    return {
-        "ok": True,
-        "result": [
-            {
-                "name": tool.name,
-                "description": tool.description or "",
-                "inputSchema": tool.inputSchema or {"type": "object", "properties": {}},
-                "mutating": tool.name not in READ_ONLY,
-            }
-            for tool in tools
-        ],
-    }
-
-
-async def handle_call(req):
-    name = str(req.get("name") or "")
-    if not name:
-        return {"ok": False, "error": "missing tool name"}
-    arguments = req.get("input") or {}
-    try:
-        content, structured = await mcp.call_tool(name, arguments)
-    except Exception as exc:  # noqa: BLE001
-        return {"ok": False, "error": f"{exc.__class__.__name__}: {exc}"}
-    if isinstance(structured, dict) and "result" in structured:
-        return {"ok": True, "result": structured["result"]}
-    text_parts = []
-    for block in content or []:
-        text = getattr(block, "text", None)
-        if isinstance(text, str):
-            text_parts.append(text)
-    return {"ok": True, "result": "\n".join(text_parts)}
-
-
-async def handle_instructions():
-    instructions = getattr(mcp, "instructions", None) or ""
-    return {"ok": True, "result": str(instructions)}
-
-
-async def dispatch(req):
-    kind = req.get("kind")
-    if kind == "list":
-        return await handle_list()
-    if kind == "call":
-        return await handle_call(req)
-    if kind == "instructions":
-        return await handle_instructions()
-    return {"ok": False, "error": f"unknown kind: {kind!r}"}
-
-
-def write(resp):
-    sys.stdout.write(json.dumps(resp, default=str) + "\n")
-    sys.stdout.flush()
-
-
-def main():
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
-    try:
-        for line in sys.stdin:
-            line = line.strip()
-            if not line:
-                continue
-            try:
-                req = json.loads(line)
-            except Exception as exc:  # noqa: BLE001
-                write({"id": None, "ok": False, "error": f"json: {exc}"})
-                continue
-            rid = req.get("id")
-            try:
-                resp = loop.run_until_complete(dispatch(req))
-            except Exception as exc:  # noqa: BLE001
-                resp = {
-                    "ok": False,
-                    "error": f"{exc.__class__.__name__}: {exc}",
-                    "trace": traceback.format_exc(),
-                }
-            resp["id"] = rid
-            write(resp)
-    finally:
-        try:
-            loop.close()
-        except Exception:
-            pass
-
-
-if __name__ == "__main__" or True:
-    main()
-`;
   }
 });
 
@@ -33343,7 +20046,7 @@ var init_discover = __esm({
   "../../dist/src/models/discover.js"() {
     "use strict";
     init_scoped_fetch();
-    init_store8();
+    init_store();
     init_anthropic_oauth();
     init_copilot_oauth();
     init_loader();
@@ -33365,14 +20068,13 @@ var init_sdk_entry = __esm({
     "use strict";
     init_scoped_fetch();
     init_agent_loop();
-    init_registry();
+    init_registry_core();
     init_gate();
     init_providers();
     init_system_prompt();
     init_project_context();
     init_client3();
-    init_engine();
-    init_store8();
+    init_store();
     init_anthropic_oauth();
     init_copilot_oauth();
     init_openai_codex_oauth();
@@ -33500,9 +20202,9 @@ function describeMode(mode) {
 async function readPolicy(vaultPath) {
   if (!vaultPath) return defaultPolicy();
   const path = POLICY_PATH(vaultPath);
-  if (!(0, import_node_fs19.existsSync)(path)) return defaultPolicy();
+  if (!(0, import_node_fs5.existsSync)(path)) return defaultPolicy();
   try {
-    const raw = await import_node_fs19.promises.readFile(path, "utf8");
+    const raw = await import_node_fs5.promises.readFile(path, "utf8");
     if (!raw.trim()) throw new Error("Empty security policy.");
     const parsed = JSON.parse(raw);
     const policy = { ...defaultPolicy(), ...parsed };
@@ -33516,13 +20218,13 @@ async function readPolicy(vaultPath) {
 }
 async function writePolicy(vaultPath, policy) {
   const path = POLICY_PATH(vaultPath);
-  await import_node_fs19.promises.mkdir((0, import_node_path33.join)(vaultPath, ".pericode"), { recursive: true });
-  await import_node_fs19.promises.writeFile(path, JSON.stringify(policy, null, 2) + "\n", "utf8");
+  await import_node_fs5.promises.mkdir((0, import_node_path8.join)(vaultPath, ".pericode"), { recursive: true });
+  await import_node_fs5.promises.writeFile(path, JSON.stringify(policy, null, 2) + "\n", "utf8");
 }
 async function ensurePolicy(vaultPath) {
   if (!vaultPath) return;
   const path = POLICY_PATH(vaultPath);
-  if ((0, import_node_fs19.existsSync)(path)) return;
+  if ((0, import_node_fs5.existsSync)(path)) return;
   await writePolicy(vaultPath, defaultPolicy());
 }
 function classifyRisk(toolName, isReadOnly) {
@@ -33653,7 +20355,7 @@ function onQuarantineChange(cb) {
 function isPathDenylisted(vaultRelativePath, patterns) {
   const input = vaultRelativePath.replace(/\\/g, "/");
   if (input.startsWith("/") || /^[a-z]:/i.test(input) || input.includes("\0")) return true;
-  const norm = import_node_path33.posix.normalize(input).replace(/^\.\//, "").toLowerCase();
+  const norm = import_node_path8.posix.normalize(input).replace(/^\.\//, "").toLowerCase();
   if (norm === ".." || norm.startsWith("../")) return true;
   for (const p of patterns) {
     if (matchGlob(norm, p.toLowerCase()) || matchGlob(norm + "/", p.toLowerCase())) return true;
@@ -33682,8 +20384,8 @@ function decideGate(toolName, isReadOnly, source, policy, args = {}) {
   }
   if (toolName.startsWith("mcp__") && policy.approvedMcps.length > 0) {
     const rest = toolName.slice("mcp__".length);
-    const sep3 = rest.indexOf("__");
-    const serverName = sep3 > 0 ? rest.slice(0, sep3) : rest;
+    const sep2 = rest.indexOf("__");
+    const serverName = sep2 > 0 ? rest.slice(0, sep2) : rest;
     if (!policy.approvedMcps.includes(serverName)) {
       return {
         kind: "block",
@@ -33893,14 +20595,14 @@ function isFieldManagedByOrg(policy, field) {
   if (!snap || !snap.is_fresh) return false;
   return snap.document.managed_fields.includes(field);
 }
-var import_node_fs19, import_node_path33, POLICY_PATH, HIGH_RISK_TOOL_PREFIXES, HIGH_RISK_TOOL_NAMES, MEDIUM_RISK_TOOL_PREFIXES, JAILBREAK_PATTERNS, HIDDEN_UNICODE_PATTERN, SHELL_LANGUAGE_PATTERNS, EMAIL_RE, PHONE_RE, SSN_RE, CARD_RE, _quarantine, _quarantineListeners, ADMIN_MANAGEABLE_FIELDS;
+var import_node_fs5, import_node_path8, POLICY_PATH, HIGH_RISK_TOOL_PREFIXES, HIGH_RISK_TOOL_NAMES, MEDIUM_RISK_TOOL_PREFIXES, JAILBREAK_PATTERNS, HIDDEN_UNICODE_PATTERN, SHELL_LANGUAGE_PATTERNS, EMAIL_RE, PHONE_RE, SSN_RE, CARD_RE, _quarantine, _quarantineListeners, ADMIN_MANAGEABLE_FIELDS;
 var init_pericodeSecurity = __esm({
   "src/pericodeSecurity.ts"() {
     "use strict";
     init_scoped_fetch();
-    import_node_fs19 = require("node:fs");
-    import_node_path33 = require("node:path");
-    POLICY_PATH = (vaultPath) => (0, import_node_path33.join)(vaultPath, ".pericode", "policy.json");
+    import_node_fs5 = require("node:fs");
+    import_node_path8 = require("node:path");
+    POLICY_PATH = (vaultPath) => (0, import_node_path8.join)(vaultPath, ".pericode", "policy.json");
     HIGH_RISK_TOOL_PREFIXES = [
       "delete_",
       "drop_",
@@ -34008,6 +20710,7 @@ var pericodeMcp_exports = {};
 __export(pericodeMcp_exports, {
   PluginMcpManager: () => PluginMcpManager,
   approveMcpEntry: () => approveMcpEntry,
+  clearMcpApprovals: () => clearMcpApprovals,
   ensureMcpConfig: () => ensureMcpConfig,
   mcpEntryHash: () => mcpEntryHash,
   pluginMcpConfigPath: () => pluginMcpConfigPath,
@@ -34016,17 +20719,17 @@ __export(pericodeMcp_exports, {
   writeMcpConfig: () => writeMcpConfig
 });
 function configPath(vaultPath) {
-  return (0, import_node_path34.join)(vaultPath, ".pericode", "mcp.json");
+  return (0, import_node_path13.join)(vaultPath, ".pericode", "mcp.json");
 }
 function pluginMcpConfigPath(vaultPath) {
   return configPath(vaultPath);
 }
 async function readMcpConfig(vaultPath) {
   const path = configPath(vaultPath);
-  if (!(0, import_node_fs20.existsSync)(path)) return [];
+  if (!(0, import_node_fs9.existsSync)(path)) return [];
   let raw;
   try {
-    raw = await import_node_fs20.promises.readFile(path, "utf8");
+    raw = await import_node_fs9.promises.readFile(path, "utf8");
   } catch {
     return [];
   }
@@ -34041,106 +20744,88 @@ async function readMcpConfig(vaultPath) {
 }
 async function writeMcpConfig(vaultPath, servers) {
   const path = configPath(vaultPath);
-  await import_node_fs20.promises.mkdir((0, import_node_path34.join)(vaultPath, ".pericode"), { recursive: true });
+  await import_node_fs9.promises.mkdir((0, import_node_path13.join)(vaultPath, ".pericode"), { recursive: true });
   let existing = {};
-  if ((0, import_node_fs20.existsSync)(path)) {
+  if ((0, import_node_fs9.existsSync)(path)) {
     try {
-      const raw = await import_node_fs20.promises.readFile(path, "utf8");
+      const raw = await import_node_fs9.promises.readFile(path, "utf8");
       existing = JSON.parse(raw);
     } catch {
     }
   }
   const next = {
-    _hint: existing._hint ?? "Add MCP servers to `servers`. Each entry: { name, transport: 'stdio', command, args?, env? }. The plugin loads them at startup. See https://github.com/modelcontextprotocol/servers for the official catalog.",
+    _hint: existing._hint ?? "Add MCP servers to `servers`. Each entry: { name, transport: 'stdio', command, args?, env? }. Each server requires approval in Settings for the current plugin session. See https://github.com/modelcontextprotocol/servers for the official catalog.",
     servers
   };
-  await import_node_fs20.promises.writeFile(path, JSON.stringify(next, null, 2) + "\n", "utf8");
-}
-function approvedPath(vaultPath) {
-  return (0, import_node_path34.join)(vaultPath, ".pericode", APPROVED_FILENAME);
+  await import_node_fs9.promises.writeFile(path, JSON.stringify(next, null, 2) + "\n", "utf8");
 }
 function mcpEntryHash(server) {
-  const envKeys = server.env ? Object.keys(server.env).sort() : [];
-  const identity = JSON.stringify({
+  const env = Object.entries(server.env ?? {}).sort(([a], [b2]) => a.localeCompare(b2));
+  return (0, import_node_crypto6.createHash)("sha256").update(JSON.stringify({
     name: server.name,
     transport: server.transport,
-    command: server.command,
+    command: server.command ?? "",
     args: server.args ?? [],
-    envKeys
-  });
-  return (0, import_node_crypto13.createHash)("sha256").update(identity).digest("hex").slice(0, 16);
-}
-async function readApprovedStore(vaultPath) {
-  const path = approvedPath(vaultPath);
-  if (!(0, import_node_fs20.existsSync)(path)) return null;
-  try {
-    const raw = await import_node_fs20.promises.readFile(path, "utf8");
-    const parsed = JSON.parse(raw);
-    if (!Array.isArray(parsed.approved)) return null;
-    return {
-      approved: parsed.approved.filter((s) => typeof s === "string"),
-      updated_at: parsed.updated_at ?? ""
-    };
-  } catch {
-    return null;
-  }
-}
-async function writeApprovedStore(vaultPath, store) {
-  const path = approvedPath(vaultPath);
-  await import_node_fs20.promises.mkdir((0, import_node_path34.join)(vaultPath, ".pericode"), { recursive: true });
-  await import_node_fs20.promises.writeFile(path, JSON.stringify(store, null, 2) + "\n", "utf8");
+    url: server.url ?? "",
+    env
+  })).digest("hex");
 }
 async function approveMcpEntry(vaultPath, hash) {
-  const store = await readApprovedStore(vaultPath) ?? {
-    approved: [],
-    updated_at: ""
-  };
-  if (!store.approved.includes(hash)) store.approved.push(hash);
-  store.updated_at = (/* @__PURE__ */ new Date()).toISOString();
-  await writeApprovedStore(vaultPath, store);
+  if (!/^[a-f0-9]{64}$/.test(hash)) throw new Error("Invalid MCP approval.");
+  const key = approvalKey(vaultPath);
+  const approved = sessionApprovals.get(key) ?? /* @__PURE__ */ new Set();
+  approved.add(hash);
+  sessionApprovals.set(key, approved);
 }
 async function revokeMcpEntry(vaultPath, hash) {
-  const store = await readApprovedStore(vaultPath);
-  if (!store) return;
-  store.approved = store.approved.filter((h) => h !== hash);
-  store.updated_at = (/* @__PURE__ */ new Date()).toISOString();
-  await writeApprovedStore(vaultPath, store);
+  sessionApprovals.get(approvalKey(vaultPath))?.delete(hash);
+}
+function clearMcpApprovals(vaultPath) {
+  sessionApprovals.delete(approvalKey(vaultPath));
 }
 async function ensureMcpConfig(vaultPath) {
   if (!vaultPath) return;
   const path = configPath(vaultPath);
-  if ((0, import_node_fs20.existsSync)(path)) return;
+  if ((0, import_node_fs9.existsSync)(path)) return;
   const stub = JSON.stringify(
     {
-      _hint: "Add MCP servers to `servers`. Each entry: { name, transport: 'stdio', command, args?, env? }. The plugin loads them at startup. Example servers: GitHub, Jira, Gmail, Slack. See https://modelcontextprotocol.io for available servers.",
+      _hint: "Add MCP servers to `servers`. Each entry: { name, transport: 'stdio', command, args?, env? }. Each server requires approval in Settings for the current plugin session. Example servers: GitHub, Jira, Gmail, Slack. See https://modelcontextprotocol.io for available servers.",
       servers: []
     },
     null,
     2
   );
   try {
-    await import_node_fs20.promises.mkdir((0, import_node_path34.join)(vaultPath, ".pericode"), { recursive: true });
-    await import_node_fs20.promises.writeFile(path, stub, "utf8");
+    await import_node_fs9.promises.mkdir((0, import_node_path13.join)(vaultPath, ".pericode"), { recursive: true });
+    await import_node_fs9.promises.writeFile(path, stub, "utf8");
   } catch {
   }
 }
-var import_node_crypto13, import_node_fs20, import_node_path34, APPROVED_FILENAME, PluginMcpManager;
+var import_node_crypto6, import_node_fs9, import_node_path13, sessionApprovals, approvalKey, PluginMcpManager;
 var init_pericodeMcp = __esm({
   "src/pericodeMcp.ts"() {
     "use strict";
     init_scoped_fetch();
-    import_node_crypto13 = require("node:crypto");
-    import_node_fs20 = require("node:fs");
-    import_node_path34 = require("node:path");
+    import_node_crypto6 = require("node:crypto");
+    import_node_fs9 = require("node:fs");
+    import_node_path13 = require("node:path");
     init_sdk_entry();
-    APPROVED_FILENAME = "mcp-approved.json";
+    sessionApprovals = /* @__PURE__ */ new Map();
+    approvalKey = (vault) => {
+      const path = (0, import_node_path13.resolve)(vault);
+      return process.platform === "win32" ? path.toLowerCase() : path;
+    };
     PluginMcpManager = class {
+      constructor(createClient = () => new McpClient({ inheritEnvironment: false, allowCommandFallback: false })) {
+        this.createClient = createClient;
+      }
+      createClient;
       client = null;
       connectedNames = [];
       lastFailures = [];
       /**
-       * Entries the operator hasn't approved yet (mcp.json shows them but
-       * mcp-approved.json doesn't). Surfaced in settings so the operator
+       * Entries the operator has not approved in this session.
+       * Surfaced in settings so the operator
        * can review the command + args before approving the entry to spawn.
        */
       pendingApproval = [];
@@ -34152,17 +20837,10 @@ var init_pericodeMcp = __esm({
       async start(vaultPath, registry2) {
         if (!vaultPath) return { connected: [], failed: [] };
         this.pendingApproval = [];
+        this.lastFailures = [];
         let servers = await readMcpConfig(vaultPath);
         if (servers.length === 0) return { connected: [], failed: [] };
-        let approvedStore = await readApprovedStore(vaultPath);
-        if (approvedStore === null) {
-          approvedStore = {
-            approved: servers.map((s) => mcpEntryHash(s)),
-            updated_at: (/* @__PURE__ */ new Date()).toISOString()
-          };
-          await writeApprovedStore(vaultPath, approvedStore);
-        }
-        const approvedSet = new Set(approvedStore.approved);
+        const approvedSet = sessionApprovals.get(approvalKey(vaultPath)) ?? /* @__PURE__ */ new Set();
         const pendingBefore = [];
         const allowedToSpawn = [];
         for (const s of servers) {
@@ -34175,7 +20853,7 @@ var init_pericodeMcp = __esm({
               hash,
               command: s.command ?? "",
               args: s.args ?? [],
-              reason: "New or modified MCP entry \u2014 review the command + args in Settings, then approve to spawn."
+              reason: "MCP server requires approval for this session. Review its command, arguments and environment in Settings."
             });
           }
         }
@@ -34193,6 +20871,10 @@ var init_pericodeMcp = __esm({
         try {
           const { readPolicy: readPolicy3 } = await Promise.resolve().then(() => (init_pericodeSecurity(), pericodeSecurity_exports));
           const policy = await readPolicy3(vaultPath);
+          if (policy.dryRun) {
+            this.lastFailures = servers.map((s) => ({ name: s.name, error: "Dry-run policy: MCP startup is disabled." }));
+            return { connected: [], failed: this.lastFailures };
+          }
           if (policy.approvedMcps && policy.approvedMcps.length > 0) {
             const allow = new Set(policy.approvedMcps);
             const filteredOut = [];
@@ -34216,8 +20898,10 @@ var init_pericodeMcp = __esm({
             }
           }
         } catch {
+          this.lastFailures = servers.map((s) => ({ name: s.name, error: "Security policy could not be loaded; MCP startup refused." }));
+          return { connected: [], failed: this.lastFailures };
         }
-        const client = new McpClient();
+        const client = this.createClient();
         const connected = [];
         const failed = [...this.lastFailures];
         for (const server of servers) {
@@ -34236,7 +20920,7 @@ var init_pericodeMcp = __esm({
           }
         }
         if (connected.length > 0) {
-          registry2.setMcpCaller(new CompositeToolCaller([client]));
+          registry2.setMcpCaller(client);
           this.client = client;
           this.connectedNames = connected;
         } else {
@@ -34283,22 +20967,22 @@ async function scaffoldVault(vaultPath) {
   const created = [];
   const skipped = [];
   for (const rel of PIPELINE_DIRS) {
-    const abs = (0, import_node_path37.join)(vaultPath, rel);
-    if ((0, import_node_fs24.existsSync)(abs)) {
+    const abs = (0, import_node_path16.join)(vaultPath, rel);
+    if ((0, import_node_fs13.existsSync)(abs)) {
       skipped.push(`${rel}/`);
       continue;
     }
-    await import_node_fs23.promises.mkdir(abs, { recursive: true });
+    await import_node_fs12.promises.mkdir(abs, { recursive: true });
     created.push(`${rel}/`);
   }
   for (const seed of SEED_FILES) {
-    const abs = (0, import_node_path37.join)(vaultPath, seed.path);
-    if ((0, import_node_fs24.existsSync)(abs)) {
+    const abs = (0, import_node_path16.join)(vaultPath, seed.path);
+    if ((0, import_node_fs13.existsSync)(abs)) {
       skipped.push(seed.path);
       continue;
     }
-    await import_node_fs23.promises.mkdir((0, import_node_path37.dirname)(abs), { recursive: true });
-    await import_node_fs23.promises.writeFile(abs, seed.content, "utf8");
+    await import_node_fs12.promises.mkdir((0, import_node_path16.dirname)(abs), { recursive: true });
+    await import_node_fs12.promises.writeFile(abs, seed.content, "utf8");
     created.push(seed.path);
   }
   return { created, skipped, vaultPath };
@@ -34397,14 +21081,14 @@ internal docs. Pointers only \u2014 never duplicate the contents here.
 <!-- pericode:append:references -->
 `;
 }
-var import_node_fs23, import_node_fs24, import_node_path37, PIPELINE_DIRS, SEED_FILES;
+var import_node_fs12, import_node_fs13, import_node_path16, PIPELINE_DIRS, SEED_FILES;
 var init_vaultScaffold = __esm({
   "src/vaultScaffold.ts"() {
     "use strict";
     init_scoped_fetch();
-    import_node_fs23 = require("node:fs");
-    import_node_fs24 = require("node:fs");
-    import_node_path37 = require("node:path");
+    import_node_fs12 = require("node:fs");
+    import_node_fs13 = require("node:fs");
+    import_node_path16 = require("node:path");
     PIPELINE_DIRS = [
       "raw",
       "raw/_compiled",
@@ -34440,12 +21124,12 @@ __export(obsidianHostBridge_exports, {
   seedPericodeTemplates: () => seedPericodeTemplates
 });
 async function readDailyNotesConfig(vaultPath) {
-  const path = (0, import_node_path42.join)(vaultPath, ".obsidian", "daily-notes.json");
-  if (!(0, import_node_fs27.existsSync)(path)) {
+  const path = (0, import_node_path20.join)(vaultPath, ".obsidian", "daily-notes.json");
+  if (!(0, import_node_fs16.existsSync)(path)) {
     return { folder: "", format: DEFAULT_DAILY_FORMAT, template: "", configured: false };
   }
   try {
-    const raw = await import_node_fs27.promises.readFile(path, "utf8");
+    const raw = await import_node_fs16.promises.readFile(path, "utf8");
     const parsed = JSON.parse(raw);
     return {
       folder: (parsed.folder ?? "").replace(/^\/+|\/+$/g, ""),
@@ -34479,30 +21163,30 @@ async function appendDailyNoteEntry(vaultPath, message) {
   const cfg = await readDailyNotesConfig(vaultPath);
   if (!cfg.configured) return null;
   const todayName = formatToday(cfg.format) + ".md";
-  const folderAbs = cfg.folder ? (0, import_node_path42.join)(vaultPath, cfg.folder) : vaultPath;
-  const filePath = (0, import_node_path42.join)(folderAbs, todayName);
-  await import_node_fs27.promises.mkdir(folderAbs, { recursive: true });
+  const folderAbs = cfg.folder ? (0, import_node_path20.join)(vaultPath, cfg.folder) : vaultPath;
+  const filePath = (0, import_node_path20.join)(folderAbs, todayName);
+  await import_node_fs16.promises.mkdir(folderAbs, { recursive: true });
   const now = /* @__PURE__ */ new Date();
   const hh = String(now.getHours()).padStart(2, "0");
   const mm = String(now.getMinutes()).padStart(2, "0");
   const line = `- ${hh}:${mm} ${message.trim()}`;
   const heading = "## PeriCode log";
-  if (!(0, import_node_fs27.existsSync)(filePath)) {
+  if (!(0, import_node_fs16.existsSync)(filePath)) {
     const initial = `# ${formatToday(cfg.format)}
 
 ${heading}
 
 ${line}
 `;
-    await import_node_fs27.promises.appendFile(filePath, initial, "utf8");
+    await import_node_fs16.promises.appendFile(filePath, initial, "utf8");
     return filePath;
   }
-  const existing = await import_node_fs27.promises.readFile(filePath, "utf8").catch(() => "");
+  const existing = await import_node_fs16.promises.readFile(filePath, "utf8").catch(() => "");
   if (existing.includes(heading)) {
-    await import_node_fs27.promises.appendFile(filePath, `${line}
+    await import_node_fs16.promises.appendFile(filePath, `${line}
 `, "utf8");
   } else {
-    await import_node_fs27.promises.appendFile(filePath, `
+    await import_node_fs16.promises.appendFile(filePath, `
 ${heading}
 
 ${line}
@@ -34513,26 +21197,26 @@ ${line}
 async function seedPericodeTemplates(vaultPath) {
   const result = { written: [], skipped: [] };
   if (!vaultPath) return result;
-  const dir = (0, import_node_path42.join)(vaultPath, "templates", "PeriCode");
-  await import_node_fs27.promises.mkdir(dir, { recursive: true });
+  const dir = (0, import_node_path20.join)(vaultPath, "templates", "PeriCode");
+  await import_node_fs16.promises.mkdir(dir, { recursive: true });
   for (const [name, body] of Object.entries(TEMPLATES)) {
-    const filePath = (0, import_node_path42.join)(dir, name);
-    if ((0, import_node_fs27.existsSync)(filePath)) {
+    const filePath = (0, import_node_path20.join)(dir, name);
+    if ((0, import_node_fs16.existsSync)(filePath)) {
       result.skipped.push(filePath);
       continue;
     }
-    await import_node_fs27.promises.writeFile(filePath, body, "utf8");
+    await import_node_fs16.promises.writeFile(filePath, body, "utf8");
     result.written.push(filePath);
   }
   return result;
 }
 async function readObsidianConfigSnapshot(vaultPath) {
-  const dir = (0, import_node_path42.join)(vaultPath, ".obsidian");
+  const dir = (0, import_node_path20.join)(vaultPath, ".obsidian");
   const [enabledCommunityPlugins, installedThemes, cssSnippets, customHotkeys, dailyNotes] = await Promise.all([
-    readJson((0, import_node_path42.join)(dir, "community-plugins.json"), []),
-    listDir((0, import_node_path42.join)(dir, "themes")),
-    listDir((0, import_node_path42.join)(dir, "snippets")),
-    readJson((0, import_node_path42.join)(dir, "hotkeys.json"), {}),
+    readJson((0, import_node_path20.join)(dir, "community-plugins.json"), []),
+    listDir((0, import_node_path20.join)(dir, "themes")),
+    listDir((0, import_node_path20.join)(dir, "snippets")),
+    readJson((0, import_node_path20.join)(dir, "hotkeys.json"), {}),
     readDailyNotesConfig(vaultPath)
   ]);
   return {
@@ -34544,30 +21228,30 @@ async function readObsidianConfigSnapshot(vaultPath) {
   };
 }
 async function readJson(path, fallback) {
-  if (!(0, import_node_fs27.existsSync)(path)) return fallback;
+  if (!(0, import_node_fs16.existsSync)(path)) return fallback;
   try {
-    const raw = await import_node_fs27.promises.readFile(path, "utf8");
+    const raw = await import_node_fs16.promises.readFile(path, "utf8");
     return JSON.parse(raw);
   } catch {
     return fallback;
   }
 }
 async function listDir(path) {
-  if (!(0, import_node_fs27.existsSync)(path)) return [];
+  if (!(0, import_node_fs16.existsSync)(path)) return [];
   try {
-    const entries = await import_node_fs27.promises.readdir(path);
+    const entries = await import_node_fs16.promises.readdir(path);
     return entries.sort();
   } catch {
     return [];
   }
 }
-var import_node_fs27, import_node_path42, DEFAULT_DAILY_FORMAT, TEMPLATES;
+var import_node_fs16, import_node_path20, DEFAULT_DAILY_FORMAT, TEMPLATES;
 var init_obsidianHostBridge = __esm({
   "src/obsidianHostBridge.ts"() {
     "use strict";
     init_scoped_fetch();
-    import_node_fs27 = require("node:fs");
-    import_node_path42 = require("node:path");
+    import_node_fs16 = require("node:fs");
+    import_node_path20 = require("node:path");
     DEFAULT_DAILY_FORMAT = "YYYY-MM-DD";
     TEMPLATES = {
       "Decision.md": `---
@@ -34657,7 +21341,338 @@ __export(main_exports, {
 });
 module.exports = __toCommonJS(main_exports);
 init_scoped_fetch();
-var import_obsidian13 = require("obsidian");
+
+// src/vaultFileTools.ts
+init_scoped_fetch();
+
+// ../../src/tools/secret-guard.ts
+init_scoped_fetch();
+var import_node_path = require("node:path");
+var lowercased = (predicate) => (name) => predicate(name.toLowerCase());
+var SECRET_RULES = [
+  {
+    reason: ".env file (environment secrets)",
+    test: lowercased(
+      (n) => n === ".env" || n.startsWith(".env.") || n.endsWith(".env")
+    )
+  },
+  {
+    reason: "PEM key material",
+    test: lowercased((n) => n.endsWith(".pem"))
+  },
+  {
+    reason: "PKCS#12 keystore",
+    test: lowercased((n) => n.endsWith(".pfx") || n.endsWith(".p12"))
+  },
+  {
+    reason: "SSH private key",
+    test: lowercased(
+      (n) => n === "id_rsa" || n === "id_dsa" || n === "id_ecdsa" || n === "id_ed25519"
+    )
+  },
+  {
+    reason: "filename contains 'secret'",
+    test: lowercased((n) => n.includes("secret"))
+  },
+  {
+    reason: "filename contains 'credentials'",
+    test: lowercased((n) => n.includes("credentials"))
+  },
+  {
+    reason: "KeePass database",
+    test: lowercased((n) => n.endsWith(".kdbx") || n.endsWith(".kdb"))
+  }
+];
+function classifySecretPath(path) {
+  const name = (0, import_node_path.basename)(path);
+  for (const rule of SECRET_RULES) {
+    if (rule.test(name)) return { matched: true, reason: rule.reason };
+  }
+  return { matched: false };
+}
+
+// src/vaultFileTools.ts
+var import_obsidian = require("obsidian");
+
+// src/guardedRegistry.ts
+init_scoped_fetch();
+var import_promises = require("node:fs/promises");
+var import_node_path9 = require("node:path");
+init_sdk_entry();
+init_pericodeSecurity();
+var PATH_KEYS = /* @__PURE__ */ new Set(["path", "paths", "file_path", "target_path", "dir", "directory", "output_path", "notebook_path", "cwd", "under_path"]);
+var FILE_TOOLS = /* @__PURE__ */ new Set(["read_file", "write_file", "edit_file", "delete_file", "list_dir", "search_files"]);
+var FORBIDDEN = /* @__PURE__ */ new Set(["obsidian_call_plugin_api", "obsidian_run_command", "obsidian_inspect_config"]);
+async function checkedVaultPath(path, vault, policy) {
+  if (!path || path.includes("\0") || /(^|[\\/])\.\.([\\/]|$)/.test(path) || /[<>|*?]/.test(path)) throw new Error("Invalid vault path.");
+  const base = (0, import_node_path9.resolve)(vault);
+  const absolute = (0, import_node_path9.resolve)(base, path);
+  const rel = (0, import_node_path9.relative)(base, absolute);
+  if (rel === ".." || rel.startsWith(`..${import_node_path9.sep}`) || (0, import_node_path9.isAbsolute)(rel) || rel.includes(":")) throw new Error("Path is outside the vault.");
+  const portable = rel.replace(/\\/g, "/");
+  if (process.platform === "win32" && portable.split("/").some((part) => /[. ]$/.test(part))) throw new Error("Ambiguous Windows path.");
+  if (isPathDenylisted(portable, policy.denylistPaths)) throw new Error("Path is excluded by security policy.");
+  const root = await (0, import_promises.realpath)(base);
+  let current = base;
+  for (const part of rel.split(import_node_path9.sep).filter(Boolean)) {
+    current = (0, import_node_path9.resolve)(current, part);
+    try {
+      const info = await (0, import_promises.lstat)(current);
+      if (info.isSymbolicLink()) throw new Error("Linked paths are not accessible to tools.");
+      const actual = (0, import_node_path9.relative)(root, await (0, import_promises.realpath)(current));
+      if (actual === ".." || actual.startsWith(`..${import_node_path9.sep}`) || (0, import_node_path9.isAbsolute)(actual)) throw new Error("Path resolves outside the vault.");
+      if (isPathDenylisted(actual.replace(/\\/g, "/"), policy.denylistPaths)) throw new Error("Resolved path is excluded by security policy.");
+    } catch (e) {
+      if (e.code === "ENOENT") break;
+      throw e;
+    }
+  }
+  return { absolute, relative: portable };
+}
+var GuardedRegistry = class extends ToolRegistry {
+  constructor(source, deps) {
+    super();
+    this.deps = deps;
+    for (const { definition } of source.getAllWithSource("all")) {
+      if (!FILE_TOOLS.has(definition.name)) continue;
+      this.registerBuiltin({ definition, readOnly: source.isReadOnly(definition.name), execute: (input, context) => source.execute(definition.name, input, { context }) });
+    }
+  }
+  deps;
+  turn = null;
+  permits = /* @__PURE__ */ new Map();
+  denials = /* @__PURE__ */ new Map();
+  quarantineRevision = 0;
+  stopWatchingQuarantine;
+  registerBuiltin(tool) {
+    if (!FORBIDDEN.has(tool.definition.name)) super.registerBuiltin(tool);
+  }
+  beginTurn(ask, signal, forcePrompt = false) {
+    if (this.turn) throw new Error("A secured tool turn is already active.");
+    const options = { oneShot: false, autoApprove: /* @__PURE__ */ new Set(), autoApproveReadOnly: true, ask };
+    this.turn = { signal, ask, forcePrompt, gate: new PermissionGate(options) };
+    this.permits.clear();
+    this.denials.clear();
+    this.stopWatchingQuarantine = onQuarantineChange(() => {
+      this.quarantineRevision++;
+      this.permits.clear();
+    });
+    const registry2 = this;
+    return new class extends PermissionGate {
+      check(req) {
+        return registry2.authorize(req);
+      }
+      getDenialReason(req) {
+        return registry2.denials.get(registry2.key(req.toolName, req.input)) ?? "Tool request was not approved.";
+      }
+    }(options);
+  }
+  endTurn() {
+    this.permits.clear();
+    this.denials.clear();
+    this.turn = null;
+    this.stopWatchingQuarantine?.();
+    this.stopWatchingQuarantine = void 0;
+  }
+  key(name, input) {
+    return JSON.stringify([name, input]);
+  }
+  async inspect(name, input) {
+    if (!this.has(name)) throw new Error("Unknown or unavailable tool.");
+    if (getQuarantineState().active) throw new Error("Session quarantined.");
+    const policy = this.deps.getPolicy();
+    const fingerprint = JSON.stringify(policy);
+    const vault = this.deps.getVaultPath();
+    if (!vault) throw new Error("A local vault is required.");
+    const source = this.source(name) === "builtin" ? classifyToolSource(name) : "mcp_result";
+    const server = this.source(name);
+    if (server !== "builtin" && policy.approvedMcps.length && !policy.approvedMcps.includes(server ?? "")) throw new Error("MCP server is not approved by policy.");
+    const normalized = structuredClone(input);
+    if (["list_dir", "search_files", "obsidian_list_notes"].includes(name) && (normalized.path === void 0 || normalized.path === null || normalized.path === "")) normalized.path = ".";
+    const inspectValue = async (value, key = "") => {
+      if (PATH_KEYS.has(key) && typeof value === "string") {
+        const p = await checkedVaultPath(value, vault, policy);
+        return FILE_TOOLS.has(name) ? p.absolute : p.relative;
+      }
+      if (Array.isArray(value)) return Promise.all(value.map((v2) => inspectValue(v2, key)));
+      if (value && typeof value === "object") {
+        const result = {};
+        for (const [k2, v2] of Object.entries(value)) result[k2] = await inspectValue(v2, k2);
+        return result;
+      }
+      return value;
+    };
+    const args = await inspectValue(normalized);
+    for (const path of this.deps.getContextPaths?.(name) ?? []) await checkedVaultPath(path, vault, policy);
+    const decision = decideGate(name, this.isReadOnly(name), source, { ...policy, denylistPaths: [] });
+    if (decision.kind === "block") throw new Error(decision.reason);
+    if (JSON.stringify(this.deps.getPolicy()) !== fingerprint) throw new Error("Security policy changed; retry the request.");
+    return { args, policy, fingerprint, decision };
+  }
+  async authorize(req) {
+    const turn = this.turn;
+    const requestKey = this.key(req.toolName, req.input);
+    this.denials.delete(requestKey);
+    const refuse = (reason) => {
+      this.denials.set(requestKey, reason);
+      return false;
+    };
+    if (!turn || turn.signal.aborted) return refuse("Tool request cancelled or no longer active.");
+    try {
+      const revision = this.quarantineRevision;
+      const checked = await this.inspect(req.toolName, req.input);
+      const force = turn.forcePrompt || checked.policy.alwaysPromptForEveryCall || this.source(req.toolName) !== "builtin";
+      const gate = force ? new PermissionGate({ oneShot: false, autoApprove: /* @__PURE__ */ new Set(), autoApproveReadOnly: false, ask: turn.ask }) : turn.gate;
+      const allowed = await gate.check({ ...req, source: this.source(req.toolName) ?? "builtin", isReadOnly: !force && checked.decision.kind === "auto-approve" });
+      if (this.turn !== turn || turn.signal.aborted) return refuse("Tool request cancelled or no longer active.");
+      if (getQuarantineState().active || revision !== this.quarantineRevision || JSON.stringify(this.deps.getPolicy()) !== checked.fingerprint || this.key(req.toolName, req.input) !== requestKey) return refuse("Authorization changed before execution. Retry the request.");
+      if (!allowed) return refuse("Permission request was declined or dismissed.");
+      this.permits.set(requestKey, checked.fingerprint);
+      return true;
+    } catch (e) {
+      return refuse(`Tool request blocked: ${e instanceof Error ? e.message : String(e)}`);
+    }
+  }
+  async execute(name, input, options = {}) {
+    const turn = this.turn;
+    const key = this.key(name, input);
+    const revision = this.quarantineRevision;
+    const permit = this.permits.get(key);
+    this.permits.delete(key);
+    try {
+      if (!turn || turn.signal.aborted || options?.context?.signal !== turn.signal || !permit) throw new Error("Tool requires authorization in the active turn.");
+      const checked = await this.inspect(name, input);
+      if (permit !== checked.fingerprint || this.turn !== turn || turn.signal.aborted || revision !== this.quarantineRevision || getQuarantineState().active) throw new Error("Authorization expired; retry the request.");
+      if (checked.policy.dryRun) return { output: `[dry-run] ${name}: no tool was executed.`, isError: false };
+      if (name === "read_file") {
+        const info = await (0, import_promises.lstat)(String(checked.args.path));
+        if (info.size > 2e6) throw new Error("File exceeds the safe read limit (2 MB).");
+      }
+      const result = await super.execute(name, checked.args, options);
+      if (turn.signal.aborted || this.turn !== turn || revision !== this.quarantineRevision || getQuarantineState().active || JSON.stringify(this.deps.getPolicy()) !== permit) return { output: "Tool output withheld because authorization changed.", isError: true };
+      if (checked.policy.scanUntrustedText && scanUntrustedText(result.output).hit) {
+        if (checked.policy.autoQuarantineOnJailbreak) triggerQuarantine(`Untrusted output from ${name}`, "automatic");
+        return { output: "Tool output withheld by the untrusted-text policy.", isError: true };
+      }
+      return { ...result, output: redactForPrivacyMode(result.output, checked.policy.privacyMode) };
+    } catch (e) {
+      if (e.code === "ENOENT") return { output: "File or folder not found. Check the vault-relative path using list_dir or search_files.", isError: true };
+      return { output: `Blocked: ${e instanceof Error ? e.message : String(e)}`, isError: true };
+    }
+  }
+};
+
+// src/vaultFileTools.ts
+var LIMIT = 2e6;
+var str = (input, key, empty = false) => {
+  const value = input[key];
+  if (typeof value !== "string" || !empty && !value.length) throw new Error(`Provide ${key}.`);
+  return value;
+};
+function vaultFileTools(app, deps) {
+  const path = { type: "string" };
+  const edits = { old_str: { type: "string" }, new_str: { type: "string" }, replace_all: { type: "boolean" }, expected_replacements: { type: "integer" } };
+  const specs = [
+    { name: "read_file", description: "Read a vault text file with line numbers. Reads are limited to 2 MB and 500 lines per call; use start_line and end_line to page.", properties: { path, start_line: { type: "integer" }, end_line: { type: "integer" } }, required: ["path"] },
+    { name: "write_file", description: "Create or replace a vault text file. Its parent folder must exist. Use expected_old_content to refuse stale overwrites or create_only to refuse any overwrite. Empty content is refused.", properties: { path, content: { type: "string" }, expected_old_content: { type: "string" }, create_only: { type: "boolean" } }, required: ["path", "content"] },
+    { name: "edit_file", description: "Apply exact text replacements to a vault file. Matches must be unique unless replace_all or expected_replacements is supplied. Multiple edits are applied atomically.", properties: { path, ...edits, edits: { type: "array", items: { type: "object", properties: edits, required: ["old_str", "new_str"], additionalProperties: false } } }, required: ["path"] },
+    { name: "delete_file", description: "Move one vault file to Obsidian trash after confirmation. Permanent deletion and folder deletion are unavailable.", properties: { path }, required: ["path"] }
+  ];
+  return specs.map((spec) => ({
+    readOnly: spec.name === "read_file",
+    definition: { name: spec.name, description: spec.description, input_schema: { type: "object", properties: spec.properties, required: spec.required, additionalProperties: false } },
+    async execute(input, context) {
+      try {
+        const vault = deps.getVaultPath();
+        if (!vault) throw new Error("No local vault.");
+        const check2 = async () => {
+          if (context?.signal?.aborted) throw new Error("Cancelled.");
+          return checkedVaultPath(str(input, "path"), vault, deps.getPolicy());
+        };
+        const target = await check2();
+        const file = app.vault.getAbstractFileByPath(target.relative);
+        if (file && !(file instanceof import_obsidian.TFile)) throw new Error("Path is not a file.");
+        if (file instanceof import_obsidian.TFile && file.stat.size > LIMIT) throw new Error("File exceeds 2 MB.");
+        const ensureSize = (text2) => {
+          if (new TextEncoder().encode(text2).length > LIMIT) throw new Error("Content exceeds 2 MB.");
+        };
+        if (spec.name === "read_file") {
+          if (classifySecretPath(target.relative).matched) throw new Error("Secret-like files are not available to the model.");
+          if (!(file instanceof import_obsidian.TFile)) throw new Error("File not found.");
+          const text2 = await app.vault.read(file);
+          ensureSize(text2);
+          if (text2.includes("\0")) throw new Error("Binary files cannot be read as text.");
+          const lines = text2.split("\n");
+          const start = input.start_line ?? 1;
+          const end = input.end_line ?? Math.min(lines.length, Number(start) + 499);
+          if (!Number.isInteger(start) || !Number.isInteger(end) || Number(start) < 1 || Number(end) < Number(start)) throw new Error("Invalid line range.");
+          const stop = Math.min(Number(end), Number(start) + 499, lines.length);
+          const body = lines.slice(Number(start) - 1, stop).map((line, i) => `${Number(start) + i} | ${line}`).join("\n");
+          return { output: body + (stop < lines.length ? `
+[More lines available; next start_line: ${stop + 1}]` : ""), isError: false };
+        }
+        if (spec.name === "delete_file") {
+          if (!(file instanceof import_obsidian.TFile)) throw new Error("File not found.");
+          if (input.permanent !== void 0) throw new Error("Permanent deletion is unavailable.");
+          await check2();
+          await app.vault.trash(file, true);
+          return { output: "Moved to trash.", isError: false };
+        }
+        if (spec.name === "write_file") {
+          const content = str(input, "content");
+          ensureSize(content);
+          if (input.create_only !== void 0 && typeof input.create_only !== "boolean") throw new Error("Invalid create_only.");
+          if (input.expected_old_content !== void 0 && typeof input.expected_old_content !== "string") throw new Error("Invalid expected_old_content.");
+          if (file instanceof import_obsidian.TFile) {
+            if (input.create_only) throw new Error("File already exists.");
+            await check2();
+            await app.vault.process(file, (before) => {
+              if (context?.signal?.aborted) throw new Error("Cancelled.");
+              ensureSize(before);
+              if (input.expected_old_content !== void 0 && before !== input.expected_old_content) throw new Error("Stale content; read the file again.");
+              return content;
+            });
+          } else {
+            if (input.expected_old_content !== void 0) throw new Error("Stale content; file does not exist.");
+            const parent = target.relative.split("/").slice(0, -1).join("/");
+            if (parent && !(app.vault.getAbstractFileByPath(parent) instanceof import_obsidian.TFolder)) throw new Error("Create the parent folder first.");
+            await check2();
+            await app.vault.create(target.relative, content);
+          }
+          return { output: "File saved through Obsidian.", isError: false };
+        }
+        if (!(file instanceof import_obsidian.TFile)) throw new Error("File not found.");
+        const batch = input.edits ?? [input];
+        if (!Array.isArray(batch) || !batch.length || batch.length > 100) throw new Error("Provide 1 to 100 edits.");
+        await check2();
+        await app.vault.process(file, (before) => {
+          if (context?.signal?.aborted) throw new Error("Cancelled.");
+          ensureSize(before);
+          let after = before;
+          for (const item of batch) {
+            if (!item || typeof item !== "object" || Array.isArray(item)) throw new Error("Invalid edit.");
+            const oldText = str(item, "old_str"), newText = str(item, "new_str", true);
+            if (item.replace_all !== void 0 && typeof item.replace_all !== "boolean") throw new Error("Invalid replace_all.");
+            const count = after.split(oldText).length - 1;
+            if (!count) throw new Error("Text not found.");
+            if (item.expected_replacements !== void 0 && (!Number.isInteger(item.expected_replacements) || item.expected_replacements < 1 || count !== item.expected_replacements)) throw new Error("Replacement count mismatch.");
+            if (count > 1 && !item.replace_all && item.expected_replacements === void 0) throw new Error("Text is not unique.");
+            after = item.replace_all ? after.split(oldText).join(newText) : after.replace(oldText, () => newText);
+          }
+          if (!after.length) throw new Error("Empty content is refused; use a trash tool to delete a file.");
+          ensureSize(after);
+          return after;
+        });
+        return { output: "Edits saved through Obsidian.", isError: false };
+      } catch (error2) {
+        return { output: error2 instanceof Error ? error2.message : String(error2), isError: true };
+      }
+    }
+  }));
+}
+
+// src/main.ts
+var import_obsidian14 = require("obsidian");
 
 // src/InlineEditModal.ts
 init_scoped_fetch();
@@ -34690,34 +21705,34 @@ async function ollamaAccountModels(host) {
 }
 
 // src/InlineEditModal.ts
-var import_obsidian = require("obsidian");
+var import_obsidian2 = require("obsidian");
 init_sdk_entry();
 
 // src/grokCode.ts
 init_scoped_fetch();
-var import_node_child_process9 = require("node:child_process");
-var import_node_fs17 = require("node:fs");
-var import_promises12 = require("node:fs/promises");
-var import_node_os5 = require("node:os");
-var import_node_path31 = require("node:path");
+var import_node_child_process2 = require("node:child_process");
+var import_node_fs7 = require("node:fs");
+var import_promises3 = require("node:fs/promises");
+var import_node_os3 = require("node:os");
+var import_node_path11 = require("node:path");
 
 // src/claudeCode.ts
 init_scoped_fetch();
-var import_node_child_process8 = require("node:child_process");
-var import_node_fs16 = require("node:fs");
-var import_promises11 = require("node:fs/promises");
-var import_node_os4 = require("node:os");
-var import_node_path30 = require("node:path");
+var import_node_child_process = require("node:child_process");
+var import_node_fs6 = require("node:fs");
+var import_promises2 = require("node:fs/promises");
+var import_node_os2 = require("node:os");
+var import_node_path10 = require("node:path");
 var import_node_http2 = require("node:http");
-var import_node_crypto11 = require("node:crypto");
+var import_node_crypto4 = require("node:crypto");
 var import_node_readline = require("node:readline");
 function claudeExecutable() {
   const binary = process.platform === "win32" ? "claude.exe" : "claude";
   const candidates = [
-    (0, import_node_path30.join)((0, import_node_os4.homedir)(), ".local", "bin", binary),
-    ...(process.env.PATH ?? "").split(import_node_path30.delimiter).filter((p) => p && (0, import_node_path30.isAbsolute)(p)).map((p) => (0, import_node_path30.join)(p, binary))
+    (0, import_node_path10.join)((0, import_node_os2.homedir)(), ".local", "bin", binary),
+    ...(process.env.PATH ?? "").split(import_node_path10.delimiter).filter((p) => p && (0, import_node_path10.isAbsolute)(p)).map((p) => (0, import_node_path10.join)(p, binary))
   ];
-  const found = candidates.find((p) => (0, import_node_fs16.existsSync)(p));
+  const found = candidates.find((p) => (0, import_node_fs6.existsSync)(p));
   if (!found) throw new Error("Install Claude Code from https://code.claude.com/docs/en/setup, then reopen PeriCode sign-in.");
   return found;
 }
@@ -34739,11 +21754,11 @@ function claudeEnvironment() {
   return env;
 }
 async function claudeAuthStatus() {
-  return new Promise((resolve19, reject) => {
-    (0, import_node_child_process8.execFile)(claudeExecutable(), ["auth", "status"], { windowsHide: true, env: claudeEnvironment(), timeout: 15e3, maxBuffer: 64e3 }, (error2, stdout) => {
+  return new Promise((resolve4, reject) => {
+    (0, import_node_child_process.execFile)(claudeExecutable(), ["auth", "status"], { windowsHide: true, env: claudeEnvironment(), timeout: 15e3, maxBuffer: 64e3 }, (error2, stdout) => {
       try {
         const status = JSON.parse(stdout);
-        resolve19({ loggedIn: status.loggedIn === true, subscription: status.subscriptionType ?? "" });
+        resolve4({ loggedIn: status.loggedIn === true, subscription: status.subscriptionType ?? "" });
       } catch {
         reject(new Error(error2 ? "Could not check Claude Code sign-in. Run claude auth status in a terminal." : "Claude Code returned an invalid sign-in status."));
       }
@@ -34753,26 +21768,26 @@ async function claudeAuthStatus() {
 function stopProcess(child) {
   if (!child.pid || child.exitCode !== null) return;
   if (process.platform === "win32") {
-    const killer = (0, import_node_child_process8.spawn)("taskkill", ["/PID", String(child.pid), "/T", "/F"], { windowsHide: true, stdio: "ignore" });
+    const killer = (0, import_node_child_process.spawn)("taskkill", ["/PID", String(child.pid), "/T", "/F"], { windowsHide: true, stdio: "ignore" });
     killer.on("error", () => child.kill());
   } else child.kill("SIGTERM");
 }
 async function loginWithClaudeCode(signal) {
   if (signal.aborted) return;
-  await new Promise((resolve19, reject) => {
-    const child = (0, import_node_child_process8.spawn)(claudeExecutable(), ["auth", "login", "--claudeai"], { windowsHide: true, env: claudeEnvironment(), stdio: ["ignore", "ignore", "ignore"] });
+  await new Promise((resolve4, reject) => {
+    const child = (0, import_node_child_process.spawn)(claudeExecutable(), ["auth", "login", "--claudeai"], { windowsHide: true, env: claudeEnvironment(), stdio: ["ignore", "ignore", "ignore"] });
     const cancel = () => stopProcess(child);
     signal.addEventListener("abort", cancel, { once: true });
     child.once("error", reject);
     child.once("close", (code) => {
       signal.removeEventListener("abort", cancel);
-      if (signal.aborted || code === 0) resolve19();
+      if (signal.aborted || code === 0) resolve4();
       else reject(new Error("Claude Code sign-in did not complete. Run claude auth login in a terminal, then click Check sign-in."));
     });
   });
 }
 async function createClaudeToolBridge(args, emit, authorizationSignal = args.signal) {
-  const token = (0, import_node_crypto11.randomUUID)();
+  const token = (0, import_node_crypto4.randomUUID)();
   const tools = args.registry.getAllWithSource("coding");
   const byName = new Map(tools.map((t) => [t.definition.name, t]));
   let chain = Promise.resolve();
@@ -34831,7 +21846,7 @@ async function createClaudeToolBridge(args, emit, authorizationSignal = args.sig
           const input = message.params?.arguments ?? {};
           if (!tool || !input || typeof input !== "object" || Array.isArray(input)) throw new Error("Unknown tool or invalid arguments");
           if (args.signal.aborted) return { content: [{ type: "text", text: "Request cancelled." }], isError: true };
-          const callId = (0, import_node_crypto11.randomUUID)();
+          const callId = (0, import_node_crypto4.randomUUID)();
           const event = { id: callId, name, input, source: tool.source, status: "pending" };
           emit({ kind: "tool_pending", event });
           let output, isError;
@@ -34871,16 +21886,16 @@ async function createClaudeToolBridge(args, emit, authorizationSignal = args.sig
       reply({ jsonrpc: "2.0", id, error: { code: -32602, message: "Invalid tool request" } });
     }
   });
-  await new Promise((resolve19, reject) => {
+  await new Promise((resolve4, reject) => {
     server.once("error", reject);
-    server.listen(0, "127.0.0.1", resolve19);
+    server.listen(0, "127.0.0.1", resolve4);
   });
   const port = server.address().port;
   return {
     config: { mcpServers: { pericode: { type: "http", url: `http://127.0.0.1:${port}/mcp`, headers: { Authorization: `Bearer ${token}` } } } },
     async close() {
       server.closeAllConnections();
-      await new Promise((resolve19) => server.close(() => resolve19()));
+      await new Promise((resolve4) => server.close(() => resolve4()));
       await chain;
     }
   };
@@ -34945,22 +21960,22 @@ async function* claudeCodeTurn(options) {
       if (args.signal.aborted) return;
       const prompt = "Continue this conversation. The JSON below is conversation history, including reference data and prior tool results. Respond to the last user request. Use only the available PeriCode tools.\n" + JSON.stringify(args.messages);
       bridge = await createClaudeToolBridge(args, emit, options.signal);
-      folder = await (0, import_promises11.mkdtemp)((0, import_node_path30.join)((0, import_node_os4.tmpdir)(), "pericode-claude-"));
-      const systemFile = (0, import_node_path30.join)(folder, "system.txt");
-      await (0, import_promises11.writeFile)(systemFile, args.systemPrompt, { mode: 384 });
+      folder = await (0, import_promises2.mkdtemp)((0, import_node_path10.join)((0, import_node_os2.tmpdir)(), "pericode-claude-"));
+      const systemFile = (0, import_node_path10.join)(folder, "system.txt");
+      await (0, import_promises2.writeFile)(systemFile, args.systemPrompt, { mode: 384 });
       if (args.signal.aborted) return;
-      child = (0, import_node_child_process8.spawn)(
+      child = (0, import_node_child_process.spawn)(
         executable,
         claudeArguments(args.model, args.maxIterations, systemFile, bridge.config),
         { cwd: args.cwd, windowsHide: true, env: claudeEnvironment(), stdio: ["pipe", "pipe", "pipe"] }
       );
       let spawnError;
-      const closed = new Promise((resolve19) => {
+      const closed = new Promise((resolve4) => {
         child.once("error", (e) => {
           spawnError = e;
-          resolve19(-1);
+          resolve4(-1);
         });
-        child.once("close", resolve19);
+        child.once("close", resolve4);
       });
       child.stderr.resume();
       child.stdin.on("error", () => {
@@ -35006,9 +22021,9 @@ async function* claudeCodeTurn(options) {
       args.signal.removeEventListener("abort", cancel);
       await bridge?.close();
       if (folder) {
-        await (0, import_promises11.unlink)((0, import_node_path30.join)(folder, "system.txt")).catch(() => {
+        await (0, import_promises2.unlink)((0, import_node_path10.join)(folder, "system.txt")).catch(() => {
         });
-        await (0, import_promises11.rmdir)(folder).catch(() => {
+        await (0, import_promises2.rmdir)(folder).catch(() => {
         });
       }
       done = true;
@@ -35018,8 +22033,8 @@ async function* claudeCodeTurn(options) {
   try {
     while (!done || queue.length) {
       if (queue.length) yield queue.shift();
-      else await new Promise((resolve19) => {
-        wake = resolve19;
+      else await new Promise((resolve4) => {
+        wake = resolve4;
       });
     }
   } finally {
@@ -35033,18 +22048,18 @@ async function* claudeCodeTurn(options) {
 function grokExecutable() {
   const name = process.platform === "win32" ? "grok.exe" : "grok";
   const paths = [
-    (0, import_node_path31.join)((0, import_node_os5.homedir)(), ".grok", "bin", name),
-    (0, import_node_path31.join)((0, import_node_os5.homedir)(), ".local", "bin", name),
-    ...(process.env.PATH ?? "").split(import_node_path31.delimiter).filter((p) => p && (0, import_node_path31.isAbsolute)(p)).map((p) => (0, import_node_path31.join)(p, name))
+    (0, import_node_path11.join)((0, import_node_os3.homedir)(), ".grok", "bin", name),
+    (0, import_node_path11.join)((0, import_node_os3.homedir)(), ".local", "bin", name),
+    ...(process.env.PATH ?? "").split(import_node_path11.delimiter).filter((p) => p && (0, import_node_path11.isAbsolute)(p)).map((p) => (0, import_node_path11.join)(p, name))
   ];
-  const found = paths.find((p) => (0, import_node_fs17.existsSync)(p));
+  const found = paths.find((p) => (0, import_node_fs7.existsSync)(p));
   if (!found) throw new Error("Install Grok Build from https://docs.x.ai/build/overview, then reopen this connection.");
   return found;
 }
 function grokEnvironment() {
   const env = { ...process.env };
   for (const key of Object.keys(env)) if (/^(GROK_|XAI_|ANTHROPIC_|OPENAI_|OPENROUTER_)/i.test(key)) delete env[key];
-  env.GROK_HOME = (0, import_node_path31.join)((0, import_node_os5.homedir)(), ".pericode", "grok-build");
+  env.GROK_HOME = (0, import_node_path11.join)((0, import_node_os3.homedir)(), ".pericode", "grok-build");
   env.GROK_DISABLE_AUTOUPDATER = "1";
   env.GROK_OFFICIAL_MARKETPLACE_AUTO_REGISTER = "0";
   for (const key of ["GROK_MEMORY", "GROK_SUBAGENTS", "GROK_WEB_FETCH", "GROK_WRITE_FILE", "GROK_LSP_TOOLS"])
@@ -35055,20 +22070,20 @@ function grokEnvironment() {
 }
 async function grokWorkspace() {
   const home = grokEnvironment().GROK_HOME;
-  for (const path of [(0, import_node_path31.join)((0, import_node_os5.homedir)(), ".pericode"), home, (0, import_node_path31.join)(home, "workspace")]) {
-    await (0, import_promises12.mkdir)(path, { recursive: true, mode: 448 });
-    if ((await (0, import_promises12.lstat)(path)).isSymbolicLink()) throw new Error("Linked Grok profile directories are not supported.");
+  for (const path of [(0, import_node_path11.join)((0, import_node_os3.homedir)(), ".pericode"), home, (0, import_node_path11.join)(home, "workspace")]) {
+    await (0, import_promises3.mkdir)(path, { recursive: true, mode: 448 });
+    if ((await (0, import_promises3.lstat)(path)).isSymbolicLink()) throw new Error("Linked Grok profile directories are not supported.");
   }
   for (const name of ["managed_config.toml", "requirements.toml", "plugins", "hooks", "skills"])
-    if ((0, import_node_fs17.existsSync)((0, import_node_path31.join)(home, name))) throw new Error("The PeriCode Grok profile contains custom configuration. Remove it from ~/.pericode/grok-build before connecting; keep custom Grok configuration in your normal ~/.grok profile.");
-  const config2 = (0, import_node_path31.join)(home, "config.toml");
-  if ((0, import_node_fs17.existsSync)(config2)) {
-    const stat5 = await (0, import_promises12.lstat)(config2);
-    if (!stat5.isFile() || stat5.isSymbolicLink() || stat5.size > 4096 || !safeGrokGeneratedConfig(await (0, import_promises12.readFile)(config2, "utf8")))
+    if ((0, import_node_fs7.existsSync)((0, import_node_path11.join)(home, name))) throw new Error("The PeriCode Grok profile contains custom configuration. Remove it from ~/.pericode/grok-build before connecting; keep custom Grok configuration in your normal ~/.grok profile.");
+  const config2 = (0, import_node_path11.join)(home, "config.toml");
+  if ((0, import_node_fs7.existsSync)(config2)) {
+    const stat = await (0, import_promises3.lstat)(config2);
+    if (!stat.isFile() || stat.isSymbolicLink() || stat.size > 4096 || !safeGrokGeneratedConfig(await (0, import_promises3.readFile)(config2, "utf8")))
       throw new Error("The PeriCode Grok profile has custom configuration. Use a clean integration profile before connecting.");
   }
-  if ((0, import_node_fs17.existsSync)((0, import_node_path31.join)(home, "workspace", ".grok"))) throw new Error("Custom Grok workspace configuration is not supported.");
-  return (0, import_node_path31.join)(home, "workspace");
+  if ((0, import_node_fs7.existsSync)((0, import_node_path11.join)(home, "workspace", ".grok"))) throw new Error("Custom Grok workspace configuration is not supported.");
+  return (0, import_node_path11.join)(home, "workspace");
 }
 function safeGrokGeneratedConfig(text2) {
   const normalized = text2.split(/\r?\n/).map((line) => line.trim()).filter((line) => line && !line.startsWith("#")).join("\n");
@@ -35096,7 +22111,7 @@ var grokSessionMeta = (maxTurns = 1) => ({
 function stopGrok(child) {
   if (!child.pid || child.exitCode !== null) return;
   if (process.platform === "win32") {
-    const stop = (0, import_node_child_process9.spawn)("taskkill", ["/PID", String(child.pid), "/T", "/F"], { windowsHide: true, stdio: "ignore" });
+    const stop = (0, import_node_child_process2.spawn)("taskkill", ["/PID", String(child.pid), "/T", "/F"], { windowsHide: true, stdio: "ignore" });
     stop.on("error", () => child.kill());
   } else child.kill("SIGTERM");
 }
@@ -35163,13 +22178,13 @@ var GrokConnection = class {
   request(method, params, timeout = 25e3) {
     if (this.closed) return Promise.reject(new Error("Grok connection is closed."));
     const id = this.next++;
-    return new Promise((resolve19, reject) => {
+    return new Promise((resolve4, reject) => {
       const timer = setTimeout(() => {
         this.pending.delete(id);
         reject(new Error(`Grok ${method} timed out. Retry or check sign-in.`));
         this.close();
       }, timeout);
-      this.pending.set(id, { resolve: resolve19, reject, timer });
+      this.pending.set(id, { resolve: resolve4, reject, timer });
       this.send({ id, method, params });
     });
   }
@@ -35193,7 +22208,7 @@ function parseGrokModels(value) {
 async function connectGrok(signal) {
   const cwd = await grokWorkspace();
   if (signal?.aborted) throw new Error("Grok connection cancelled.");
-  const client = new GrokConnection((0, import_node_child_process9.spawn)(grokExecutable(), grokArguments(), { cwd, env: grokEnvironment(), windowsHide: true, stdio: ["pipe", "pipe", "pipe"] }));
+  const client = new GrokConnection((0, import_node_child_process2.spawn)(grokExecutable(), grokArguments(), { cwd, env: grokEnvironment(), windowsHide: true, stdio: ["pipe", "pipe", "pipe"] }));
   const abort = () => client.close(new Error("Grok request cancelled."));
   signal?.addEventListener("abort", abort, { once: true });
   client.child.once("close", () => signal?.removeEventListener("abort", abort));
@@ -35226,7 +22241,7 @@ async function grokAccountModels(signal) {
 async function loginWithGrok(signal) {
   const cwd = await grokWorkspace();
   if (signal.aborted) return;
-  const child = (0, import_node_child_process9.spawn)(grokExecutable(), ["--no-auto-update", "login", "--oauth"], { cwd, env: grokEnvironment(), windowsHide: true, stdio: ["pipe", "pipe", "pipe"] });
+  const child = (0, import_node_child_process2.spawn)(grokExecutable(), ["--no-auto-update", "login", "--oauth"], { cwd, env: grokEnvironment(), windowsHide: true, stdio: ["pipe", "pipe", "pipe"] });
   child.stdout.resume();
   child.stderr.resume();
   child.stdin.end();
@@ -35234,9 +22249,9 @@ async function loginWithGrok(signal) {
   signal.addEventListener("abort", abort, { once: true });
   const timeout = setTimeout(abort, 18e4);
   try {
-    await new Promise((resolve19, reject) => {
+    await new Promise((resolve4, reject) => {
       child.once("error", () => reject(new Error("Could not start Grok sign-in.")));
-      child.once("close", (code) => code === 0 ? resolve19() : reject(new Error("Grok sign-in did not complete. Retry the connection.")));
+      child.once("close", (code) => code === 0 ? resolve4() : reject(new Error("Grok sign-in did not complete. Retry the connection.")));
     });
   } finally {
     clearTimeout(timeout);
@@ -35307,8 +22322,8 @@ async function* grokCodeTurn(options) {
   try {
     while (!done || queue.length) {
       if (queue.length) yield queue.shift();
-      else await new Promise((resolve19) => {
-        wake = resolve19;
+      else await new Promise((resolve4) => {
+        wake = resolve4;
       });
     }
   } finally {
@@ -35320,8 +22335,8 @@ async function* grokCodeTurn(options) {
 
 // src/providerEnv.ts
 init_scoped_fetch();
-var import_node_fs18 = require("node:fs");
-var import_node_path32 = require("node:path");
+var import_node_fs8 = require("node:fs");
+var import_node_path12 = require("node:path");
 init_sdk_entry();
 var MANAGED_ENV_KEYS = [
   "ANTHROPIC_API_KEY",
@@ -35447,10 +22462,10 @@ function formatMcpInventoryBlock(inv) {
 }
 function readMemoryIndexSync(vaultPath) {
   if (!vaultPath) return null;
-  const indexPath3 = (0, import_node_path32.join)(vaultPath, ".pericode", "MEMORY.md");
-  if (!(0, import_node_fs18.existsSync)(indexPath3)) return null;
+  const indexPath2 = (0, import_node_path12.join)(vaultPath, ".pericode", "MEMORY.md");
+  if (!(0, import_node_fs8.existsSync)(indexPath2)) return null;
   try {
-    const raw = (0, import_node_fs18.readFileSync)(indexPath3, "utf8");
+    const raw = (0, import_node_fs8.readFileSync)(indexPath2, "utf8");
     if (!raw.trim()) return null;
     return `PERICODE MEMORY (current state \u2014 load relevant entries via pericode_memory_read):
 
@@ -35462,9 +22477,9 @@ ${raw}`;
 
 // src/subscriptionModels.ts
 init_scoped_fetch();
-var import_node_child_process10 = require("node:child_process");
-var import_node_os6 = require("node:os");
-var import_node_crypto12 = require("node:crypto");
+var import_node_child_process3 = require("node:child_process");
+var import_node_os4 = require("node:os");
+var import_node_crypto5 = require("node:crypto");
 init_sdk_entry();
 var subscriptionProvider = (provider) => ["claude-oauth", "copilot", "codex-oauth", "grok-oauth", "ollama-cloud"].includes(provider);
 var providerLabel = (provider) => ({ "grok-oauth": "Grok subscription", "ollama-cloud": "Ollama Cloud", xai: "Grok", "claude-oauth": "Claude", copilot: "Copilot", "codex-oauth": "ChatGPT / Codex" })[provider] ?? provider;
@@ -35477,9 +22492,9 @@ function parseClaudeModels(value) {
 async function claudeAccountModels() {
   const status = await claudeAuthStatus();
   if (!status.loggedIn) throw new Error("Connect your Claude subscription in PeriCode settings, then refresh.");
-  const models = await new Promise((resolve19, reject) => {
-    const id = (0, import_node_crypto12.randomUUID)();
-    const child = (0, import_node_child_process10.spawn)(
+  const models = await new Promise((resolve4, reject) => {
+    const id = (0, import_node_crypto5.randomUUID)();
+    const child = (0, import_node_child_process3.spawn)(
       claudeExecutable(),
       [
         "-p",
@@ -35500,7 +22515,7 @@ async function claudeAccountModels() {
         "--settings",
         JSON.stringify({ disableAllHooks: true })
       ],
-      { cwd: (0, import_node_os6.tmpdir)(), windowsHide: true, env: claudeEnvironment(), stdio: ["pipe", "pipe", "pipe"] }
+      { cwd: (0, import_node_os4.tmpdir)(), windowsHide: true, env: claudeEnvironment(), stdio: ["pipe", "pipe", "pipe"] }
     );
     let done = false, buffer = "", size = 0;
     const finish = (error2, models2) => {
@@ -35510,7 +22525,7 @@ async function claudeAccountModels() {
       child.stdin.end();
       child.kill();
       if (error2) reject(error2);
-      else resolve19(models2);
+      else resolve4(models2);
     };
     const timer = setTimeout(() => finish(new Error("Claude account model lookup timed out. Refresh to retry.")), 2e4);
     child.on("error", () => finish(new Error("Could not start Claude Code for model discovery.")));
@@ -35612,7 +22627,7 @@ async function* nativeRevision(args, cwd, grok = false) {
     if (event.kind === "error") yield { type: "error", error: event.message };
   }
 }
-var InlineEditModal = class extends import_obsidian.Modal {
+var InlineEditModal = class extends import_obsidian2.Modal {
   constructor(plugin, view) {
     super(plugin.app);
     this.plugin = plugin;
@@ -35636,7 +22651,7 @@ var InlineEditModal = class extends import_obsidian.Modal {
     this.contentEl.addClass("pericode-edit-modal");
     this.contentEl.createEl("h2", { text: "Review a revision" });
     this.contentEl.createEl("p", { text: `${this.snapshot.path} \xB7 ${this.snapshot.selected.length.toLocaleString()} selected characters. Only the selected text is sent to your configured provider.` });
-    new import_obsidian.Setting(this.contentEl).setName("What should change?").addTextArea((t) => {
+    new import_obsidian2.Setting(this.contentEl).setName("What should change?").addTextArea((t) => {
       this.instructionInput = t.inputEl;
       t.setPlaceholder("Make this clearer, preserving facts and links\u2026").onChange((v2) => {
         this.instruction = v2;
@@ -35645,7 +22660,7 @@ var InlineEditModal = class extends import_obsidian.Modal {
     });
     this.status = this.contentEl.createDiv({ attr: { role: "status", "aria-live": "polite" } });
     this.preview = this.contentEl.createDiv({ cls: "pericode-edit-preview" });
-    new import_obsidian.Setting(this.contentEl).addButton((b2) => {
+    new import_obsidian2.Setting(this.contentEl).addButton((b2) => {
       this.generate = b2.buttonEl;
       b2.setButtonText("Generate preview").setCta().onClick(() => void this.propose());
     }).addButton((b2) => {
@@ -35733,7 +22748,7 @@ var InlineEditModal = class extends import_obsidian.Modal {
       this.checkPolicy();
       applyReviewedEdit(this.snapshot, this.view.file?.path ?? "", this.view.editor.getValue(), this.replacement);
       this.view.editor.replaceRange(this.replacement, this.view.editor.offsetToPos(this.snapshot.from), this.view.editor.offsetToPos(this.snapshot.to));
-      new import_obsidian.Notice("Revision applied. Use Undo in the note to restore the original.");
+      new import_obsidian2.Notice("Revision applied. Use Undo in the note to restore the original.");
       this.close();
     } catch (e) {
       this.status.setText(e instanceof Error ? e.message : String(e));
@@ -35752,12 +22767,12 @@ init_sdk_entry();
 
 // src/settings.ts
 init_scoped_fetch();
-var import_obsidian5 = require("obsidian");
+var import_obsidian6 = require("obsidian");
 init_sdk_entry();
 
 // src/AuthModals.ts
 init_scoped_fetch();
-var import_obsidian2 = require("obsidian");
+var import_obsidian3 = require("obsidian");
 init_sdk_entry();
 init_fetchAdapter();
 function openExternal(url) {
@@ -35778,7 +22793,7 @@ async function copyToClipboard(text2) {
   } catch {
   }
 }
-var AnthropicLoginModal = class extends import_obsidian2.Modal {
+var AnthropicLoginModal = class extends import_obsidian3.Modal {
   constructor(app, onComplete, lifecycle) {
     super(app);
     this.onComplete = onComplete;
@@ -35796,7 +22811,7 @@ var AnthropicLoginModal = class extends import_obsidian2.Modal {
     this.contentEl.createEl("p", { text: "PeriCode runs your installed Claude Code. Sign-in happens through Anthropic's own browser flow; PeriCode does not collect or copy your subscription tokens. If Claude Code is already signed in, use Check sign-in." });
     this.statusEl = this.contentEl.createDiv({ cls: "setting-item-description" });
     this.statusEl.setText("Checking Claude Code sign-in\u2026");
-    new import_obsidian2.Setting(this.contentEl).addButton((b2) => b2.setButtonText("Sign in with Claude Code").setCta().onClick(() => void this.login())).addButton((b2) => b2.setButtonText("Check sign-in").onClick(() => void this.check(true))).addButton((b2) => b2.setButtonText("Close").onClick(() => this.close()));
+    new import_obsidian3.Setting(this.contentEl).addButton((b2) => b2.setButtonText("Sign in with Claude Code").setCta().onClick(() => void this.login())).addButton((b2) => b2.setButtonText("Check sign-in").onClick(() => void this.check(true))).addButton((b2) => b2.setButtonText("Close").onClick(() => this.close()));
     void this.check(false);
   }
   async check(finish) {
@@ -35844,7 +22859,7 @@ function friendlyAuthError(message) {
   }
   return message;
 }
-var CopilotLoginModal = class extends import_obsidian2.Modal {
+var CopilotLoginModal = class extends import_obsidian3.Modal {
   constructor(app, onComplete) {
     super(app);
     this.onComplete = onComplete;
@@ -35859,7 +22874,7 @@ var CopilotLoginModal = class extends import_obsidian2.Modal {
     contentEl.createEl("p", {
       text: "GitHub uses a device-flow login. Click Start and we'll request a one-time user code from GitHub, open the browser to its verification page, and copy the code to your clipboard."
     });
-    new import_obsidian2.Setting(contentEl).addButton((b2) => b2.setButtonText("Cancel").onClick(() => this.cancel())).addButton(
+    new import_obsidian3.Setting(contentEl).addButton((b2) => b2.setButtonText("Cancel").onClick(() => this.cancel())).addButton(
       (b2) => b2.setButtonText("Start").setCta().onClick(() => void this.run())
     );
     this.statusEl = contentEl.createEl("div", { cls: "setting-item-description" });
@@ -35875,7 +22890,7 @@ var CopilotLoginModal = class extends import_obsidian2.Modal {
       await withRequestUrlFetch(() => pollDeviceFlow(init));
       if (this.aborted) return;
       this.setStatus("Signed in. Closing\u2026", false);
-      new import_obsidian2.Notice("PeriCode: GitHub Copilot signed in.");
+      new import_obsidian3.Notice("PeriCode: GitHub Copilot signed in.");
       this.onComplete(true);
       window.setTimeout(() => this.close(), 600);
     } catch (err) {
@@ -35903,13 +22918,13 @@ var CopilotLoginModal = class extends import_obsidian2.Modal {
     const copyBtn = codeRow.createEl("button", { text: "Copy code" });
     copyBtn.addEventListener("click", () => {
       void copyToClipboard(userCode);
-      new import_obsidian2.Notice("Copied user code.");
+      new import_obsidian3.Notice("Copied user code.");
     });
     contentEl.createEl("p", {
       text: `If the browser didn't open: ${verificationUri}`,
       cls: "setting-item-description"
     });
-    new import_obsidian2.Setting(contentEl).addButton((b2) => b2.setButtonText("Cancel").onClick(() => this.cancel()));
+    new import_obsidian3.Setting(contentEl).addButton((b2) => b2.setButtonText("Cancel").onClick(() => this.cancel()));
     this.statusEl = contentEl.createEl("div", { cls: "setting-item-description" });
     this.setStatus("Waiting for you to authorize in the browser\u2026", false);
   }
@@ -35929,7 +22944,7 @@ var CopilotLoginModal = class extends import_obsidian2.Modal {
     this.contentEl.empty();
   }
 };
-var CodexLoginModal = class extends import_obsidian2.Modal {
+var CodexLoginModal = class extends import_obsidian3.Modal {
   constructor(app, onComplete) {
     super(app);
     this.onComplete = onComplete;
@@ -35945,7 +22960,7 @@ var CodexLoginModal = class extends import_obsidian2.Modal {
     contentEl.createEl("p", {
       text: "We'll open a local listener on port 1455 and route you to OpenAI to sign in. The browser will redirect back to localhost when you're done."
     });
-    new import_obsidian2.Setting(contentEl).addButton((b2) => b2.setButtonText("Cancel").onClick(() => this.cancel())).addButton(
+    new import_obsidian3.Setting(contentEl).addButton((b2) => b2.setButtonText("Cancel").onClick(() => this.cancel())).addButton(
       (b2) => b2.setButtonText("Start").setCta().onClick(() => void this.run())
     );
     this.statusEl = contentEl.createEl("div", { cls: "setting-item-description" });
@@ -35963,7 +22978,7 @@ var CodexLoginModal = class extends import_obsidian2.Modal {
       );
       if (this.aborted) return;
       this.setStatus("Signed in. Closing\u2026", false);
-      new import_obsidian2.Notice("PeriCode: ChatGPT/Codex signed in.");
+      new import_obsidian3.Notice("PeriCode: ChatGPT/Codex signed in.");
       this.onComplete(true);
       window.setTimeout(() => this.close(), 600);
     } catch (err) {
@@ -36118,9 +23133,9 @@ var MCP_PRESETS = [
 
 // src/mcpDiscovery.ts
 init_scoped_fetch();
-var import_node_fs21 = require("node:fs");
-var import_node_os7 = require("node:os");
-var import_node_path35 = require("node:path");
+var import_node_fs10 = require("node:fs");
+var import_node_os5 = require("node:os");
+var import_node_path14 = require("node:path");
 async function discoverMcpServers() {
   const sources = [
     { source: "claude-desktop", paths: claudeDesktopPaths() },
@@ -36131,9 +23146,9 @@ async function discoverMcpServers() {
   const found = [];
   for (const s of sources) {
     for (const path of s.paths) {
-      if (!(0, import_node_fs21.existsSync)(path)) continue;
+      if (!(0, import_node_fs10.existsSync)(path)) continue;
       try {
-        const raw = await import_node_fs21.promises.readFile(path, "utf8");
+        const raw = await import_node_fs10.promises.readFile(path, "utf8");
         const parsed = JSON.parse(raw);
         const block = parsed.mcpServers ?? {};
         for (const [name, entry] of Object.entries(block)) {
@@ -36182,15 +23197,15 @@ function toDiscovered(name, entry, source, path) {
   };
 }
 function claudeDesktopPaths() {
-  const home = (0, import_node_os7.homedir)();
+  const home = (0, import_node_os5.homedir)();
   const paths = [];
-  if ((0, import_node_os7.platform)() === "win32") {
+  if ((0, import_node_os5.platform)() === "win32") {
     const appData = process.env.APPDATA;
     if (appData)
-      paths.push((0, import_node_path35.join)(appData, "Claude", "claude_desktop_config.json"));
+      paths.push((0, import_node_path14.join)(appData, "Claude", "claude_desktop_config.json"));
   }
   paths.push(
-    (0, import_node_path35.join)(
+    (0, import_node_path14.join)(
       home,
       "Library",
       "Application Support",
@@ -36201,14 +23216,14 @@ function claudeDesktopPaths() {
   return paths;
 }
 function claudeCodePaths() {
-  return [(0, import_node_path35.join)((0, import_node_os7.homedir)(), ".claude.json")];
+  return [(0, import_node_path14.join)((0, import_node_os5.homedir)(), ".claude.json")];
 }
 function cursorPaths() {
-  return [(0, import_node_path35.join)((0, import_node_os7.homedir)(), ".cursor", "mcp.json")];
+  return [(0, import_node_path14.join)((0, import_node_os5.homedir)(), ".cursor", "mcp.json")];
 }
 function windsurfPaths() {
   return [
-    (0, import_node_path35.join)((0, import_node_os7.homedir)(), ".codeium", "windsurf", "mcp_config.json")
+    (0, import_node_path14.join)((0, import_node_os5.homedir)(), ".codeium", "windsurf", "mcp_config.json")
   ];
 }
 function maskEnv(env) {
@@ -36238,8 +23253,8 @@ init_pericodeSecurity();
 
 // src/GrokLoginModal.ts
 init_scoped_fetch();
-var import_obsidian3 = require("obsidian");
-var GrokLoginModal = class extends import_obsidian3.Modal {
+var import_obsidian4 = require("obsidian");
+var GrokLoginModal = class extends import_obsidian4.Modal {
   constructor(app, complete, lifecycle) {
     super(app);
     this.complete = complete;
@@ -36257,7 +23272,7 @@ var GrokLoginModal = class extends import_obsidian3.Modal {
     this.contentEl.createEl("h2", { text: "Connect your Grok subscription" });
     this.contentEl.createEl("p", { text: "Sign in using the installed Grok Build app. Your account\u2019s model access and usage limits apply. PeriCode uses a separate Grok profile so your normal terminal settings stay intact." });
     this.status = this.contentEl.createDiv({ cls: "setting-item-description", text: "Connect once, then load your account models." });
-    new import_obsidian3.Setting(this.contentEl).addButton((b2) => b2.setButtonText("Sign in with Grok").setCta().onClick(() => void this.login())).addButton((b2) => b2.setButtonText("Check connection").onClick(() => void this.check())).addButton((b2) => b2.setButtonText("Close").onClick(() => this.close()));
+    new import_obsidian4.Setting(this.contentEl).addButton((b2) => b2.setButtonText("Sign in with Grok").setCta().onClick(() => void this.login())).addButton((b2) => b2.setButtonText("Check connection").onClick(() => void this.check())).addButton((b2) => b2.setButtonText("Close").onClick(() => this.close()));
   }
   async check() {
     if (this.closed || this.checking) return;
@@ -36300,9 +23315,9 @@ var GrokLoginModal = class extends import_obsidian3.Modal {
 
 // src/onboardingWizard.ts
 init_scoped_fetch();
-var import_obsidian4 = require("obsidian");
-var import_node_fs22 = require("node:fs");
-var import_node_path36 = require("node:path");
+var import_obsidian5 = require("obsidian");
+var import_node_fs11 = require("node:fs");
+var import_node_path15 = require("node:path");
 var STEP_ORDER = ["welcome", "provider", "import", "done"];
 var PROVIDER_LABELS = {
   anthropic: "Anthropic (API key)",
@@ -36317,7 +23332,7 @@ var PROVIDER_LABELS = {
   copilot: "GitHub Copilot (OAuth)",
   "codex-oauth": "ChatGPT / Codex (OAuth)"
 };
-var OnboardingWizard = class extends import_obsidian4.Modal {
+var OnboardingWizard = class extends import_obsidian5.Modal {
   constructor(app, plugin) {
     super(app);
     this.plugin = plugin;
@@ -36379,7 +23394,7 @@ var OnboardingWizard = class extends import_obsidian4.Modal {
     el.createEl("p", {
       text: "PeriCode talks to one provider at a time. OAuth options use your existing subscription; API-key options need a key from the provider's console."
     });
-    new import_obsidian4.Setting(el).setName("Provider").setDesc("You can change this any time from Settings.").addDropdown((d) => {
+    new import_obsidian5.Setting(el).setName("Provider").setDesc("You can change this any time from Settings.").addDropdown((d) => {
       for (const [id, label] of Object.entries(PROVIDER_LABELS)) {
         d.addOption(id, label);
       }
@@ -36393,7 +23408,7 @@ var OnboardingWizard = class extends import_obsidian4.Modal {
     });
     const provider = this.plugin.settings.provider;
     if (provider === "grok-oauth") {
-      new import_obsidian4.Setting(el).setName("Grok subscription").addButton((b2) => b2.setButtonText("Sign in").onClick(() => new GrokLoginModal(this.app, () => this.render(), this.plugin).open()));
+      new import_obsidian5.Setting(el).setName("Grok subscription").addButton((b2) => b2.setButtonText("Sign in").onClick(() => new GrokLoginModal(this.app, () => this.render(), this.plugin).open()));
     } else if (provider === "ollama-cloud") {
       el.createEl("p", { text: "Run ollama signin on your Ollama server, then pull a cloud model. Your account plan and limits apply." });
       this.renderTextRow(el, "Ollama server", "ollamaHost", "http://localhost:11434");
@@ -36412,20 +23427,20 @@ var OnboardingWizard = class extends import_obsidian4.Modal {
     } else if (provider === "ollama") {
       this.renderTextRow(el, "Ollama host", "ollamaHost", "http://localhost:11434");
     } else if (provider === "claude-oauth") {
-      new import_obsidian4.Setting(el).setName("Claude subscription").setDesc("Sign in through your installed Claude Code.").addButton((b2) => b2.setButtonText("Connect Claude Code").onClick(() => new AnthropicLoginModal(this.app, () => {
+      new import_obsidian5.Setting(el).setName("Claude subscription").setDesc("Sign in through your installed Claude Code.").addButton((b2) => b2.setButtonText("Connect Claude Code").onClick(() => new AnthropicLoginModal(this.app, () => {
       }, this.plugin).open()));
     } else {
-      new import_obsidian4.Setting(el).setName("Connect subscription").setDesc("Sign in here before sending your first message. No API key is needed.").addButton((b2) => b2.setButtonText("Sign in").setCta().onClick(() => {
+      new import_obsidian5.Setting(el).setName("Connect subscription").setDesc("Sign in here before sending your first message. No API key is needed.").addButton((b2) => b2.setButtonText("Sign in").setCta().onClick(() => {
         const LoginModal = provider === "copilot" ? CopilotLoginModal : CodexLoginModal;
         new LoginModal(this.app, (success) => {
-          if (success) new import_obsidian4.Notice("Subscription connected.");
+          if (success) new import_obsidian5.Notice("Subscription connected.");
         }).open();
       }));
     }
     this.renderNav(el, { nextLabel: "Continue" });
   }
   renderApiKeyRow(el, label, field, placeholder) {
-    new import_obsidian4.Setting(el).setName(label).setDesc("Stored in this plugin's data.json. Never written to vault notes.").addText((t) => {
+    new import_obsidian5.Setting(el).setName(label).setDesc("Stored in this plugin's data.json. Never written to vault notes.").addText((t) => {
       t.inputEl.type = "password";
       t.setPlaceholder(placeholder);
       t.setValue(this.plugin.settings[field]);
@@ -36436,7 +23451,7 @@ var OnboardingWizard = class extends import_obsidian4.Modal {
     });
   }
   renderTextRow(el, label, field, placeholder) {
-    new import_obsidian4.Setting(el).setName(label).addText((t) => {
+    new import_obsidian5.Setting(el).setName(label).addText((t) => {
       t.setPlaceholder(placeholder);
       t.setValue(this.plugin.settings[field]);
       t.onChange(async (value) => {
@@ -36456,7 +23471,7 @@ var OnboardingWizard = class extends import_obsidian4.Modal {
     note.setText(
       "v1 supports .md and .txt only. Other extensions are reported as skipped."
     );
-    new import_obsidian4.Setting(el).setName("Source folder").setDesc("Absolute path. Drag a folder onto Obsidian first to copy its path, then paste here.").addText((t) => {
+    new import_obsidian5.Setting(el).setName("Source folder").setDesc("Absolute path. Drag a folder onto Obsidian first to copy its path, then paste here.").addText((t) => {
       t.setPlaceholder("C:\\Users\\you\\Documents\\notes");
       t.setValue(this.importPath);
       t.onChange((value) => {
@@ -36476,21 +23491,21 @@ var OnboardingWizard = class extends import_obsidian4.Modal {
         `Imported ${r.imported} of ${r.scanned} files. Skipped ${r.skipped}` + (r.unsupportedExtensions.length > 0 ? ` (unsupported: ${r.unsupportedExtensions.join(", ")})` : "") + `. Originals archived to ${r.archivedFolder}.`
       );
     }
-    new import_obsidian4.Setting(el).addButton((b2) => {
+    new import_obsidian5.Setting(el).addButton((b2) => {
       b2.setButtonText(this.importing ? "Importing\u2026" : "Import & archive");
       b2.setDisabled(this.importing);
       b2.onClick(async () => {
         const vaultPath = this.plugin.vaultPath;
         if (!vaultPath) {
-          new import_obsidian4.Notice("Vault path unavailable on this platform.");
+          new import_obsidian5.Notice("Vault path unavailable on this platform.");
           return;
         }
         if (!this.importPath) {
-          new import_obsidian4.Notice("Enter a source folder path first.");
+          new import_obsidian5.Notice("Enter a source folder path first.");
           return;
         }
-        if (!(0, import_node_fs22.existsSync)(this.importPath)) {
-          new import_obsidian4.Notice(`Source folder not found: ${this.importPath}`);
+        if (!(0, import_node_fs11.existsSync)(this.importPath)) {
+          new import_obsidian5.Notice(`Source folder not found: ${this.importPath}`);
           return;
         }
         this.importing = true;
@@ -36502,7 +23517,7 @@ var OnboardingWizard = class extends import_obsidian4.Modal {
             vaultPath
           );
         } catch (err) {
-          new import_obsidian4.Notice(
+          new import_obsidian5.Notice(
             `Import failed: ${err instanceof Error ? err.message : String(err)}`,
             8e3
           );
@@ -36528,7 +23543,7 @@ var OnboardingWizard = class extends import_obsidian4.Modal {
         text: `Imported ${this.importStatus.imported} files; archived to ${this.importStatus.archivedFolder}.`
       });
     }
-    const row = new import_obsidian4.Setting(el);
+    const row = new import_obsidian5.Setting(el);
     row.addButton(
       (b2) => b2.setButtonText("Open chat").setCta().onClick(() => {
         this.close();
@@ -36548,7 +23563,7 @@ var OnboardingWizard = class extends import_obsidian4.Modal {
   }
   renderNav(el, opts) {
     const { showBack = true, skipLabel, nextLabel } = opts;
-    const row = new import_obsidian4.Setting(el);
+    const row = new import_obsidian5.Setting(el);
     if (showBack) {
       row.addButton(
         (b2) => b2.setButtonText("Back").onClick(() => {
@@ -36577,17 +23592,17 @@ var OnboardingWizard = class extends import_obsidian4.Modal {
   }
 };
 async function importAndArchive(sourceDir, vaultPath) {
-  const stat5 = (0, import_node_fs22.statSync)(sourceDir);
-  if (!stat5.isDirectory()) {
+  const stat = (0, import_node_fs11.statSync)(sourceDir);
+  if (!stat.isDirectory()) {
     throw new Error(`${sourceDir} is not a directory.`);
   }
-  const sourceName = (0, import_node_path36.basename)(sourceDir).replace(/[^A-Za-z0-9._-]+/g, "_");
+  const sourceName = (0, import_node_path15.basename)(sourceDir).replace(/[^A-Za-z0-9._-]+/g, "_");
   const today = (/* @__PURE__ */ new Date()).toISOString().slice(0, 10);
-  const wikiTarget = (0, import_node_path36.join)(vaultPath, "wiki", sourceName);
-  const archiveTarget = (0, import_node_path36.join)(vaultPath, "raw", "_archived", `${sourceName}-${today}`);
-  await import_node_fs22.promises.mkdir(wikiTarget, { recursive: true });
-  await import_node_fs22.promises.mkdir(archiveTarget, { recursive: true });
-  const entries = await import_node_fs22.promises.readdir(sourceDir, { withFileTypes: true });
+  const wikiTarget = (0, import_node_path15.join)(vaultPath, "wiki", sourceName);
+  const archiveTarget = (0, import_node_path15.join)(vaultPath, "raw", "_archived", `${sourceName}-${today}`);
+  await import_node_fs11.promises.mkdir(wikiTarget, { recursive: true });
+  await import_node_fs11.promises.mkdir(archiveTarget, { recursive: true });
+  const entries = await import_node_fs11.promises.readdir(sourceDir, { withFileTypes: true });
   let scanned = 0;
   let imported = 0;
   let skipped = 0;
@@ -36597,13 +23612,13 @@ async function importAndArchive(sourceDir, vaultPath) {
     scanned += 1;
     const name = entry.name;
     const ext = name.toLowerCase().split(".").pop() ?? "";
-    const sourcePath = (0, import_node_path36.join)(sourceDir, name);
+    const sourcePath = (0, import_node_path15.join)(sourceDir, name);
     if (ext === "md") {
-      await import_node_fs22.promises.copyFile(sourcePath, (0, import_node_path36.join)(wikiTarget, name));
+      await import_node_fs11.promises.copyFile(sourcePath, (0, import_node_path15.join)(wikiTarget, name));
       imported += 1;
     } else if (ext === "txt") {
       const stem = name.replace(/\.txt$/i, "");
-      await import_node_fs22.promises.copyFile(sourcePath, (0, import_node_path36.join)(wikiTarget, `${stem}.md`));
+      await import_node_fs11.promises.copyFile(sourcePath, (0, import_node_path15.join)(wikiTarget, `${stem}.md`));
       imported += 1;
     } else {
       skipped += 1;
@@ -36611,16 +23626,16 @@ async function importAndArchive(sourceDir, vaultPath) {
       continue;
     }
     try {
-      await import_node_fs22.promises.rename(sourcePath, (0, import_node_path36.join)(archiveTarget, name));
+      await import_node_fs11.promises.rename(sourcePath, (0, import_node_path15.join)(archiveTarget, name));
     } catch {
-      await import_node_fs22.promises.copyFile(sourcePath, (0, import_node_path36.join)(archiveTarget, name));
-      await import_node_fs22.promises.unlink(sourcePath);
+      await import_node_fs11.promises.copyFile(sourcePath, (0, import_node_path15.join)(archiveTarget, name));
+      await import_node_fs11.promises.unlink(sourcePath);
     }
   }
   try {
-    const remaining = await import_node_fs22.promises.readdir(sourceDir);
+    const remaining = await import_node_fs11.promises.readdir(sourceDir);
     if (remaining.length === 0) {
-      await import_node_fs22.promises.rmdir(sourceDir);
+      await import_node_fs11.promises.rmdir(sourceDir);
     }
   } catch {
   }
@@ -36735,7 +23750,7 @@ var DEFAULT_SETTINGS = {
   anthropicThinkingBudget: 0,
   settingsView: "simple"
 };
-var PericodeSettingsTab = class extends import_obsidian5.PluginSettingTab {
+var PericodeSettingsTab = class extends import_obsidian6.PluginSettingTab {
   constructor(app, plugin) {
     super(app, plugin);
     this.plugin = plugin;
@@ -36781,7 +23796,7 @@ var PericodeSettingsTab = class extends import_obsidian5.PluginSettingTab {
     containerEl.addClass("pericode-settings-tab");
     const header = containerEl.createDiv({ cls: "pericode-settings-header" });
     const brand = header.createDiv({ cls: "pericode-settings-brand" });
-    (0, import_obsidian5.setIcon)(brand.createSpan({ cls: "pericode-settings-mark" }), "sparkles");
+    (0, import_obsidian6.setIcon)(brand.createSpan({ cls: "pericode-settings-mark" }), "sparkles");
     const title = brand.createDiv();
     title.createEl("h2", { text: "PeriCode" });
     title.createEl("p", { text: "Your assistant. Your workspace.", cls: "pericode-settings-muted" });
@@ -36790,7 +23805,7 @@ var PericodeSettingsTab = class extends import_obsidian5.PluginSettingTab {
     const nav = containerEl.createEl("nav", { cls: "pericode-settings-nav", attr: { "aria-label": "PeriCode settings sections" } });
     for (const section2 of SETTINGS_SECTIONS) {
       const button = nav.createEl("button", { cls: "pericode-settings-nav-item", attr: { "aria-current": section2.id === this.activeSection ? "page" : "false" } });
-      (0, import_obsidian5.setIcon)(button.createSpan(), section2.icon);
+      (0, import_obsidian6.setIcon)(button.createSpan(), section2.icon);
       button.createSpan({ text: section2.name });
       button.onclick = () => {
         this.activeSection = section2.id;
@@ -36867,14 +23882,14 @@ var PericodeSettingsTab = class extends import_obsidian5.PluginSettingTab {
       const label = button.createSpan({ cls: "pericode-provider-card-label" });
       label.createEl("strong", { text: option.name });
       label.createSpan({ text: option.detail });
-      if (option.id === provider) (0, import_obsidian5.setIcon)(button.createSpan({ cls: "pericode-provider-check" }), "check");
+      if (option.id === provider) (0, import_obsidian6.setIcon)(button.createSpan({ cls: "pericode-provider-check" }), "check");
       button.onclick = async () => {
         if (this.modelLoading.size) {
-          new import_obsidian5.Notice("Wait for the current model lookup to finish.");
+          new import_obsidian6.Notice("Wait for the current model lookup to finish.");
           return;
         }
         if (!this.plugin.claimInteractiveTurn()) {
-          new import_obsidian5.Notice("Finish the active request before changing providers.");
+          new import_obsidian6.Notice("Finish the active request before changing providers.");
           return;
         }
         try {
@@ -36898,9 +23913,9 @@ var PericodeSettingsTab = class extends import_obsidian5.PluginSettingTab {
     this.renderModelPicker(card);
     const subscriptionRoute = { anthropic: "claude-oauth", openai: "codex-oauth", xai: "grok-oauth", ollama: "ollama-cloud" }[provider];
     if (subscriptionRoute) {
-      new import_obsidian5.Setting(container).setName("Already have a subscription?").setDesc("Use the provider's account connection instead of API billing.").addButton((b2) => b2.setButtonText("Use my subscription").onClick(async () => {
+      new import_obsidian6.Setting(container).setName("Already have a subscription?").setDesc("Use the provider's account connection instead of API billing.").addButton((b2) => b2.setButtonText("Use my subscription").onClick(async () => {
         if (this.modelLoading.size || !this.plugin.claimInteractiveTurn()) {
-          new import_obsidian5.Notice("Finish the active request or model lookup first.");
+          new import_obsidian6.Notice("Finish the active request or model lookup first.");
           return;
         }
         try {
@@ -36928,12 +23943,12 @@ var PericodeSettingsTab = class extends import_obsidian5.PluginSettingTab {
   renderCredentials(container) {
     const provider = this.plugin.settings.provider;
     if (provider === "grok-oauth") {
-      new import_obsidian5.Setting(container).setName("Grok subscription").setDesc("Connect through Grok Build. Uses your subscription allowance; no API key fallback.").addButton((b2) => b2.setButtonText("Connect Grok").onClick(() => new GrokLoginModal(this.app, () => {
+      new import_obsidian6.Setting(container).setName("Grok subscription").setDesc("Connect through Grok Build. Uses your subscription allowance; no API key fallback.").addButton((b2) => b2.setButtonText("Connect Grok").onClick(() => new GrokLoginModal(this.app, () => {
         this.resetModels(provider);
         void this.loadModelsFor(provider);
       }, this.plugin).open()));
     } else if (provider === "ollama-cloud") {
-      new import_obsidian5.Setting(container).setName("Ollama account").setDesc("Uses the account signed in to your Ollama server. Run ollama signin, then ollama pull <cloud-model> on that server. Load models here after setup.");
+      new import_obsidian6.Setting(container).setName("Ollama account").setDesc("Uses the account signed in to your Ollama server. Run ollama signin, then ollama pull <cloud-model> on that server. Load models here after setup.");
       container.createEl("a", { text: "Ollama cloud setup", href: "https://docs.ollama.com/cloud", attr: { target: "_blank", rel: "noopener noreferrer" } });
     } else if (subscriptionProvider(provider)) this.renderOAuthStatus(container, provider);
     const keys = {
@@ -36993,7 +24008,7 @@ var PericodeSettingsTab = class extends import_obsidian5.PluginSettingTab {
     const isManualKey = `model-manual:${provider}`;
     const subscription = subscriptionProvider(provider);
     const wantManual = !subscription && this.editing.has(isManualKey);
-    const setting = new import_obsidian5.Setting(container).setName("Model").setDesc(
+    const setting = new import_obsidian6.Setting(container).setName("Model").setDesc(
       cached2 ? `${cached2.length} models available from ${providerDisplayName(provider)}.` : loading ? "Loading models from provider\u2026" : error2 ? `Account model list unavailable: ${error2}` : "Connect above, then load the models available to your account."
     );
     if (cached2 && cached2.length > 0 && !wantManual) {
@@ -37113,7 +24128,7 @@ var PericodeSettingsTab = class extends import_obsidian5.PluginSettingTab {
     const isEditing = this.editing.has(opts.key);
     const currentValue = opts.get();
     if (opts.disabled) {
-      const setting2 = new import_obsidian5.Setting(opts.container).setName(opts.name).setDesc(opts.desc);
+      const setting2 = new import_obsidian6.Setting(opts.container).setName(opts.name).setDesc(opts.desc);
       const display = opts.isPassword ? maskSecret(currentValue) : (opts.formatDisplay ?? ((v2) => v2 || "(empty)"))(currentValue);
       const valueEl = setting2.controlEl.createSpan({
         cls: "pericode-locked-value",
@@ -37126,7 +24141,7 @@ var PericodeSettingsTab = class extends import_obsidian5.PluginSettingTab {
       setting2.settingEl.style.pointerEvents = "none";
       return;
     }
-    const setting = new import_obsidian5.Setting(opts.container).setName(opts.name).setDesc(opts.desc);
+    const setting = new import_obsidian6.Setting(opts.container).setName(opts.name).setDesc(opts.desc);
     if (isEditing) {
       let draft = currentValue;
       setting.addText((t) => {
@@ -37198,7 +24213,7 @@ var PericodeSettingsTab = class extends import_obsidian5.PluginSettingTab {
     const currentValue = opts.get();
     const onText = opts.onLabel ?? "On";
     const offText = opts.offLabel ?? "Off";
-    const setting = new import_obsidian5.Setting(opts.container).setName(opts.name);
+    const setting = new import_obsidian6.Setting(opts.container).setName(opts.name);
     if (isEditing) {
       setting.setDesc(opts.desc);
       let draft = currentValue;
@@ -37247,7 +24262,7 @@ var PericodeSettingsTab = class extends import_obsidian5.PluginSettingTab {
   lockableDropdown(opts) {
     const isEditing = this.editing.has(opts.key);
     const currentValue = opts.get();
-    const setting = new import_obsidian5.Setting(opts.container).setName(opts.name);
+    const setting = new import_obsidian6.Setting(opts.container).setName(opts.name);
     if (isEditing) {
       setting.setDesc(opts.desc);
       let draft = currentValue;
@@ -37302,7 +24317,7 @@ var PericodeSettingsTab = class extends import_obsidian5.PluginSettingTab {
   lockableSlider(opts) {
     const isEditing = this.editing.has(opts.key);
     const currentValue = opts.get();
-    const setting = new import_obsidian5.Setting(opts.container).setName(opts.name);
+    const setting = new import_obsidian6.Setting(opts.container).setName(opts.name);
     if (isEditing) {
       setting.setDesc(opts.desc);
       let draft = currentValue;
@@ -37351,7 +24366,7 @@ var PericodeSettingsTab = class extends import_obsidian5.PluginSettingTab {
   lockableTextarea(opts) {
     const isEditing = this.editing.has(opts.key);
     const currentValue = opts.get();
-    const setting = new import_obsidian5.Setting(opts.container).setName(opts.name);
+    const setting = new import_obsidian6.Setting(opts.container).setName(opts.name);
     if (isEditing) {
       setting.setDesc(opts.desc);
       let draft = currentValue;
@@ -37563,7 +24578,7 @@ var PericodeSettingsTab = class extends import_obsidian5.PluginSettingTab {
           this.policyLoaded = false;
           this.display();
         } catch (err) {
-          new import_obsidian5.Notice(
+          new import_obsidian6.Notice(
             `Org policy refresh failed: ${err instanceof Error ? err.message : String(err)}`,
             8e3
           );
@@ -37821,7 +24836,7 @@ var PericodeSettingsTab = class extends import_obsidian5.PluginSettingTab {
       );
     };
     refreshStatus();
-    new import_obsidian5.Setting(container).setName("Scaffold this vault").setDesc(
+    new import_obsidian6.Setting(container).setName("Scaffold this vault").setDesc(
       "Creates any missing pipeline folders + seed files. Existing files are left untouched."
     ).addButton(
       (b2) => b2.setButtonText("Scaffold").setCta().onClick(async () => {
@@ -37829,13 +24844,13 @@ var PericodeSettingsTab = class extends import_obsidian5.PluginSettingTab {
         try {
           const { scaffoldVault: scaffoldVault2 } = await Promise.resolve().then(() => (init_vaultScaffold(), vaultScaffold_exports));
           const report = await scaffoldVault2(vault);
-          new import_obsidian5.Notice(
+          new import_obsidian6.Notice(
             report.created.length === 0 ? `Vault already scaffolded (${report.skipped.length} entries existed).` : `Created ${report.created.length} entries, skipped ${report.skipped.length} existing.`,
             6e3
           );
           refreshStatus();
         } catch (err) {
-          new import_obsidian5.Notice(
+          new import_obsidian6.Notice(
             `Scaffold failed: ${err instanceof Error ? err.message : String(err)}`,
             8e3
           );
@@ -37888,7 +24903,7 @@ var PericodeSettingsTab = class extends import_obsidian5.PluginSettingTab {
       try {
         this.mcpDiscovered = await discoverMcpServers();
       } catch (err) {
-        new import_obsidian5.Notice(
+        new import_obsidian6.Notice(
           `MCP discovery failed: ${err instanceof Error ? err.message : String(err)}`,
           6e3
         );
@@ -38070,13 +25085,13 @@ var PericodeSettingsTab = class extends import_obsidian5.PluginSettingTab {
           const key = `${d.source}::${d.name}::${d.command ?? ""}::${(d.args ?? [])[0] ?? ""}`;
           this.mcpDiscoverSelected.delete(key);
         }
-        new import_obsidian5.Notice(
+        new import_obsidian6.Notice(
           `Added ${additions.length} MCP server${additions.length === 1 ? "" : "s"} to your config. Click "Reload MCP servers" below to start them.`,
           6e3
         );
         this.display();
       } catch (err) {
-        new import_obsidian5.Notice(
+        new import_obsidian6.Notice(
           `Save failed: ${err instanceof Error ? err.message : String(err)}`,
           6e3
         );
@@ -38127,7 +25142,7 @@ var PericodeSettingsTab = class extends import_obsidian5.PluginSettingTab {
       });
       blurb.style.marginBottom = "10px";
       blurb.setText(
-        "These MCP servers were added or modified in mcp.json but the plugin refused to spawn them. Review the command and arguments before approving. Once approved, the plugin will start the server and remember the approval (entries with the same shape skip this prompt next time)."
+        "These MCP servers were added or modified in mcp.json but the plugin refused to spawn them. Review the command and arguments before approving. Once approved, the plugin will start the server for this plugin session only. Reloading the plugin requires approval again. Changes to environment values also require approval."
       );
       for (const p of status.pendingApproval) {
         const entry = pendingCard.createDiv();
@@ -38150,18 +25165,19 @@ var PericodeSettingsTab = class extends import_obsidian5.PluginSettingTab {
         buttonRow.style.display = "flex";
         buttonRow.style.gap = "6px";
         const approveBtn = buttonRow.createEl("button", {
-          text: "Approve and spawn"
+          text: "Approve for this session"
         });
         approveBtn.classList.add("mod-cta");
         approveBtn.onclick = async () => {
           try {
             const { approveMcpEntry: approveMcpEntry2 } = await Promise.resolve().then(() => (init_pericodeMcp(), pericodeMcp_exports));
             await approveMcpEntry2(vault, p.hash);
-            await this.plugin.mcpManager.restart(vault, this.plugin.registry);
-            new import_obsidian5.Notice(`MCP '${p.name}' approved and started.`, 5e3);
+            const result = await this.plugin.mcpManager.restart(vault, this.plugin.registry);
+            const started = result.connected.includes(p.name);
+            new import_obsidian6.Notice(started ? `MCP '${p.name}' approved and started.` : `MCP '${p.name}' approved, but did not start. Check the connection status.`, 5e3);
             this.display();
           } catch (err) {
-            new import_obsidian5.Notice(
+            new import_obsidian6.Notice(
               `Approve failed: ${err instanceof Error ? err.message : String(err)}`,
               8e3
             );
@@ -38195,7 +25211,7 @@ var PericodeSettingsTab = class extends import_obsidian5.PluginSettingTab {
       const isEditing = this.mcpEditingIndex === i;
       const isConnected = connectedSet.has(server.name);
       const failure = failureMap.get(server.name);
-      const setting = new import_obsidian5.Setting(container).setName(server.name || "(unnamed)");
+      const setting = new import_obsidian6.Setting(container).setName(server.name || "(unnamed)");
       const summaryParts = [];
       summaryParts.push(`${server.command ?? ""} ${(server.args ?? []).join(" ")}`.trim());
       if (failure) summaryParts.push(`error: ${failure}`);
@@ -38238,7 +25254,7 @@ var PericodeSettingsTab = class extends import_obsidian5.PluginSettingTab {
         });
       }
     }
-    const addRow = new import_obsidian5.Setting(container).setName("Add server").setDesc("Quick add picks one of the common MCP servers; you can edit before saving.");
+    const addRow = new import_obsidian6.Setting(container).setName("Add server").setDesc("Quick add picks one of the common MCP servers; you can edit before saving.");
     addRow.addDropdown((d) => {
       d.addOption("", "\u2014 quick add \u2014");
       for (const preset of MCP_PRESETS) {
@@ -38272,7 +25288,7 @@ var PericodeSettingsTab = class extends import_obsidian5.PluginSettingTab {
         this.display();
       })
     );
-    new import_obsidian5.Setting(container).setName(this.mcpRestarting ? "Reloading\u2026" : "Reload MCP servers").setDesc(
+    new import_obsidian6.Setting(container).setName(this.mcpRestarting ? "Reloading\u2026" : "Reload MCP servers").setDesc(
       "Disconnect and re-spawn every server with the current config. Useful after editing env vars."
     ).addButton(
       (b2) => b2.setButtonText(this.mcpRestarting ? "Reloading\u2026" : "Reload").setDisabled(this.mcpRestarting).onClick(async () => {
@@ -38297,17 +25313,17 @@ var PericodeSettingsTab = class extends import_obsidian5.PluginSettingTab {
     let draftCommand = server.command ?? "";
     let draftArgs = (server.args ?? []).join("\n");
     let draftEnv = server.env ? JSON.stringify(server.env, null, 2) : "{}";
-    new import_obsidian5.Setting(wrap).setName("Name").setDesc("Internal id \u2014 also shown in audit logs and tool sources.").addText((t) => {
+    new import_obsidian6.Setting(wrap).setName("Name").setDesc("Internal id \u2014 also shown in audit logs and tool sources.").addText((t) => {
       t.setValue(draftName).onChange((v2) => {
         draftName = v2.trim();
       });
     });
-    new import_obsidian5.Setting(wrap).setName("Command").setDesc("An already-installed executable that speaks MCP over stdio. Presets disable package downloads; install servers separately first.").addText((t) => {
+    new import_obsidian6.Setting(wrap).setName("Command").setDesc("An already-installed executable that speaks MCP over stdio. Presets disable package downloads; install servers separately first.").addText((t) => {
       t.setValue(draftCommand).onChange((v2) => {
         draftCommand = v2.trim();
       });
     });
-    const argsSetting = new import_obsidian5.Setting(wrap).setName("Args (one per line)").setDesc("Arguments passed to the command. Order matters.");
+    const argsSetting = new import_obsidian6.Setting(wrap).setName("Args (one per line)").setDesc("Arguments passed to the command. Order matters.");
     argsSetting.controlEl.style.flexDirection = "column";
     argsSetting.controlEl.style.alignItems = "stretch";
     const argsInput = argsSetting.controlEl.createEl("textarea", {
@@ -38319,7 +25335,7 @@ var PericodeSettingsTab = class extends import_obsidian5.PluginSettingTab {
     argsInput.addEventListener("input", () => {
       draftArgs = argsInput.value;
     });
-    const envSetting = new import_obsidian5.Setting(wrap).setName("Env (JSON)").setDesc(
+    const envSetting = new import_obsidian6.Setting(wrap).setName("Env (JSON)").setDesc(
       "Environment variables passed to the child process. Use this for API keys / tokens \u2014 they're scoped, not shared with anything else."
     );
     envSetting.controlEl.style.flexDirection = "column";
@@ -38333,7 +25349,7 @@ var PericodeSettingsTab = class extends import_obsidian5.PluginSettingTab {
     envInput.addEventListener("input", () => {
       draftEnv = envInput.value;
     });
-    new import_obsidian5.Setting(wrap).addButton(
+    new import_obsidian6.Setting(wrap).addButton(
       (b2) => b2.setButtonText("Save & reload").setCta().onClick(async () => {
         let envParsed;
         if (draftEnv.trim() && draftEnv.trim() !== "{}") {
@@ -38342,11 +25358,11 @@ var PericodeSettingsTab = class extends import_obsidian5.PluginSettingTab {
             if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
               envParsed = parsed;
             } else {
-              new import_obsidian5.Notice("Env must be a JSON object.");
+              new import_obsidian6.Notice("Env must be a JSON object.");
               return;
             }
           } catch (err) {
-            new import_obsidian5.Notice(`Env is not valid JSON: ${err instanceof Error ? err.message : String(err)}`);
+            new import_obsidian6.Notice(`Env is not valid JSON: ${err instanceof Error ? err.message : String(err)}`);
             return;
           }
         }
@@ -38363,7 +25379,7 @@ var PericodeSettingsTab = class extends import_obsidian5.PluginSettingTab {
     try {
       await writeMcpConfig(vaultPath, this.mcpServers);
     } catch (err) {
-      new import_obsidian5.Notice(
+      new import_obsidian6.Notice(
         `PeriCode: failed to write MCP config \u2014 ${err instanceof Error ? err.message : String(err)}`,
         8e3
       );
@@ -38379,16 +25395,16 @@ var PericodeSettingsTab = class extends import_obsidian5.PluginSettingTab {
         this.plugin.activeRegistry()
       );
       if (status.connected.length > 0) {
-        new import_obsidian5.Notice(
+        new import_obsidian6.Notice(
           `PeriCode: ${status.connected.length} MCP server(s) connected \u2014 ${status.connected.join(", ")}.`,
           5e3
         );
       }
       for (const f2 of status.failed) {
-        new import_obsidian5.Notice(`PeriCode MCP '${f2.name}' failed: ${f2.error}`, 8e3);
+        new import_obsidian6.Notice(`PeriCode MCP '${f2.name}' failed: ${f2.error}`, 8e3);
       }
     } catch (err) {
-      new import_obsidian5.Notice(
+      new import_obsidian6.Notice(
         `PeriCode: MCP restart failed \u2014 ${err instanceof Error ? err.message : String(err)}`,
         8e3
       );
@@ -38403,7 +25419,7 @@ var PericodeSettingsTab = class extends import_obsidian5.PluginSettingTab {
    * `deleteAuth` for disconnect.
    */
   renderOAuthStatus(container, selected) {
-    if (!selected || selected === "claude-oauth") new import_obsidian5.Setting(container).setName("Claude subscription").setDesc("Uses your installed Claude Code and its own sign-in. PeriCode does not store subscription tokens.").addButton((b2) => b2.setButtonText("Connect Claude Code").onClick(() => new AnthropicLoginModal(this.app, () => {
+    if (!selected || selected === "claude-oauth") new import_obsidian6.Setting(container).setName("Claude subscription").setDesc("Uses your installed Claude Code and its own sign-in. PeriCode does not store subscription tokens.").addButton((b2) => b2.setButtonText("Connect Claude Code").onClick(() => new AnthropicLoginModal(this.app, () => {
       void this.loadModelsFor("claude-oauth");
     }, this.plugin).open()));
     let stored = {};
@@ -38422,7 +25438,7 @@ var PericodeSettingsTab = class extends import_obsidian5.PluginSettingTab {
       const record2 = stored[lane.authStoreKey];
       const isLoggedIn = record2?.type === "oauth";
       const expired = isLoggedIn && !!record2.expires && record2.expires < Date.now();
-      const setting = new import_obsidian5.Setting(container).setName(lane.displayName).setDesc(
+      const setting = new import_obsidian6.Setting(container).setName(lane.displayName).setDesc(
         isLoggedIn ? expired ? "Saved access token has expired. Requests will try to refresh it; if refresh fails, click Sign in again." : "Credentials are saved. Account access is verified when you send a request." : `Not logged in. Click Login to sign in from inside the plugin.`
       );
       const statusEl = setting.controlEl.createSpan({
@@ -38437,9 +25453,9 @@ var PericodeSettingsTab = class extends import_obsidian5.PluginSettingTab {
           (b2) => b2.setButtonText("Disconnect").setWarning().onClick(async () => {
             const ok = deleteAuth(lane.authStoreKey);
             if (ok) {
-              new import_obsidian5.Notice(`PeriCode: disconnected ${lane.displayName}.`);
+              new import_obsidian6.Notice(`PeriCode: disconnected ${lane.displayName}.`);
             } else {
-              new import_obsidian5.Notice(`No stored credentials for ${lane.displayName}.`);
+              new import_obsidian6.Notice(`No stored credentials for ${lane.displayName}.`);
             }
             this.modelCache.delete(lane.providerId);
             this.modelError.delete(lane.providerId);
@@ -38464,10 +25480,10 @@ var PericodeSettingsTab = class extends import_obsidian5.PluginSettingTab {
         );
       }
     }
-    if (!selected) new import_obsidian5.Setting(container).setName("Refresh OAuth status").setDesc("Re-read ~/.pericode/auth.json (e.g. after authenticating from another tool).").addButton(
+    if (!selected) new import_obsidian6.Setting(container).setName("Refresh OAuth status").setDesc("Re-read ~/.pericode/auth.json (e.g. after authenticating from another tool).").addButton(
       (b2) => b2.setButtonText("Refresh").onClick(() => {
         this.display();
-        new import_obsidian5.Notice("PeriCode: refreshed OAuth status.");
+        new import_obsidian6.Notice("PeriCode: refreshed OAuth status.");
       })
     );
   }
@@ -39906,184 +26922,16 @@ function renderSafeMarkdown(text2, target, openNote) {
   }
 }
 
-// src/guardedRegistry.ts
-init_scoped_fetch();
-var import_promises13 = require("node:fs/promises");
-var import_node_path38 = require("node:path");
-init_sdk_entry();
-init_pericodeSecurity();
-var PATH_KEYS = /* @__PURE__ */ new Set(["path", "paths", "file_path", "target_path", "dir", "directory", "output_path", "notebook_path", "cwd", "under_path"]);
-var FILE_TOOLS = /* @__PURE__ */ new Set(["read_file", "write_file", "edit_file", "delete_file", "list_dir", "search_files"]);
-var FORBIDDEN = /* @__PURE__ */ new Set(["obsidian_call_plugin_api", "obsidian_run_command", "obsidian_inspect_config"]);
-async function checkedVaultPath(path, vault, policy) {
-  if (!path || path.includes("\0") || /(^|[\\/])\.\.([\\/]|$)/.test(path) || /[<>|*?]/.test(path)) throw new Error("Invalid vault path.");
-  const base = (0, import_node_path38.resolve)(vault);
-  const absolute = (0, import_node_path38.resolve)(base, path);
-  const rel = (0, import_node_path38.relative)(base, absolute);
-  if (rel === ".." || rel.startsWith(`..${import_node_path38.sep}`) || (0, import_node_path38.isAbsolute)(rel) || rel.includes(":")) throw new Error("Path is outside the vault.");
-  const portable = rel.replace(/\\/g, "/");
-  if (process.platform === "win32" && portable.split("/").some((part) => /[. ]$/.test(part))) throw new Error("Ambiguous Windows path.");
-  if (isPathDenylisted(portable, policy.denylistPaths)) throw new Error("Path is excluded by security policy.");
-  const root = await (0, import_promises13.realpath)(base);
-  let current = base;
-  for (const part of rel.split(import_node_path38.sep).filter(Boolean)) {
-    current = (0, import_node_path38.resolve)(current, part);
-    try {
-      const info = await (0, import_promises13.lstat)(current);
-      if (info.isSymbolicLink()) throw new Error("Linked paths are not accessible to tools.");
-      const actual = (0, import_node_path38.relative)(root, await (0, import_promises13.realpath)(current));
-      if (actual === ".." || actual.startsWith(`..${import_node_path38.sep}`) || (0, import_node_path38.isAbsolute)(actual)) throw new Error("Path resolves outside the vault.");
-      if (isPathDenylisted(actual.replace(/\\/g, "/"), policy.denylistPaths)) throw new Error("Resolved path is excluded by security policy.");
-    } catch (e) {
-      if (e.code === "ENOENT") break;
-      throw e;
-    }
-  }
-  return { absolute, relative: portable };
-}
-var GuardedRegistry = class extends ToolRegistry {
-  constructor(source, deps) {
-    super();
-    this.deps = deps;
-    for (const { definition } of source.getAllWithSource("all")) {
-      if (!FILE_TOOLS.has(definition.name)) continue;
-      this.registerBuiltin({ definition, readOnly: source.isReadOnly(definition.name), execute: (input, context) => source.execute(definition.name, input, { context }) });
-    }
-  }
-  deps;
-  turn = null;
-  permits = /* @__PURE__ */ new Map();
-  denials = /* @__PURE__ */ new Map();
-  quarantineRevision = 0;
-  stopWatchingQuarantine;
-  registerBuiltin(tool) {
-    if (!FORBIDDEN.has(tool.definition.name)) super.registerBuiltin(tool);
-  }
-  beginTurn(ask, signal, forcePrompt = false) {
-    if (this.turn) throw new Error("A secured tool turn is already active.");
-    const options = { oneShot: false, autoApprove: /* @__PURE__ */ new Set(), autoApproveReadOnly: true, ask };
-    this.turn = { signal, ask, forcePrompt, gate: new PermissionGate(options) };
-    this.permits.clear();
-    this.denials.clear();
-    this.stopWatchingQuarantine = onQuarantineChange(() => {
-      this.quarantineRevision++;
-      this.permits.clear();
-    });
-    const registry2 = this;
-    return new class extends PermissionGate {
-      check(req) {
-        return registry2.authorize(req);
-      }
-      getDenialReason(req) {
-        return registry2.denials.get(registry2.key(req.toolName, req.input)) ?? "Tool request was not approved.";
-      }
-    }(options);
-  }
-  endTurn() {
-    this.permits.clear();
-    this.denials.clear();
-    this.turn = null;
-    this.stopWatchingQuarantine?.();
-    this.stopWatchingQuarantine = void 0;
-  }
-  key(name, input) {
-    return JSON.stringify([name, input]);
-  }
-  async inspect(name, input) {
-    if (!this.has(name)) throw new Error("Unknown or unavailable tool.");
-    if (getQuarantineState().active) throw new Error("Session quarantined.");
-    const policy = this.deps.getPolicy();
-    const fingerprint = JSON.stringify(policy);
-    const vault = this.deps.getVaultPath();
-    if (!vault) throw new Error("A local vault is required.");
-    const source = this.source(name) === "builtin" ? classifyToolSource(name) : "mcp_result";
-    const server = this.source(name);
-    if (server !== "builtin" && policy.approvedMcps.length && !policy.approvedMcps.includes(server ?? "")) throw new Error("MCP server is not approved by policy.");
-    const normalized = structuredClone(input);
-    if (["list_dir", "search_files", "obsidian_list_notes"].includes(name) && (normalized.path === void 0 || normalized.path === null || normalized.path === "")) normalized.path = ".";
-    const inspectValue = async (value, key = "") => {
-      if (PATH_KEYS.has(key) && typeof value === "string") {
-        const p = await checkedVaultPath(value, vault, policy);
-        return FILE_TOOLS.has(name) ? p.absolute : p.relative;
-      }
-      if (Array.isArray(value)) return Promise.all(value.map((v2) => inspectValue(v2, key)));
-      if (value && typeof value === "object") {
-        const result = {};
-        for (const [k2, v2] of Object.entries(value)) result[k2] = await inspectValue(v2, k2);
-        return result;
-      }
-      return value;
-    };
-    const args = await inspectValue(normalized);
-    for (const path of this.deps.getContextPaths?.(name) ?? []) await checkedVaultPath(path, vault, policy);
-    const decision = decideGate(name, this.isReadOnly(name), source, { ...policy, denylistPaths: [] });
-    if (decision.kind === "block") throw new Error(decision.reason);
-    if (JSON.stringify(this.deps.getPolicy()) !== fingerprint) throw new Error("Security policy changed; retry the request.");
-    return { args, policy, fingerprint, decision };
-  }
-  async authorize(req) {
-    const turn = this.turn;
-    const requestKey = this.key(req.toolName, req.input);
-    this.denials.delete(requestKey);
-    const refuse = (reason) => {
-      this.denials.set(requestKey, reason);
-      return false;
-    };
-    if (!turn || turn.signal.aborted) return refuse("Tool request cancelled or no longer active.");
-    try {
-      const revision = this.quarantineRevision;
-      const checked = await this.inspect(req.toolName, req.input);
-      const force = turn.forcePrompt || checked.policy.alwaysPromptForEveryCall || this.source(req.toolName) !== "builtin";
-      const gate = force ? new PermissionGate({ oneShot: false, autoApprove: /* @__PURE__ */ new Set(), autoApproveReadOnly: false, ask: turn.ask }) : turn.gate;
-      const allowed = await gate.check({ ...req, source: this.source(req.toolName) ?? "builtin", isReadOnly: !force && checked.decision.kind === "auto-approve" });
-      if (this.turn !== turn || turn.signal.aborted) return refuse("Tool request cancelled or no longer active.");
-      if (getQuarantineState().active || revision !== this.quarantineRevision || JSON.stringify(this.deps.getPolicy()) !== checked.fingerprint || this.key(req.toolName, req.input) !== requestKey) return refuse("Authorization changed before execution. Retry the request.");
-      if (!allowed) return refuse("Permission request was declined or dismissed.");
-      this.permits.set(requestKey, checked.fingerprint);
-      return true;
-    } catch (e) {
-      return refuse(`Tool request blocked: ${e instanceof Error ? e.message : String(e)}`);
-    }
-  }
-  async execute(name, input, options = {}) {
-    const turn = this.turn;
-    const key = this.key(name, input);
-    const revision = this.quarantineRevision;
-    const permit = this.permits.get(key);
-    this.permits.delete(key);
-    try {
-      if (!turn || turn.signal.aborted || options?.context?.signal !== turn.signal || !permit) throw new Error("Tool requires authorization in the active turn.");
-      const checked = await this.inspect(name, input);
-      if (permit !== checked.fingerprint || this.turn !== turn || turn.signal.aborted || revision !== this.quarantineRevision || getQuarantineState().active) throw new Error("Authorization expired; retry the request.");
-      if (checked.policy.dryRun) return { output: `[dry-run] ${name}: no tool was executed.`, isError: false };
-      if (name === "read_file") {
-        const info = await (0, import_promises13.lstat)(String(checked.args.path));
-        if (info.size > 2e6) throw new Error("File exceeds the safe read limit (2 MB).");
-      }
-      const result = await super.execute(name, checked.args, options);
-      if (turn.signal.aborted || this.turn !== turn || revision !== this.quarantineRevision || getQuarantineState().active || JSON.stringify(this.deps.getPolicy()) !== permit) return { output: "Tool output withheld because authorization changed.", isError: true };
-      if (checked.policy.scanUntrustedText && scanUntrustedText(result.output).hit) {
-        if (checked.policy.autoQuarantineOnJailbreak) triggerQuarantine(`Untrusted output from ${name}`, "automatic");
-        return { output: "Tool output withheld by the untrusted-text policy.", isError: true };
-      }
-      return { ...result, output: redactForPrivacyMode(result.output, checked.policy.privacyMode) };
-    } catch (e) {
-      if (e.code === "ENOENT") return { output: "File or folder not found. Check the vault-relative path using list_dir or search_files.", isError: true };
-      return { output: `Blocked: ${e instanceof Error ? e.message : String(e)}`, isError: true };
-    }
-  }
-};
-
 // src/PericodeView.ts
-var import_obsidian8 = require("obsidian");
+var import_obsidian9 = require("obsidian");
 
 // src/conversationStore.ts
 init_scoped_fetch();
-var import_promises14 = require("node:fs/promises");
-var import_node_path39 = require("node:path");
-var import_node_crypto14 = require("node:crypto");
+var import_promises4 = require("node:fs/promises");
+var import_node_path17 = require("node:path");
+var import_node_crypto7 = require("node:crypto");
 function newConversation() {
-  return { id: (0, import_node_crypto14.randomUUID)(), title: "New conversation", updatedAt: Date.now(), provider: "", model: "", messages: [], entries: [], draft: "" };
+  return { id: (0, import_node_crypto7.randomUUID)(), title: "New conversation", updatedAt: Date.now(), provider: "", model: "", messages: [], entries: [], draft: "" };
 }
 function emptyConversations() {
   const first = newConversation();
@@ -40133,11 +26981,11 @@ var ConversationStore = class {
   readable = false;
   directory;
   constructor(vaultPath) {
-    this.directory = (0, import_node_path39.join)(vaultPath, ".pericode", "conversations");
+    this.directory = (0, import_node_path17.join)(vaultPath, ".pericode", "conversations");
   }
   async load() {
     try {
-      const data = parseConversations(await (0, import_promises14.readFile)((0, import_node_path39.join)(this.directory, "sessions.json"), "utf8"));
+      const data = parseConversations(await (0, import_promises4.readFile)((0, import_node_path17.join)(this.directory, "sessions.json"), "utf8"));
       this.readable = true;
       return data;
     } catch (err) {
@@ -40151,10 +26999,10 @@ var ConversationStore = class {
     const snapshot = JSON.stringify(data);
     const write = this.queue.catch(() => {
     }).then(async () => {
-      await (0, import_promises14.mkdir)(this.directory, { recursive: true });
-      const temporary = (0, import_node_path39.join)(this.directory, `sessions-${(0, import_node_crypto14.randomUUID)()}.tmp`);
-      await (0, import_promises14.writeFile)(temporary, snapshot, { encoding: "utf8", mode: 384 });
-      await (0, import_promises14.rename)(temporary, (0, import_node_path39.join)(this.directory, "sessions.json"));
+      await (0, import_promises4.mkdir)(this.directory, { recursive: true });
+      const temporary = (0, import_node_path17.join)(this.directory, `sessions-${(0, import_node_crypto7.randomUUID)()}.tmp`);
+      await (0, import_promises4.writeFile)(temporary, snapshot, { encoding: "utf8", mode: 384 });
+      await (0, import_promises4.rename)(temporary, (0, import_node_path17.join)(this.directory, "sessions.json"));
     });
     this.queue = write;
     return write;
@@ -40172,8 +27020,8 @@ ${e.text}`).join("\n\n");
 
 // src/ContextPicker.ts
 init_scoped_fetch();
-var import_obsidian6 = require("obsidian");
-var ContextPicker = class extends import_obsidian6.FuzzySuggestModal {
+var import_obsidian7 = require("obsidian");
+var ContextPicker = class extends import_obsidian7.FuzzySuggestModal {
   constructor(app, picked) {
     super(app);
     this.picked = picked;
@@ -40182,7 +27030,7 @@ var ContextPicker = class extends import_obsidian6.FuzzySuggestModal {
   picked;
   getItems() {
     const files = this.app.vault.getMarkdownFiles().map((f2) => f2.path);
-    const folders = this.app.vault.getAllLoadedFiles().filter((f2) => f2 instanceof import_obsidian6.TFolder && f2.path !== "/").map((f2) => f2.path + "/");
+    const folders = this.app.vault.getAllLoadedFiles().filter((f2) => f2 instanceof import_obsidian7.TFolder && f2.path !== "/").map((f2) => f2.path + "/");
     return [...files, ...folders].filter((p) => !p.split("/").some((part) => part.startsWith("."))).sort();
   }
   getItemText(item) {
@@ -40249,14 +27097,14 @@ init_sdk_entry();
 
 // src/PermissionModal.ts
 init_scoped_fetch();
-var import_obsidian7 = require("obsidian");
-var import_node_fs25 = require("node:fs");
-var import_node_path40 = require("node:path");
-var PermissionModal = class extends import_obsidian7.Modal {
-  constructor(app, request, resolve19) {
+var import_obsidian8 = require("obsidian");
+var import_node_fs14 = require("node:fs");
+var import_node_path18 = require("node:path");
+var PermissionModal = class extends import_obsidian8.Modal {
+  constructor(app, request, resolve4) {
     super(app);
     this.request = request;
-    this.resolve = resolve19;
+    this.resolve = resolve4;
   }
   request;
   resolve;
@@ -40321,7 +27169,7 @@ var PermissionModal = class extends import_obsidian7.Modal {
         preview.length > 4e3 ? preview.slice(0, 4e3) + "\n\u2026[truncated]" : preview
       );
     }
-    const buttonRow = new import_obsidian7.Setting(contentEl);
+    const buttonRow = new import_obsidian8.Setting(contentEl);
     buttonRow.addButton(
       (b2) => b2.setButtonText("Allow").setCta().onClick(() => this.complete("yes"))
     );
@@ -40356,18 +27204,18 @@ var PermissionModal = class extends import_obsidian7.Modal {
     if (!path) return null;
     let absolute;
     try {
-      absolute = (0, import_node_path40.resolve)(path);
+      absolute = (0, import_node_path18.resolve)(path);
     } catch {
       return null;
     }
-    if (!(0, import_node_fs25.existsSync)(absolute)) return null;
+    if (!(0, import_node_fs14.existsSync)(absolute)) return null;
     let existingSize = 0;
     let existingContent = "";
     try {
-      const stat5 = (0, import_node_fs25.statSync)(absolute);
-      existingSize = stat5.size;
-      if (stat5.size <= 64 * 1024) {
-        existingContent = (0, import_node_fs25.readFileSync)(absolute, "utf8");
+      const stat = (0, import_node_fs14.statSync)(absolute);
+      existingSize = stat.size;
+      if (stat.size <= 64 * 1024) {
+        existingContent = (0, import_node_fs14.readFileSync)(absolute, "utf8");
       }
     } catch {
       return null;
@@ -40570,27 +27418,27 @@ function prettySource(source) {
 
 // src/pericodeAudit.ts
 init_scoped_fetch();
-var import_node_fs26 = require("node:fs");
-var import_node_path41 = require("node:path");
+var import_node_fs15 = require("node:fs");
+var import_node_path19 = require("node:path");
 var MAX_OUTPUT_PREVIEW = 4e3;
 var ROTATE_AT_BYTES = 5 * 1024 * 1024;
 var KEEP_AFTER_ROTATE_BYTES = 3 * 1024 * 1024;
 var ROTATION_CHECK_EVERY = 50;
 var _appendsSinceCheck = 0;
 function auditPath(vaultPath) {
-  return (0, import_node_path41.join)(vaultPath, ".pericode", "audit.jsonl");
+  return (0, import_node_path19.join)(vaultPath, ".pericode", "audit.jsonl");
 }
 async function maybeRotate(path) {
   let stats;
   try {
-    stats = await import_node_fs26.promises.stat(path);
+    stats = await import_node_fs15.promises.stat(path);
   } catch {
     return;
   }
   if (stats.size <= ROTATE_AT_BYTES) return;
   let raw;
   try {
-    raw = await import_node_fs26.promises.readFile(path, "utf8");
+    raw = await import_node_fs15.promises.readFile(path, "utf8");
   } catch {
     return;
   }
@@ -40599,16 +27447,16 @@ async function maybeRotate(path) {
   if (sliceStart === -1) return;
   const kept = raw.slice(sliceStart + 1);
   try {
-    await import_node_fs26.promises.writeFile(path, kept, "utf8");
+    await import_node_fs15.promises.writeFile(path, kept, "utf8");
   } catch {
   }
 }
 async function ensureAuditFile(vaultPath) {
   if (!vaultPath) return;
   const path = auditPath(vaultPath);
-  await import_node_fs26.promises.mkdir((0, import_node_path41.dirname)(path), { recursive: true });
-  if (!(0, import_node_fs26.existsSync)(path)) {
-    await import_node_fs26.promises.writeFile(path, "", "utf8");
+  await import_node_fs15.promises.mkdir((0, import_node_path19.dirname)(path), { recursive: true });
+  if (!(0, import_node_fs15.existsSync)(path)) {
+    await import_node_fs15.promises.writeFile(path, "", "utf8");
   }
 }
 async function appendAudit(vaultPath, record2) {
@@ -40617,7 +27465,7 @@ async function appendAudit(vaultPath, record2) {
   const truncated = record2.output_preview.length > MAX_OUTPUT_PREVIEW ? record2.output_preview.slice(0, MAX_OUTPUT_PREVIEW) + "\n\u2026[truncated]" : record2.output_preview;
   const line = JSON.stringify({ ...record2, output_preview: truncated }) + "\n";
   try {
-    await import_node_fs26.promises.appendFile(path, line, "utf8");
+    await import_node_fs15.promises.appendFile(path, line, "utf8");
     _appendsSinceCheck += 1;
     if (_appendsSinceCheck >= ROTATION_CHECK_EVERY) {
       _appendsSinceCheck = 0;
@@ -40629,10 +27477,10 @@ async function appendAudit(vaultPath, record2) {
 async function readRecentAudit(vaultPath, limit = 50) {
   if (!vaultPath) return [];
   const path = auditPath(vaultPath);
-  if (!(0, import_node_fs26.existsSync)(path)) return [];
+  if (!(0, import_node_fs15.existsSync)(path)) return [];
   let raw = "";
   try {
-    raw = await import_node_fs26.promises.readFile(path, "utf8");
+    raw = await import_node_fs15.promises.readFile(path, "utf8");
   } catch {
     return [];
   }
@@ -40650,10 +27498,10 @@ async function readRecentAudit(vaultPath, limit = 50) {
 async function readAuditRange(vaultPath) {
   if (!vaultPath) return [];
   const path = auditPath(vaultPath);
-  if (!(0, import_node_fs26.existsSync)(path)) return [];
+  if (!(0, import_node_fs15.existsSync)(path)) return [];
   let raw = "";
   try {
-    raw = await import_node_fs26.promises.readFile(path, "utf8");
+    raw = await import_node_fs15.promises.readFile(path, "utf8");
   } catch {
     return [];
   }
@@ -40671,7 +27519,7 @@ async function readAuditRange(vaultPath) {
 // src/PericodeView.ts
 init_pericodeSecurity();
 var PERICODE_VIEW_TYPE = "pericode-chat";
-var PericodeView = class extends import_obsidian8.ItemView {
+var PericodeView = class extends import_obsidian9.ItemView {
   constructor(leaf, plugin) {
     super(leaf);
     this.plugin = plugin;
@@ -40800,7 +27648,7 @@ var PericodeView = class extends import_obsidian8.ItemView {
         this.sessions = await this.store.load();
       } catch (err) {
         this.store = null;
-        new import_obsidian8.Notice(`Saved chats could not be loaded: ${String(err)}. Existing data was left intact.`, 1e4);
+        new import_obsidian9.Notice(`Saved chats could not be loaded: ${String(err)}. Existing data was left intact.`, 1e4);
       }
     }
     if (this.closed) return;
@@ -40818,7 +27666,7 @@ var PericodeView = class extends import_obsidian8.ItemView {
   }
   iconButton(parent, icon, label, action) {
     const button = parent.createEl("button", { cls: "pericode-icon-button", attr: { "aria-label": label, title: label } });
-    (0, import_obsidian8.setIcon)(button, icon);
+    (0, import_obsidian9.setIcon)(button, icon);
     button.addEventListener("click", action);
     return button;
   }
@@ -40837,7 +27685,7 @@ var PericodeView = class extends import_obsidian8.ItemView {
     const label = this.expanded ? "Restore sidebar" : "Expand chat";
     this.expandButtonEl.setAttribute("aria-label", label);
     this.expandButtonEl.title = label;
-    (0, import_obsidian8.setIcon)(this.expandButtonEl, this.expanded ? "minimize-2" : "maximize-2");
+    (0, import_obsidian9.setIcon)(this.expandButtonEl, this.expanded ? "minimize-2" : "maximize-2");
     this.resizeComposer();
     this.inputEl.focus();
   }
@@ -40852,18 +27700,18 @@ var PericodeView = class extends import_obsidian8.ItemView {
   }
   openContextMenu(anchor) {
     if (this.busy) return;
-    const menu = new import_obsidian8.Menu();
+    const menu = new import_obsidian9.Menu();
     menu.addItem((item) => item.setTitle("Add note or folder").setIcon("files").onClick(() => this.openContextPicker()));
     menu.addItem((item) => item.setTitle("Attach selected text").setIcon("text-select").onClick(() => {
-      const editor = this.app.workspace.getActiveViewOfType(import_obsidian8.MarkdownView);
+      const editor = this.app.workspace.getActiveViewOfType(import_obsidian9.MarkdownView);
       const text2 = editor?.editor.getSelection();
       if (editor?.file && text2) this.attachSelection(editor.file.path, text2);
-      else new import_obsidian8.Notice("Select text in a note, then use the Attach selection to chat command.");
+      else new import_obsidian9.Notice("Select text in a note, then use the Attach selection to chat command.");
     }));
     this.showMenu(menu, anchor);
   }
   openActions(anchor) {
-    const menu = new import_obsidian8.Menu();
+    const menu = new import_obsidian9.Menu();
     menu.addItem((item) => item.setTitle("Copy all").setIcon("copy").onClick(() => {
       const feedback = document.createElement("button");
       void this.copyAllToClipboard(feedback);
@@ -40896,13 +27744,13 @@ var PericodeView = class extends import_obsidian8.ItemView {
   }
   async openModelMenu() {
     if (this.busy || !this.plugin.claimInteractiveTurn()) {
-      new import_obsidian8.Notice("Finish the active request, then choose a model.");
+      new import_obsidian9.Notice("Finish the active request, then choose a model.");
       return;
     }
     const settings = { ...this.plugin.settings };
     this.headerMetaEl.setText("Loading account models\u2026");
     this.headerMetaEl.toggleAttribute("disabled", true);
-    const menu = new import_obsidian8.Menu();
+    const menu = new import_obsidian9.Menu();
     try {
       const catalog = await loadAccountModels(settings);
       if (this.closed || this.plugin.settings.provider !== settings.provider) return;
@@ -40941,11 +27789,11 @@ var PericodeView = class extends import_obsidian8.ItemView {
       }
       prompt = contextPrompt(text2, this.attachments);
     } catch (err) {
-      new import_obsidian8.Notice(String(err));
+      new import_obsidian9.Notice(String(err));
       return;
     }
     if (!this.plugin.claimInteractiveTurn(() => this.stopTurn())) {
-      new import_obsidian8.Notice("Finish or stop the active PeriCode request first.");
+      new import_obsidian9.Notice("Finish or stop the active PeriCode request first.");
       return;
     }
     this.inputEl.value = "";
@@ -41084,7 +27932,7 @@ var PericodeView = class extends import_obsidian8.ItemView {
               try {
                 const verdict = scanUntrustedText(output);
                 if (verdict.hit) {
-                  new import_obsidian8.Notice(
+                  new import_obsidian9.Notice(
                     `Untrusted-text hit in '${event.event.name}': ${verdict.reason}` + (this.plugin.cachedPolicy.autoQuarantineOnJailbreak ? " \u2014 session quarantined." : ""),
                     8e3
                   );
@@ -41138,7 +27986,7 @@ var PericodeView = class extends import_obsidian8.ItemView {
       } else {
         failed = true;
         this.appendSystemMessage(`Agent crashed: ${message}`);
-        new import_obsidian8.Notice(`PeriCode error: ${message}`);
+        new import_obsidian9.Notice(`PeriCode error: ${message}`);
       }
     } finally {
       envScope?.restore();
@@ -41158,13 +28006,13 @@ var PericodeView = class extends import_obsidian8.ItemView {
   makeAskFn() {
     return async (request) => {
       if (this.currentAbort?.signal.aborted || this.closed) return "no";
-      return new Promise((resolve19) => {
+      return new Promise((resolve4) => {
         const signal = this.currentAbort?.signal;
         const abort = () => modal.close();
         const modal = new PermissionModal(this.app, request, (decision) => {
           signal?.removeEventListener("abort", abort);
           this.pendingPermission = null;
-          resolve19(signal?.aborted ? "no" : decision);
+          resolve4(signal?.aborted ? "no" : decision);
         });
         this.pendingPermission = modal;
         signal?.addEventListener("abort", abort, { once: true });
@@ -41178,7 +28026,7 @@ var PericodeView = class extends import_obsidian8.ItemView {
   }
   setBusyState(busy) {
     this.sendButtonEl.disabled = false;
-    (0, import_obsidian8.setIcon)(this.sendButtonEl, busy ? "square" : "arrow-up");
+    (0, import_obsidian9.setIcon)(this.sendButtonEl, busy ? "square" : "arrow-up");
     this.sendButtonEl.setAttribute("aria-label", busy ? "Stop" : "Send");
     this.sendButtonEl.title = busy ? "Stop (Escape)" : "Send (Enter)";
     this.headerMetaEl.toggleAttribute("disabled", busy);
@@ -41300,8 +28148,8 @@ var PericodeView = class extends import_obsidian8.ItemView {
     if (state === "running") return "running\u2026";
     if (state === "error") {
       const err = event.error ?? "";
-      const oneLine7 = err.split("\n")[0] ?? "";
-      return oneLine7.length > 80 ? oneLine7.slice(0, 80) + "\u2026" : oneLine7;
+      const oneLine = err.split("\n")[0] ?? "";
+      return oneLine.length > 80 ? oneLine.slice(0, 80) + "\u2026" : oneLine;
     }
     const out = event.output ?? "";
     if (!out) return "(empty)";
@@ -41321,7 +28169,7 @@ var PericodeView = class extends import_obsidian8.ItemView {
       }, 1200);
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
-      new import_obsidian8.Notice(`PeriCode: clipboard copy failed \u2014 ${message}`);
+      new import_obsidian9.Notice(`PeriCode: clipboard copy failed \u2014 ${message}`);
     }
   }
   async copyAllToClipboard(button) {
@@ -41345,7 +28193,7 @@ var PericodeView = class extends import_obsidian8.ItemView {
       lines.push(prefix + text2);
     }
     if (lines.length === 0) {
-      new import_obsidian8.Notice("PeriCode: nothing to copy yet.");
+      new import_obsidian9.Notice("PeriCode: nothing to copy yet.");
       return;
     }
     await this.copyToClipboard(lines.join("\n\n"), button);
@@ -41369,7 +28217,7 @@ var PericodeView = class extends import_obsidian8.ItemView {
         if (!file || !this.plugin.vaultPath) throw new Error("Source note not found.");
         await checkedVaultPath(file.path, this.plugin.vaultPath, this.plugin.cachedPolicy);
         await this.app.workspace.openLinkText(file.path, "", false);
-      })().catch((e) => new import_obsidian8.Notice(e instanceof Error ? e.message : String(e)));
+      })().catch((e) => new import_obsidian9.Notice(e instanceof Error ? e.message : String(e)));
     });
   }
   scheduleSave() {
@@ -41422,7 +28270,7 @@ var PericodeView = class extends import_obsidian8.ItemView {
   }
   async startConversation() {
     if (this.busy || !this.loaded || this.transitioning) {
-      new import_obsidian8.Notice("Stop the active request before starting another chat.");
+      new import_obsidian9.Notice("Stop the active request before starting another chat.");
       return;
     }
     this.transitioning = true;
@@ -41459,11 +28307,11 @@ var PericodeView = class extends import_obsidian8.ItemView {
   }
   confirmDelete() {
     if (this.busy || !this.loaded || this.transitioning) {
-      new import_obsidian8.Notice("Stop the active request before deleting a chat.");
+      new import_obsidian9.Notice("Stop the active request before deleting a chat.");
       return;
     }
     const id = this.conversation.id;
-    const modal = new import_obsidian8.Modal(this.app);
+    const modal = new import_obsidian9.Modal(this.app);
     modal.contentEl.createEl("h3", { text: `Delete \u201C${this.conversation.title}\u201D?` });
     modal.contentEl.createEl("p", { text: "This removes the saved conversation from PeriCode. Exported notes are kept." });
     modal.contentEl.createEl("button", { text: "Cancel" }).addEventListener("click", () => modal.close());
@@ -41486,9 +28334,9 @@ var PericodeView = class extends import_obsidian8.ItemView {
     try {
       const path = `PeriCode chat ${(/* @__PURE__ */ new Date()).toISOString().replace(/[:.]/g, "-")}-${this.conversation.id.slice(0, 8)}.md`;
       const file = await this.app.vault.create(path, exportConversation(this.conversation));
-      new import_obsidian8.Notice(`Saved conversation to ${file.path}`);
+      new import_obsidian9.Notice(`Saved conversation to ${file.path}`);
     } catch (err) {
-      new import_obsidian8.Notice(`Export failed: ${String(err)}`);
+      new import_obsidian9.Notice(`Export failed: ${String(err)}`);
     }
   }
   openContextPicker() {
@@ -41511,7 +28359,7 @@ var PericodeView = class extends import_obsidian8.ItemView {
       this.renderAttachments();
       this.inputEl.focus();
     } catch (err) {
-      new import_obsidian8.Notice(String(err));
+      new import_obsidian9.Notice(String(err));
     }
   }
   async attachPath(path, folder) {
@@ -41525,7 +28373,7 @@ var PericodeView = class extends import_obsidian8.ItemView {
         if (!this.plugin.vaultPath) throw new Error("A local vault is required.");
         await checkedVaultPath(source, this.plugin.vaultPath, this.plugin.cachedPolicy);
         const file = this.app.vault.getAbstractFileByPath(source);
-        if (!(file instanceof import_obsidian8.TFile) || file.extension !== "md") throw new Error(`Note not found: ${source}`);
+        if (!(file instanceof import_obsidian9.TFile) || file.extension !== "md") throw new Error(`Note not found: ${source}`);
         if (file.stat.size > FILE_LIMIT * 4) throw new Error(`${source} is too large. Select a passage instead.`);
         next.push(this.prepareAttachment(source, await this.app.vault.cachedRead(file), "note"));
       }
@@ -41535,7 +28383,7 @@ var PericodeView = class extends import_obsidian8.ItemView {
       this.renderAttachments();
       this.inputEl.focus();
     } catch (err) {
-      new import_obsidian8.Notice(String(err));
+      new import_obsidian9.Notice(String(err));
     }
   }
   renderAttachments() {
@@ -41553,7 +28401,7 @@ var PericodeView = class extends import_obsidian8.ItemView {
   renderWelcomeState() {
     const card = this.messagesEl.createDiv({ cls: "pericode-welcome-card" });
     const icon = card.createDiv({ cls: "pericode-welcome-icon" });
-    (0, import_obsidian8.setIcon)(icon, "messages-square");
+    (0, import_obsidian9.setIcon)(icon, "messages-square");
     card.createEl("h3", { cls: "pericode-welcome-heading", text: "How can I help?" });
     card.createEl("p", { cls: "pericode-welcome-sub", text: "Ask about your notes. Add context with @." });
   }
@@ -41572,18 +28420,18 @@ var PericodeView = class extends import_obsidian8.ItemView {
 };
 
 // src/main.ts
-var import_obsidian14 = require("obsidian");
+var import_obsidian15 = require("obsidian");
 
 // src/obsidianTools.ts
 init_scoped_fetch();
-var import_obsidian9 = require("obsidian");
+var import_obsidian10 = require("obsidian");
 
 // src/workspaceSurface.ts
 init_scoped_fetch();
 function settingsHost(app) {
   return app.setting;
 }
-function isVisible2(el) {
+function isVisible(el) {
   if (!el?.isConnected || el.ownerDocument.defaultView?.closed || !el.getClientRects().length) return false;
   const style = el.ownerDocument.defaultView?.getComputedStyle(el);
   return style?.display !== "none" && style?.visibility !== "hidden";
@@ -41595,10 +28443,10 @@ function settingsSurface(app) {
   const host = settingsHost(app);
   const docs = [...new Set([host?.popout?.win?.document, host?.win?.document, host?.activeTab?.containerEl?.ownerDocument, host?.containerEl?.ownerDocument].filter((d) => !!d))];
   for (const doc of docs) {
-    const selected = Array.from(doc.querySelectorAll(".vertical-tab-nav-item.is-active")).find(isVisible2);
+    const selected = Array.from(doc.querySelectorAll(".vertical-tab-nav-item.is-active")).find(isVisible);
     const tab = host?.activeTab?.containerEl;
-    if (!selected && !(tab?.ownerDocument === doc && isVisible2(tab) && isVisible2(host?.containerEl))) continue;
-    const labels = Array.from(doc.querySelectorAll(".setting-item-name")).filter(isVisible2).slice(0, 40).map((el) => (el.textContent ?? "").trim().slice(0, 160));
+    if (!selected && !(tab?.ownerDocument === doc && isVisible(tab) && isVisible(host?.containerEl))) continue;
+    const labels = Array.from(doc.querySelectorAll(".setting-item-name")).filter(isVisible).slice(0, 40).map((el) => (el.textContent ?? "").trim().slice(0, 160));
     return {
       open: true,
       focused: focused(doc),
@@ -41613,13 +28461,13 @@ function workspaceSurface(app) {
   const settings = settingsSurface(app);
   const leaves = [];
   app.workspace.iterateAllLeaves((leaf2) => {
-    if (isVisible2(leaf2.view.containerEl) && leaf2.view.getViewType() !== "pericode-chat") leaves.push(leaf2);
+    if (isVisible(leaf2.view.containerEl) && leaf2.view.getViewType() !== "pericode-chat") leaves.push(leaf2);
   });
   const active = app.workspace.activeLeaf;
   const recent = app.workspace.getMostRecentLeaf();
   const leaf = leaves.find((l) => focused(l.view.containerEl.ownerDocument) && l.view.containerEl.contains(l.view.containerEl.ownerDocument.activeElement)) ?? (active && leaves.includes(active) ? active : null) ?? (recent && leaves.includes(recent) ? recent : null) ?? leaves[0] ?? null;
   const docs = [...new Set(leaves.map((l) => l.view.containerEl.ownerDocument))];
-  const modal = docs.flatMap((doc) => Array.from(doc.querySelectorAll(".modal-container"))).find(isVisible2);
+  const modal = docs.flatMap((doc) => Array.from(doc.querySelectorAll(".modal-container"))).find(isVisible);
   const workspaceFocused = !!leaf && focused(leaf.view.containerEl.ownerDocument);
   const kind = settings.open && (settings.focused || !workspaceFocused) ? "settings" : modal ? "modal" : leaf ? "workspace" : "unknown";
   return {
@@ -41808,7 +28656,7 @@ function openNoteTool(app) {
       const rawPath = (input.path ?? "").trim().replace(/\\/g, "/").replace(/^\/+/, "");
       if (!rawPath) return { output: "obsidian_open_note requires a path", isError: true };
       const file = app.vault.getAbstractFileByPath(rawPath);
-      if (!file || !(file instanceof import_obsidian9.TFile)) {
+      if (!file || !(file instanceof import_obsidian10.TFile)) {
         return { output: `No note at '${rawPath}'.`, isError: true };
       }
       const newPane = input.new_pane === true;
@@ -41856,8 +28704,8 @@ function deleteNoteTool(app) {
       if (!target) {
         return { output: `No file or folder at '${rawPath}'.`, isError: true };
       }
-      const kind = target instanceof import_obsidian9.TFile ? "file" : "folder";
-      if (!(target instanceof import_obsidian9.TFile) || input.permanent === true) return { output: "Only recoverable deletion of individual notes is allowed.", isError: true };
+      const kind = target instanceof import_obsidian10.TFile ? "file" : "folder";
+      if (!(target instanceof import_obsidian10.TFile) || input.permanent === true) return { output: "Only recoverable deletion of individual notes is allowed.", isError: true };
       try {
         await app.vault.trash(target, true);
         return {
@@ -41931,7 +28779,7 @@ function getActiveViewTool(app) {
         `display_text: ${displayText || "(none)"}`
       ];
       const file = view.file;
-      if (file instanceof import_obsidian9.TFile) {
+      if (file instanceof import_obsidian10.TFile) {
         lines.push(`file_path: ${file.path}`);
         lines.push(`file_size: ${file.stat?.size ?? "?"} bytes`);
         try {
@@ -42116,7 +28964,7 @@ function inspectOutline(view) {
 }
 async function inspectMarkdown(app, view) {
   const file = view.file;
-  if (!(file instanceof import_obsidian9.TFile)) return { note: "no file associated with view" };
+  if (!(file instanceof import_obsidian10.TFile)) return { note: "no file associated with view" };
   let text2 = "";
   try {
     text2 = await app.vault.read(file);
@@ -42198,7 +29046,7 @@ function closeActiveTabTool(app) {
           const view2 = leaf.view;
           if (view2?.getViewType?.() === PERICODE_VIEW_TYPE2) return;
           const file2 = view2.file;
-          if (file2 instanceof import_obsidian9.TFile && file2.path === targetPath) {
+          if (file2 instanceof import_obsidian10.TFile && file2.path === targetPath) {
             try {
               leaf.detach();
               closed = file2.path;
@@ -42231,7 +29079,7 @@ function closeActiveTabTool(app) {
       }
       const view = target.view;
       const file = view.file;
-      const label = file instanceof import_obsidian9.TFile ? file.path : view?.getDisplayText?.() ?? "(untitled)";
+      const label = file instanceof import_obsidian10.TFile ? file.path : view?.getDisplayText?.() ?? "(untitled)";
       try {
         target.detach();
         return { output: `Closed tab '${label}'.`, isError: false };
@@ -42456,7 +29304,7 @@ function listOpenTabsTool(app) {
       app.workspace.iterateAllLeaves((leaf) => {
         const view = leaf.view;
         const file = view.file;
-        if (file instanceof import_obsidian9.TFile) {
+        if (file instanceof import_obsidian10.TFile) {
           const marker = active?.path === file.path ? " * (focused)" : "";
           lines.push(`${file.path}${marker}`);
         }
@@ -42635,8 +29483,8 @@ function inspectConfigTool(app) {
 
 // src/vaultReadTools.ts
 init_scoped_fetch();
-var import_promises15 = require("node:fs/promises");
-var import_node_path43 = require("node:path");
+var import_promises5 = require("node:fs/promises");
+var import_node_path21 = require("node:path");
 function vaultReadTools(deps) {
   return ["list_dir", "search_files"].map((name) => ({
     readOnly: true,
@@ -42663,14 +29511,14 @@ function vaultReadTools(deps) {
         } catch {
           return;
         }
-        const info = await (0, import_promises15.lstat)(path);
+        const info = await (0, import_promises5.lstat)(path);
         if (info.isSymbolicLink()) return;
-        const label = (0, import_node_path43.relative)(vault, path).replace(/\\/g, "/");
+        const label = (0, import_node_path21.relative)(vault, path).replace(/\\/g, "/");
         if (info.isDirectory()) {
           if (name === "list_dir" && label) output.push(label + "/");
-          for (const entry of (await (0, import_promises15.readdir)(path)).slice(0, 1e3)) {
+          for (const entry of (await (0, import_promises5.readdir)(path)).slice(0, 1e3)) {
             if (entry.startsWith(".") || ["node_modules", "dist", "build"].includes(entry)) continue;
-            await visit((0, import_node_path43.join)(path, entry), depth + 1);
+            await visit((0, import_node_path21.join)(path, entry), depth + 1);
           }
         } else if (info.isFile()) {
           examined++;
@@ -42680,7 +29528,7 @@ function vaultReadTools(deps) {
           }
           if (info.size > 1e6 || /(?:secret|credential|^\.env|\.pem$|\.pfx$|\.p12$|^id_rsa|\.kdbx$)/i.test(label.split("/").pop())) return;
           bytes += info.size;
-          const content = await (0, import_promises15.readFile)(path, "utf8");
+          const content = await (0, import_promises5.readFile)(path, "utf8");
           if (content.includes("\0")) return;
           for (const [i, line] of content.split(/\r?\n/).entries()) {
             if (line.includes(pattern) && output.length < 50) output.push(`${label}:${i + 1}:${line.slice(0, 1e3)}`);
@@ -42693,13 +29541,10 @@ function vaultReadTools(deps) {
   }));
 }
 
-// src/main.ts
-var import_node_path48 = require("node:path");
-
 // src/vaultManagementTools.ts
 init_scoped_fetch();
-var import_promises16 = require("node:fs/promises");
-var import_obsidian10 = require("obsidian");
+var import_promises6 = require("node:fs/promises");
+var import_obsidian11 = require("obsidian");
 init_pericodeSecurity();
 var MAX_TEXT = 2e6;
 var pathProperty = { type: "string", description: "Exact vault-relative path, including extension for files." };
@@ -42738,7 +29583,7 @@ function createVaultManagementTools(app, deps) {
   });
   const file = (path, markdown = false) => {
     const entry = app.vault.getAbstractFileByPath(path);
-    if (!(entry instanceof import_obsidian10.TFile)) throw new Error("File not found. Use list_dir to locate its exact path.");
+    if (!(entry instanceof import_obsidian11.TFile)) throw new Error("File not found. Use list_dir to locate its exact path.");
     if (markdown && entry.extension !== "md") throw new Error("This operation requires a Markdown note.");
     return entry;
   };
@@ -42747,7 +29592,7 @@ function createVaultManagementTools(app, deps) {
     if (!path) throw new Error("The vault root cannot be changed.");
     if (app.vault.getAbstractFileByPath(path) || await app.vault.adapter.exists(path)) throw new Error("Destination already exists; nothing was overwritten.");
     const parent = path.includes("/") ? path.slice(0, path.lastIndexOf("/")) : "";
-    if (parent && !(app.vault.getAbstractFileByPath(parent) instanceof import_obsidian10.TFolder)) throw new Error("Create the destination parent folder first.");
+    if (parent && !(app.vault.getAbstractFileByPath(parent) instanceof import_obsidian11.TFolder)) throw new Error("Create the destination parent folder first.");
     return path;
   };
   return [
@@ -42798,8 +29643,8 @@ function createVaultManagementTools(app, deps) {
           await check2(source);
           await check2(dest);
           const absolute = (await checkedVaultPath(source, deps.getVaultPath(), deps.getPolicy())).absolute;
-          const info = await (0, import_promises16.lstat)(absolute);
-          if (info.isDirectory()) for (const child of await (0, import_promises16.readdir)(absolute)) await inspectTree(`${source}/${child}`, `${dest}/${child}`);
+          const info = await (0, import_promises6.lstat)(absolute);
+          if (info.isDirectory()) for (const child of await (0, import_promises6.readdir)(absolute)) await inspectTree(`${source}/${child}`, `${dest}/${child}`);
         };
         await inspectTree(path, destination);
         active();
@@ -42886,9 +29731,9 @@ function createVaultManagementTools(app, deps) {
         const path = await check2(text(input, "path"));
         if (!path) throw new Error("The vault root cannot be deleted.");
         const folder = app.vault.getAbstractFileByPath(path);
-        if (!(folder instanceof import_obsidian10.TFolder)) throw new Error("Folder not found.");
+        if (!(folder instanceof import_obsidian11.TFolder)) throw new Error("Folder not found.");
         const absolute = (await checkedVaultPath(path, deps.getVaultPath(), deps.getPolicy())).absolute;
-        if ((await (0, import_promises16.readdir)(absolute)).length) throw new Error("Folder is not empty. Trash individual files first.");
+        if ((await (0, import_promises6.readdir)(absolute)).length) throw new Error("Folder is not empty. Trash individual files first.");
         active();
         await app.vault.trash(folder, true);
         return { trashed: path };
@@ -43000,7 +29845,7 @@ function createWorkspaceTools(app) {
       await app.workspace.revealLeaf(leaf);
       context?.signal?.throwIfAborted();
       leaf.view.containerEl.ownerDocument.defaultView?.focus();
-      const visible = leaf.view.getViewType() === type && isVisible2(leaf.view.containerEl);
+      const visible = leaf.view.getViewType() === type && isVisible(leaf.view.containerEl);
       return { output: JSON.stringify({
         requested: type,
         opened: visible,
@@ -43017,8 +29862,8 @@ init_scoped_fetch();
 
 // src/pericodeMemory.ts
 init_scoped_fetch();
-var import_node_fs28 = require("node:fs");
-var import_node_path44 = require("node:path");
+var import_node_fs17 = require("node:fs");
+var import_node_path22 = require("node:path");
 var MEMORY_DIR = ".pericode";
 var MEMORY_INDEX = "MEMORY.md";
 var MEMORY_FILES = "memory";
@@ -43029,18 +29874,18 @@ var INDEX_HEADER = `# PeriCode memory
 ## Index
 `;
 function memoryRoot(vaultPath) {
-  return (0, import_node_path44.join)(vaultPath, MEMORY_DIR);
+  return (0, import_node_path22.join)(vaultPath, MEMORY_DIR);
 }
-function indexPath2(vaultPath) {
-  return (0, import_node_path44.join)(memoryRoot(vaultPath), MEMORY_INDEX);
+function indexPath(vaultPath) {
+  return (0, import_node_path22.join)(memoryRoot(vaultPath), MEMORY_INDEX);
 }
 function memoriesDir(vaultPath) {
-  return (0, import_node_path44.join)(memoryRoot(vaultPath), MEMORY_FILES);
+  return (0, import_node_path22.join)(memoryRoot(vaultPath), MEMORY_FILES);
 }
-function memoryPath2(vaultPath, name) {
-  return (0, import_node_path44.join)(memoriesDir(vaultPath), `${slugify2(name)}.md`);
+function memoryPath(vaultPath, name) {
+  return (0, import_node_path22.join)(memoriesDir(vaultPath), `${slugify(name)}.md`);
 }
-function slugify2(name) {
+function slugify(name) {
   return name.trim().toLowerCase().replace(/[^a-z0-9_-]+/g, "_").replace(/^_+|_+$/g, "").slice(0, 80) || "memory";
 }
 function todayIso() {
@@ -43048,10 +29893,10 @@ function todayIso() {
 }
 async function ensureMemoryStore(vaultPath) {
   if (!vaultPath) return;
-  await import_node_fs28.promises.mkdir(memoriesDir(vaultPath), { recursive: true });
-  const idx = indexPath2(vaultPath);
-  if (!(0, import_node_fs28.existsSync)(idx)) {
-    await import_node_fs28.promises.writeFile(idx, INDEX_HEADER + "\n_(empty \u2014 no memories saved yet.)_\n", "utf8");
+  await import_node_fs17.promises.mkdir(memoriesDir(vaultPath), { recursive: true });
+  const idx = indexPath(vaultPath);
+  if (!(0, import_node_fs17.existsSync)(idx)) {
+    await import_node_fs17.promises.writeFile(idx, INDEX_HEADER + "\n_(empty \u2014 no memories saved yet.)_\n", "utf8");
   }
 }
 async function listMemories(vaultPath) {
@@ -43059,16 +29904,16 @@ async function listMemories(vaultPath) {
   const dir = memoriesDir(vaultPath);
   let entries;
   try {
-    entries = await import_node_fs28.promises.readdir(dir);
+    entries = await import_node_fs17.promises.readdir(dir);
   } catch {
     return [];
   }
   const out = [];
   for (const entry of entries) {
     if (!entry.endsWith(".md")) continue;
-    const full = (0, import_node_path44.join)(dir, entry);
+    const full = (0, import_node_path22.join)(dir, entry);
     try {
-      const raw = await import_node_fs28.promises.readFile(full, "utf8");
+      const raw = await import_node_fs17.promises.readFile(full, "utf8");
       const parsed = parseMemoryFile(raw);
       if (parsed) out.push(parsed);
     } catch {
@@ -43080,12 +29925,12 @@ async function listMemories(vaultPath) {
 async function readMemory(vaultPath, name) {
   if (!vaultPath || !name) return null;
   const candidates = [
-    memoryPath2(vaultPath, name),
-    (0, import_node_path44.join)(memoriesDir(vaultPath), `${name}.md`)
+    memoryPath(vaultPath, name),
+    (0, import_node_path22.join)(memoriesDir(vaultPath), `${name}.md`)
   ];
   for (const path of candidates) {
     try {
-      const raw = await import_node_fs28.promises.readFile(path, "utf8");
+      const raw = await import_node_fs17.promises.readFile(path, "utf8");
       const parsed = parseMemoryFile(raw);
       if (parsed) return parsed;
     } catch {
@@ -43099,8 +29944,8 @@ async function saveMemory(vaultPath, record2) {
   }
   await ensureMemoryStore(vaultPath);
   const created = record2.created ?? todayIso();
-  const filePath = memoryPath2(vaultPath, record2.name);
-  const frontmatter2 = `---
+  const filePath = memoryPath(vaultPath, record2.name);
+  const frontmatter = `---
 name: ${escapeYaml(record2.name)}
 description: ${escapeYaml(record2.description)}
 type: ${record2.type}
@@ -43108,21 +29953,21 @@ created: ${created}
 ---
 
 `;
-  await import_node_fs28.promises.mkdir((0, import_node_path44.dirname)(filePath), { recursive: true });
-  await import_node_fs28.promises.writeFile(filePath, frontmatter2 + record2.content.trim() + "\n", "utf8");
+  await import_node_fs17.promises.mkdir((0, import_node_path22.dirname)(filePath), { recursive: true });
+  await import_node_fs17.promises.writeFile(filePath, frontmatter + record2.content.trim() + "\n", "utf8");
   await rewriteIndex(vaultPath);
   return { path: filePath, created };
 }
 async function deleteMemory(vaultPath, name) {
   if (!vaultPath) return false;
   const candidates = [
-    memoryPath2(vaultPath, name),
-    (0, import_node_path44.join)(memoriesDir(vaultPath), `${name}.md`)
+    memoryPath(vaultPath, name),
+    (0, import_node_path22.join)(memoriesDir(vaultPath), `${name}.md`)
   ];
   let removed = false;
   for (const path of candidates) {
     try {
-      await import_node_fs28.promises.unlink(path);
+      await import_node_fs17.promises.unlink(path);
       removed = true;
       break;
     } catch {
@@ -43138,15 +29983,15 @@ async function rewriteIndex(vaultPath) {
     body += "_(empty \u2014 no memories saved yet.)_\n";
   } else {
     for (const m2 of memories) {
-      const slug = slugify2(m2.name);
-      const rel = (0, import_node_path44.relative)(memoryRoot(vaultPath), memoryPath2(vaultPath, m2.name));
+      const slug = slugify(m2.name);
+      const rel = (0, import_node_path22.relative)(memoryRoot(vaultPath), memoryPath(vaultPath, m2.name));
       const link = rel.replace(/\\/g, "/");
       body += `- [${m2.name}](${link}) \u2014 *${m2.type}* \xB7 ${m2.description.replace(/\n/g, " ")}
 `;
       void slug;
     }
   }
-  await import_node_fs28.promises.writeFile(indexPath2(vaultPath), body, "utf8");
+  await import_node_fs17.promises.writeFile(indexPath(vaultPath), body, "utf8");
 }
 function parseMemoryFile(raw) {
   if (!raw.startsWith("---")) return null;
@@ -43344,13 +30189,13 @@ function deleteMemoryTool(getVaultPath) {
 
 // src/strategicTools.ts
 init_scoped_fetch();
-var import_node_fs29 = require("node:fs");
-var import_node_path45 = require("node:path");
+var import_node_fs18 = require("node:fs");
+var import_node_path23 = require("node:path");
 var DECISIONS_DIR = "Decisions";
 function todayIso2() {
   return (/* @__PURE__ */ new Date()).toISOString().slice(0, 10);
 }
-function slugify3(value, maxLen = 60) {
+function slugify2(value, maxLen = 60) {
   return value.trim().toLowerCase().replace(/[^a-z0-9_-]+/g, "_").replace(/^_+|_+$/g, "").slice(0, maxLen) || "decision";
 }
 function logDecisionTool(app, getVaultPath) {
@@ -43396,9 +30241,9 @@ function logDecisionTool(app, getVaultPath) {
       const stakeholders = Array.isArray(input.stakeholders) ? input.stakeholders.map((s) => String(s)).filter(Boolean) : [];
       const confidence = ["low", "medium", "high"].includes(String(input.confidence)) ? input.confidence : "medium";
       const created = todayIso2();
-      const id = `${created}-${slugify3(decision)}`;
-      const fileName2 = `${id}.md`;
-      const relPath = `${DECISIONS_DIR}/${fileName2}`;
+      const id = `${created}-${slugify2(decision)}`;
+      const fileName = `${id}.md`;
+      const relPath = `${DECISIONS_DIR}/${fileName}`;
       const fmLines = [
         "---",
         `id: ${id}`,
@@ -43440,9 +30285,9 @@ ${stakeholders.map((s) => `- ${s}`).join("\n")}
 _Update later \u2014 was this the right call? What did we learn?_
 `;
       const full = fmLines.join("\n") + body;
-      const absPath = (0, import_node_path45.join)(vault, relPath);
-      await import_node_fs29.promises.mkdir((0, import_node_path45.join)(vault, DECISIONS_DIR), { recursive: true });
-      await import_node_fs29.promises.writeFile(absPath, full, "utf8");
+      const absPath = (0, import_node_path23.join)(vault, relPath);
+      await import_node_fs18.promises.mkdir((0, import_node_path23.join)(vault, DECISIONS_DIR), { recursive: true });
+      await import_node_fs18.promises.writeFile(absPath, full, "utf8");
       return {
         output: `Logged decision '${decision}' at ${relPath}.`,
         isError: false
@@ -43469,10 +30314,10 @@ function queryDecisionsTool(app, getVaultPath) {
     async execute(input) {
       const vault = getVaultPath();
       if (!vault) return { output: "vault path unknown", isError: true };
-      const dir = (0, import_node_path45.join)(vault, DECISIONS_DIR);
+      const dir = (0, import_node_path23.join)(vault, DECISIONS_DIR);
       let files;
       try {
-        files = await import_node_fs29.promises.readdir(dir);
+        files = await import_node_fs18.promises.readdir(dir);
       } catch {
         return { output: JSON.stringify({ count: 0, decisions: [] }, null, 2), isError: false };
       }
@@ -43483,7 +30328,7 @@ function queryDecisionsTool(app, getVaultPath) {
       for (const file of files.sort().reverse()) {
         if (!file.endsWith(".md")) continue;
         try {
-          const raw = await import_node_fs29.promises.readFile((0, import_node_path45.join)(dir, file), "utf8");
+          const raw = await import_node_fs18.promises.readFile((0, import_node_path23.join)(dir, file), "utf8");
           const meta = parseFrontmatter(raw);
           if (!meta) continue;
           if (contains && !String(meta.decision ?? "").toLowerCase().includes(contains)) continue;
@@ -43674,51 +30519,51 @@ function resolveWikilink(target, pathSet, basenameToPath) {
   const cleaned = target.trim().replace(/\\/g, "/");
   if (pathSet.has(`${cleaned}.md`)) return `${cleaned}.md`;
   if (pathSet.has(cleaned)) return cleaned;
-  const basename9 = cleaned.split("/").pop()?.toLowerCase();
-  if (!basename9) return null;
-  return basenameToPath.get(basename9) ?? null;
+  const basename5 = cleaned.split("/").pop()?.toLowerCase();
+  if (!basename5) return null;
+  return basenameToPath.get(basename5) ?? null;
 }
 
 // src/pericodeAgents.ts
 init_scoped_fetch();
-var import_obsidian11 = require("obsidian");
-var import_node_fs30 = require("node:fs");
-var import_node_path46 = require("node:path");
+var import_obsidian12 = require("obsidian");
+var import_node_fs19 = require("node:fs");
+var import_node_path24 = require("node:path");
 var ALL_AGENTS = [
   "memory_curator",
   "risk_detection",
   "executive_summary",
   "knowledge_gap"
 ];
-var REPORTS_DIR = (0, import_node_path46.join)(".pericode", "agent-reports");
+var REPORTS_DIR = (0, import_node_path24.join)(".pericode", "agent-reports");
 function todayIso3() {
   return (/* @__PURE__ */ new Date()).toISOString().slice(0, 10);
 }
 async function writeReport(vaultPath, agent, body) {
-  const dir = (0, import_node_path46.join)(vaultPath, REPORTS_DIR);
-  await import_node_fs30.promises.mkdir(dir, { recursive: true });
-  const fileName2 = `${agent}-${todayIso3()}.md`;
-  const path = (0, import_node_path46.join)(dir, fileName2);
+  const dir = (0, import_node_path24.join)(vaultPath, REPORTS_DIR);
+  await import_node_fs19.promises.mkdir(dir, { recursive: true });
+  const fileName = `${agent}-${todayIso3()}.md`;
+  const path = (0, import_node_path24.join)(dir, fileName);
   const header = `---
 agent: ${agent}
 generated: ${(/* @__PURE__ */ new Date()).toISOString()}
 type: agent_report
 ---
 
-# ${humanize2(agent)} \u2014 ${todayIso3()}
+# ${humanize(agent)} \u2014 ${todayIso3()}
 
 `;
-  await import_node_fs30.promises.writeFile(path, header + body, "utf8");
+  await import_node_fs19.promises.writeFile(path, header + body, "utf8");
   return path;
 }
-function humanize2(agent) {
+function humanize(agent) {
   return agent.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
 }
 async function runMemoryCurator(vaultPath, app) {
-  const memDir = (0, import_node_path46.join)(vaultPath, ".pericode", "memory");
+  const memDir = (0, import_node_path24.join)(vaultPath, ".pericode", "memory");
   let entries = [];
   try {
-    entries = await import_node_fs30.promises.readdir(memDir);
+    entries = await import_node_fs19.promises.readdir(memDir);
   } catch {
     return "No memories yet \u2014 nothing to curate.";
   }
@@ -43726,13 +30571,13 @@ async function runMemoryCurator(vaultPath, app) {
   for (const file of entries) {
     if (!file.endsWith(".md")) continue;
     try {
-      const stat5 = await import_node_fs30.promises.stat((0, import_node_path46.join)(memDir, file));
-      const raw = await import_node_fs30.promises.readFile((0, import_node_path46.join)(memDir, file), "utf8");
+      const stat = await import_node_fs19.promises.stat((0, import_node_path24.join)(memDir, file));
+      const raw = await import_node_fs19.promises.readFile((0, import_node_path24.join)(memDir, file), "utf8");
       const created = /^created:\s*(\d{4}-\d{2}-\d{2})/m.exec(raw)?.[1] ?? "";
       memories.push({
         name: file.replace(/\.md$/, ""),
         created,
-        bytes: stat5.size
+        bytes: stat.size
       });
     } catch {
     }
@@ -43801,8 +30646,8 @@ async function runRiskDetection(vaultPath, app) {
   if (openDecisions.length > 20) lines.push(`- _\u2026${openDecisions.length - 20} more_`);
   lines.push("");
   try {
-    const auditPath2 = (0, import_node_path46.join)(vaultPath, ".pericode", "audit.jsonl");
-    const raw = await import_node_fs30.promises.readFile(auditPath2, "utf8");
+    const auditPath2 = (0, import_node_path24.join)(vaultPath, ".pericode", "audit.jsonl");
+    const raw = await import_node_fs19.promises.readFile(auditPath2, "utf8");
     const tail = raw.split(/\r?\n/).filter(Boolean).slice(-500);
     const errorCounts = /* @__PURE__ */ new Map();
     for (const line of tail) {
@@ -43833,8 +30678,8 @@ async function runExecutiveSummary(vaultPath, app) {
   const editedWeek = allFiles.filter((f2) => now - (f2.stat?.mtime ?? 0) < 7 * ONE_DAY).length;
   let auditTail = [];
   try {
-    const auditPath2 = (0, import_node_path46.join)(vaultPath, ".pericode", "audit.jsonl");
-    const raw = await import_node_fs30.promises.readFile(auditPath2, "utf8");
+    const auditPath2 = (0, import_node_path24.join)(vaultPath, ".pericode", "audit.jsonl");
+    const raw = await import_node_fs19.promises.readFile(auditPath2, "utf8");
     auditTail = raw.split(/\r?\n/).filter(Boolean).slice(-200);
   } catch {
   }
@@ -43867,9 +30712,9 @@ async function runKnowledgeGap(vaultPath, app) {
   const MIN_BYTES = 200;
   for (const f2 of allFiles) {
     try {
-      const stat5 = f2.stat;
-      if (!stat5) continue;
-      if (stat5.size < MIN_BYTES) thinNotes.push({ path: f2.path, bytes: stat5.size });
+      const stat = f2.stat;
+      if (!stat) continue;
+      if (stat.size < MIN_BYTES) thinNotes.push({ path: f2.path, bytes: stat.size });
     } catch {
     }
   }
@@ -43975,10 +30820,10 @@ function listReportsTool(getVaultPath) {
     async execute(input) {
       const vault = getVaultPath();
       if (!vault) return { output: "vault path unknown", isError: true };
-      const dir = (0, import_node_path46.join)(vault, REPORTS_DIR);
+      const dir = (0, import_node_path24.join)(vault, REPORTS_DIR);
       let files;
       try {
-        files = await import_node_fs30.promises.readdir(dir);
+        files = await import_node_fs19.promises.readdir(dir);
       } catch {
         return { output: JSON.stringify({ count: 0, reports: [] }, null, 2), isError: false };
       }
@@ -44006,10 +30851,10 @@ function startAgentScheduler(app, getVaultPath, intervalMs = ONE_DAY_MS) {
     if (cancelled) return;
     const vault = getVaultPath();
     if (!vault) return;
-    const dir = (0, import_node_path46.join)(vault, REPORTS_DIR);
+    const dir = (0, import_node_path24.join)(vault, REPORTS_DIR);
     let files = [];
     try {
-      files = await import_node_fs30.promises.readdir(dir);
+      files = await import_node_fs19.promises.readdir(dir);
     } catch {
     }
     for (const agent of ALL_AGENTS) {
@@ -44017,8 +30862,8 @@ function startAgentScheduler(app, getVaultPath, intervalMs = ONE_DAY_MS) {
       let needsRun = true;
       if (lastReportFile) {
         try {
-          const stat5 = await import_node_fs30.promises.stat((0, import_node_path46.join)(dir, lastReportFile));
-          if (Date.now() - stat5.mtimeMs < intervalMs) needsRun = false;
+          const stat = await import_node_fs19.promises.stat((0, import_node_path24.join)(dir, lastReportFile));
+          if (Date.now() - stat.mtimeMs < intervalMs) needsRun = false;
         } catch {
         }
       }
@@ -44040,14 +30885,14 @@ function startAgentScheduler(app, getVaultPath, intervalMs = ONE_DAY_MS) {
   };
 }
 function broadcastAgentStartup() {
-  new import_obsidian11.Notice("PeriCode: background agents running daily.", 3e3);
+  new import_obsidian12.Notice("PeriCode: background agents running daily.", 3e3);
 }
 var KEEP_REPORTS_PER_AGENT = 30;
 async function pruneOldReports(vaultPath) {
-  const dir = (0, import_node_path46.join)(vaultPath, REPORTS_DIR);
+  const dir = (0, import_node_path24.join)(vaultPath, REPORTS_DIR);
   let files;
   try {
-    files = await import_node_fs30.promises.readdir(dir);
+    files = await import_node_fs19.promises.readdir(dir);
   } catch {
     return;
   }
@@ -44056,7 +30901,7 @@ async function pruneOldReports(vaultPath) {
     const stale = matching.slice(KEEP_REPORTS_PER_AGENT);
     for (const file of stale) {
       try {
-        await import_node_fs30.promises.unlink((0, import_node_path46.join)(dir, file));
+        await import_node_fs19.promises.unlink((0, import_node_path24.join)(dir, file));
       } catch {
       }
     }
@@ -44069,8 +30914,8 @@ init_pericodeSecurity();
 
 // src/auditExportTools.ts
 init_scoped_fetch();
-var import_node_fs31 = require("node:fs");
-var import_node_path47 = require("node:path");
+var import_node_fs20 = require("node:fs");
+var import_node_path25 = require("node:path");
 function createAuditExportTools(ctx) {
   return [exportTool(ctx), reportTool(ctx)];
 }
@@ -44092,19 +30937,19 @@ function passesFilters(entry, filters) {
 }
 function escapeCsvCell(value) {
   if (value === null || value === void 0) return "";
-  const str = typeof value === "string" ? value : JSON.stringify(value);
-  if (/[",\n\r]/.test(str)) {
-    return '"' + str.replace(/"/g, '""') + '"';
+  const str2 = typeof value === "string" ? value : JSON.stringify(value);
+  if (/[",\n\r]/.test(str2)) {
+    return '"' + str2.replace(/"/g, '""') + '"';
   }
-  return str;
+  return str2;
 }
 function defaultExportPath(vaultPath, format) {
   const ts = (/* @__PURE__ */ new Date()).toISOString().replace(/[:.]/g, "-").slice(0, 19);
-  return (0, import_node_path47.join)(vaultPath, "output", `audit-export-${ts}.${format}`);
+  return (0, import_node_path25.join)(vaultPath, "output", `audit-export-${ts}.${format}`);
 }
 function defaultReportPath(vaultPath) {
   const date3 = (/* @__PURE__ */ new Date()).toISOString().slice(0, 10);
-  return (0, import_node_path47.join)(vaultPath, "output", `compliance-report-${date3}.md`);
+  return (0, import_node_path25.join)(vaultPath, "output", `compliance-report-${date3}.md`);
 }
 function exportTool(ctx) {
   return {
@@ -44161,13 +31006,13 @@ function exportTool(ctx) {
         onlyErrors: input.only_errors === true
       };
       const outputPathRaw = typeof input.output_path === "string" && input.output_path.trim() ? input.output_path.trim() : void 0;
-      const outputPath = outputPathRaw ? outputPathRaw.startsWith("/") || outputPathRaw.match(/^[A-Za-z]:[/\\]/) ? outputPathRaw : (0, import_node_path47.join)(vault, outputPathRaw) : defaultExportPath(vault, format);
+      const outputPath = outputPathRaw ? outputPathRaw.startsWith("/") || outputPathRaw.match(/^[A-Za-z]:[/\\]/) ? outputPathRaw : (0, import_node_path25.join)(vault, outputPathRaw) : defaultExportPath(vault, format);
       try {
         const all = await readAuditRange(vault);
         const filtered = all.filter((e) => passesFilters(e, filters));
-        await import_node_fs31.promises.mkdir((0, import_node_path47.dirname)(outputPath), { recursive: true });
+        await import_node_fs20.promises.mkdir((0, import_node_path25.dirname)(outputPath), { recursive: true });
         if (format === "json") {
-          await import_node_fs31.promises.writeFile(
+          await import_node_fs20.promises.writeFile(
             outputPath,
             JSON.stringify(filtered, null, 2),
             "utf8"
@@ -44199,7 +31044,7 @@ function exportTool(ctx) {
               ].map(escapeCsvCell).join(",")
             );
           }
-          await import_node_fs31.promises.writeFile(outputPath, rows.join("\n") + "\n", "utf8");
+          await import_node_fs20.promises.writeFile(outputPath, rows.join("\n") + "\n", "utf8");
         }
         return {
           output: JSON.stringify(
@@ -44258,13 +31103,13 @@ function reportTool(ctx) {
         until: typeof input.until === "string" && input.until.trim() ? input.until.trim() : void 0
       };
       const outputPathRaw = typeof input.output_path === "string" && input.output_path.trim() ? input.output_path.trim() : void 0;
-      const outputPath = outputPathRaw ? outputPathRaw.startsWith("/") || outputPathRaw.match(/^[A-Za-z]:[/\\]/) ? outputPathRaw : (0, import_node_path47.join)(vault, outputPathRaw) : defaultReportPath(vault);
+      const outputPath = outputPathRaw ? outputPathRaw.startsWith("/") || outputPathRaw.match(/^[A-Za-z]:[/\\]/) ? outputPathRaw : (0, import_node_path25.join)(vault, outputPathRaw) : defaultReportPath(vault);
       try {
         const all = await readAuditRange(vault);
         const records = all.filter((e) => passesFilters(e, filters));
         const md = buildComplianceReport(records, filters, all.length);
-        await import_node_fs31.promises.mkdir((0, import_node_path47.dirname)(outputPath), { recursive: true });
-        await import_node_fs31.promises.writeFile(outputPath, md, "utf8");
+        await import_node_fs20.promises.mkdir((0, import_node_path25.dirname)(outputPath), { recursive: true });
+        await import_node_fs20.promises.writeFile(outputPath, md, "utf8");
         return {
           output: JSON.stringify(
             {
@@ -44425,8 +31270,8 @@ function escapeMd(s) {
 
 // src/removeArtifactsModal.ts
 init_scoped_fetch();
-var import_obsidian12 = require("obsidian");
-var RemoveArtifactsModal = class extends import_obsidian12.Modal {
+var import_obsidian13 = require("obsidian");
+var RemoveArtifactsModal = class extends import_obsidian13.Modal {
   constructor(app, plugin) {
     super(app);
     this.plugin = plugin;
@@ -44460,7 +31305,7 @@ var RemoveArtifactsModal = class extends import_obsidian12.Modal {
       listWrap.createEl("p", {
         text: "Nothing to remove \u2014 no PeriCode-owned folders found in this vault."
       });
-      new import_obsidian12.Setting(contentEl).addButton(
+      new import_obsidian13.Setting(contentEl).addButton(
         (b2) => b2.setButtonText("Close").setCta().onClick(() => this.close())
       );
       return;
@@ -44503,7 +31348,7 @@ var RemoveArtifactsModal = class extends import_obsidian12.Modal {
     this.confirmInput.style.width = "120px";
     this.confirmInput.placeholder = "DELETE";
     this.confirmInput.oninput = () => this.updateDeleteButton();
-    const buttonRow = new import_obsidian12.Setting(contentEl);
+    const buttonRow = new import_obsidian13.Setting(contentEl);
     buttonRow.addButton(
       (b2) => b2.setButtonText("Cancel").onClick(() => this.close())
     );
@@ -44517,7 +31362,7 @@ var RemoveArtifactsModal = class extends import_obsidian12.Modal {
         b2.setDisabled(true);
         b2.setButtonText("Removing\u2026");
         const removed = await this.removeSelected();
-        new import_obsidian12.Notice(
+        new import_obsidian13.Notice(
           `Moved ${removed.length} folder(s) to trash. Recoverable from your OS trash.`,
           8e3
         );
@@ -44554,7 +31399,7 @@ var RemoveArtifactsModal = class extends import_obsidian12.Modal {
     const out = [];
     for (const { path, label, rationale } of known) {
       const node = vault.getAbstractFileByPath(path);
-      if (!(node instanceof import_obsidian12.TFolder)) continue;
+      if (!(node instanceof import_obsidian13.TFolder)) continue;
       const stats = await this.measureFolder(node);
       out.push({
         path,
@@ -44575,19 +31420,19 @@ var RemoveArtifactsModal = class extends import_obsidian12.Modal {
     let fileCount = 0;
     let byteSize = 0;
     const adapter = this.app.vault.adapter;
-    const walk2 = async (entry) => {
-      if (entry instanceof import_obsidian12.TFolder) {
-        for (const child of entry.children) await walk2(child);
+    const walk = async (entry) => {
+      if (entry instanceof import_obsidian13.TFolder) {
+        for (const child of entry.children) await walk(child);
         return;
       }
       fileCount += 1;
       try {
-        const stat5 = await adapter.stat(entry.path);
-        if (stat5?.size) byteSize += stat5.size;
+        const stat = await adapter.stat(entry.path);
+        if (stat?.size) byteSize += stat.size;
       } catch {
       }
     };
-    await walk2(folder);
+    await walk(folder);
     return { fileCount, byteSize };
   }
   async removeSelected() {
@@ -44600,7 +31445,7 @@ var RemoveArtifactsModal = class extends import_obsidian12.Modal {
         await this.app.vault.trash(node, true);
         removed.push(c.path);
       } catch (err) {
-        new import_obsidian12.Notice(
+        new import_obsidian13.Notice(
           `Failed to remove ${c.path}: ${err instanceof Error ? err.message : String(err)}`,
           8e3
         );
@@ -44617,7 +31462,7 @@ function formatBytes(bytes) {
 }
 
 // src/main.ts
-var PericodeObsidianPlugin = class extends import_obsidian13.Plugin {
+var PericodeObsidianPlugin = class extends import_obsidian14.Plugin {
   interactiveTurnActive = false;
   cancelInteractiveTurn = null;
   activeEditModals = /* @__PURE__ */ new Set();
@@ -44641,7 +31486,7 @@ var PericodeObsidianPlugin = class extends import_obsidian13.Plugin {
    */
   // Public so the settings tab can reach it for MCP restart paths.
   policyReady = false;
-  registry = new GuardedRegistry(createDefaultRegistry(), {
+  registry = new GuardedRegistry(new ToolRegistry(), {
     getPolicy: () => {
       if (!this.policyReady) throw new Error("Security policy is not ready.");
       return this.cachedPolicy;
@@ -44675,13 +31520,7 @@ var PericodeObsidianPlugin = class extends import_obsidian13.Plugin {
     await this.loadSettings();
     const vault = this.vaultPath;
     for (const tool of vaultReadTools({ getPolicy: () => this.cachedPolicy, getVaultPath: () => this.vaultPath })) this.registry.registerBuiltin(tool);
-    const deletion = this.registry.getAllDefinitions().find((t) => t.name === "delete_file");
-    this.registry.registerBuiltin({ definition: deletion, readOnly: false, execute: async (input) => {
-      const file = this.app.vault.getAbstractFileByPath((0, import_node_path48.relative)(this.vaultPath, String(input.path)).replace(/\\/g, "/"));
-      if (!(file instanceof import_obsidian13.TFile)) return { output: "Only individual vault files can be trashed.", isError: true };
-      await this.app.vault.trash(file, true);
-      return { output: "Moved to trash.", isError: false };
-    } });
+    for (const tool of vaultFileTools(this.app, { getPolicy: () => this.cachedPolicy, getVaultPath: () => this.vaultPath })) this.registry.registerBuiltin(tool);
     this.installObsidianHostTools(this.registry);
     for (const tool of createVaultManagementTools(this.app, { getPolicy: () => this.cachedPolicy, getVaultPath: () => this.vaultPath })) this.registry.registerBuiltin(tool);
     for (const tool of createWorkspaceTools(this.app)) this.registry.registerBuiltin(tool);
@@ -44732,18 +31571,18 @@ var PericodeObsidianPlugin = class extends import_obsidian13.Plugin {
       );
       void this.mcpManager.start(vault, this.registry).then((status) => {
         if (status.connected.length > 0) {
-          new import_obsidian14.Notice(
+          new import_obsidian15.Notice(
             `PeriCode: ${status.connected.length} MCP server(s) connected \u2014 ${status.connected.join(", ")}.`,
             5e3
           );
         }
         if (status.failed.length > 0) {
           for (const f2 of status.failed) {
-            new import_obsidian14.Notice(`PeriCode MCP '${f2.name}' failed: ${f2.error}`, 8e3);
+            new import_obsidian15.Notice(`PeriCode MCP '${f2.name}' failed: ${f2.error}`, 8e3);
           }
         }
       }).catch((err) => {
-        new import_obsidian14.Notice(
+        new import_obsidian15.Notice(
           `PeriCode: MCP startup failed \u2014 ${err instanceof Error ? err.message : String(err)}`,
           8e3
         );
@@ -44761,7 +31600,7 @@ var PericodeObsidianPlugin = class extends import_obsidian13.Plugin {
             return context.file;
           } }).open();
         } catch (err) {
-          new import_obsidian14.Notice(err instanceof Error ? err.message : String(err));
+          new import_obsidian15.Notice(err instanceof Error ? err.message : String(err));
         }
       }
     });
@@ -44772,7 +31611,7 @@ var PericodeObsidianPlugin = class extends import_obsidian13.Plugin {
         const text2 = editor.getSelection();
         const path = context.file?.path;
         if (!text2 || !path) {
-          new import_obsidian14.Notice("Select a passage in a note first.");
+          new import_obsidian15.Notice("Select a passage in a note first.");
           return;
         }
         void this.activateView().then(() => {
@@ -44825,26 +31664,27 @@ var PericodeObsidianPlugin = class extends import_obsidian13.Plugin {
   }
   async runScaffoldFromCommand() {
     const { scaffoldVault: scaffoldVault2 } = await Promise.resolve().then(() => (init_vaultScaffold(), vaultScaffold_exports));
-    const note = new import_obsidian14.Notice("Scaffolding vault\u2026", 0);
+    const note = new import_obsidian15.Notice("Scaffolding vault\u2026", 0);
     try {
       const vaultPath = this.app.vault.adapter.basePath;
       const report = await scaffoldVault2(vaultPath);
       note.hide();
       const created = report.created.length;
       const skipped = report.skipped.length;
-      new import_obsidian14.Notice(
+      new import_obsidian15.Notice(
         created === 0 ? `Vault already scaffolded (${skipped} entries existed).` : `Scaffold complete \u2014 created ${created}, skipped ${skipped} existing.`,
         6e3
       );
     } catch (err) {
       note.hide();
-      new import_obsidian14.Notice(
+      new import_obsidian15.Notice(
         `Scaffold failed: ${err instanceof Error ? err.message : String(err)}`,
         8e3
       );
     }
   }
   async onunload() {
+    if (this.vaultPath) clearMcpApprovals(this.vaultPath);
     this.cancelInteractiveTurn?.();
     this.registry.endTurn();
     for (const modal of [...this.activeEditModals]) modal.close();
@@ -44887,12 +31727,12 @@ var PericodeObsidianPlugin = class extends import_obsidian13.Plugin {
       this.policyReady = true;
     } catch {
       this.policyReady = false;
-      new import_obsidian14.Notice("PeriCode tools are disabled: repair the security policy in Settings.");
+      new import_obsidian15.Notice("PeriCode tools are disabled: repair the security policy in Settings.");
     }
   }
   /** Surface a scan finding via Notice + audit log. Wired into securityWrap. */
   onScanFinding(toolName, verdict) {
-    new import_obsidian14.Notice(
+    new import_obsidian15.Notice(
       `Untrusted-text hit in '${toolName}': ${verdict.reason}` + (this.cachedPolicy.autoQuarantineOnJailbreak ? " \u2014 session quarantined." : ""),
       8e3
     );
@@ -45000,51 +31840,3 @@ var PericodeObsidianPlugin = class extends import_obsidian13.Plugin {
     if (leaf) workspace.revealLeaf(leaf);
   }
 };
-/*! Bundled license information:
-
-is-extglob/index.js:
-  (*!
-   * is-extglob <https://github.com/jonschlinkert/is-extglob>
-   *
-   * Copyright (c) 2014-2016, Jon Schlinkert.
-   * Licensed under the MIT License.
-   *)
-
-is-glob/index.js:
-  (*!
-   * is-glob <https://github.com/jonschlinkert/is-glob>
-   *
-   * Copyright (c) 2014-2017, Jon Schlinkert.
-   * Released under the MIT License.
-   *)
-
-is-number/index.js:
-  (*!
-   * is-number <https://github.com/jonschlinkert/is-number>
-   *
-   * Copyright (c) 2014-present, Jon Schlinkert.
-   * Released under the MIT License.
-   *)
-
-to-regex-range/index.js:
-  (*!
-   * to-regex-range <https://github.com/micromatch/to-regex-range>
-   *
-   * Copyright (c) 2015-present, Jon Schlinkert.
-   * Released under the MIT License.
-   *)
-
-fill-range/index.js:
-  (*!
-   * fill-range <https://github.com/jonschlinkert/fill-range>
-   *
-   * Copyright (c) 2014-present, Jon Schlinkert.
-   * Licensed under the MIT License.
-   *)
-
-queue-microtask/index.js:
-  (*! queue-microtask. MIT License. Feross Aboukhadijeh <https://feross.org/opensource> *)
-
-run-parallel/index.js:
-  (*! run-parallel. MIT License. Feross Aboukhadijeh <https://feross.org/opensource> *)
-*/

@@ -1,3 +1,23 @@
+## 0.3.4 access hardening
+
+All 77 plugin tests, installer fixtures and release checks passed. The shared
+SDK suite passed 352 tests after registry extraction. Production dependency
+audits reported zero known advisories. The emitted bundle is 1,243,988 bytes,
+down from 1,707,487 bytes in 0.3.3; unused CLI file mutation, shell, web-fetch
+and desktop implementations are excluded by a release assertion.
+
+The installed 0.3.4 candidate passed a live native file lifecycle in Obsidian
+1.13.7: create, read, stale-write refusal, exact edit, read-back and trash.
+The synthetic note was removed. Existing ChatGPT provider/model selection was
+preserved. Settings rendered correctly with the revised CSS.
+
+MCP tests use synthetic configurations and an injected client; they do not
+launch external services. They cover first-load and forged approval refusal,
+explicit approval, environment changes, revocation, session reset, invalid
+policy, dry run, allowlist rejection and omission of ambient secrets. Provider
+runtimes and external MCP services were not reauthenticated in this pass.
+See SECURITY-REVIEW-0.3.4.md for findings and the remaining OS access boundary.
+
 ## Clean-install correction: September 11, 2026
 
 The public listing's Add to Obsidian button opened Obsidian 1.13.7, but its

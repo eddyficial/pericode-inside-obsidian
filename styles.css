@@ -33,7 +33,7 @@
     radial-gradient(circle at 30% 28%, #1f6fff, transparent 40%),
     linear-gradient(135deg, #111, #263033);
   box-shadow: inset 0 1px 0 rgba(255,255,255,.34);
-  font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+  font-family: var(--font-monospace);
   font-size: 10px; font-weight: 900; letter-spacing: -.035em;
 }
 .pericode-chat-identity { display: flex; flex-direction: column; flex: 1; min-width: 0; }
@@ -325,7 +325,6 @@
   character per line. Apply globally so every PeriCode setting row keeps
   the description readable; controls wrap below when narrow.
 */
-.setting-item:has(.pericode-mark),
 .pericode-settings-tab .setting-item {
   flex-wrap: wrap;
 }
@@ -366,8 +365,6 @@
 .pericode-view button:focus-visible, .pericode-view select:focus-visible { outline: 2px solid var(--interactive-accent); outline-offset: 2px; }
 /* Settings: focused sections, native theme colors, narrow-window reflow. */
 .vertical-tab-content.pericode-settings-tab { container-type: inline-size; width: 100%; max-width: 1000px; margin: 0 auto; padding: 32px clamp(20px, 3%, 40px) 48px; box-sizing: border-box; }
-/* Obsidian computes inline horizontal padding for its default narrow settings column. */
-.vertical-tab-content.pericode-settings-tab { padding-inline: clamp(20px, 3%, 40px) !important; }
 .pericode-settings-header { display: flex; align-items: center; justify-content: space-between; gap: 20px; margin-bottom: 26px; }
 .pericode-settings-brand { display: flex; align-items: center; gap: 14px; }
 .pericode-settings-mark { display: grid; place-items: center; width: 44px; height: 44px; border-radius: 13px; color: var(--text-on-accent); background: var(--interactive-accent); flex-shrink: 0; }
