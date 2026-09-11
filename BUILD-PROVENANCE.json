@@ -1,18 +1,18 @@
 {
-  "version": "0.3.2",
+  "version": "0.3.3",
   "sourceRepository": "https://github.com/eddyficial/pericode",
-  "sourceCommit": "fe407d20fd4dfb12643f222ef5a7c17a256f7586",
+  "sourceCommit": "c76ca33bbe851eea35362df44aed5624eba477ca",
   "sourceDirectory": "plugins/obsidian",
   "license": "MIT",
   "build": "npm ci && npm run build; cd plugins/obsidian && npm ci && npm run release",
   "validation": {
-    "pluginTests": 69,
+    "pluginTests": 70,
     "installerAndReleaseChecks": "passed",
-    "live": "Obsidian 1.13.7: plugin name, settings and chat use PeriCode; existing Codex provider/model and conversation selection preserved",
-    "website": "12 pages checked across four viewport widths; header/footer logos match; planned PeriCode CLI retained"
+    "live": "Obsidian 1.13.7: Grok 4.5 and 4.6 chat and guarded read_file passed; native file canaries blocked. Local Qwen3 Coder 30B chat and guarded read_file passed without cloud inference."
   },
   "limitations": [
-    "Authenticated Grok and Ollama Cloud inference still require verification.",
-    "Obsidian Community submission remains paused."
+    "Grok long prompts and broad discovery need further verification.",
+    "Ollama Cloud authenticated inference and cross-platform workflows need further verification.",
+    "Obsidian Community review and publication remain pending."
   ]
 }

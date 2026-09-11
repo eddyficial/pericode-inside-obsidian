@@ -1,3 +1,19 @@
+# PeriCode 0.3.3
+
+Grok subscription sessions now accept the runtime's known generated configuration
+and dispatch registered vault tools through PeriCode's permission gate. ACP
+sessions explicitly restrict native tools, inherited skills and instruction
+files. This fixes an isolation defect in 0.3.2; upgrading is recommended.
+
+Grok 4.5 and 4.6 passed installed chat and guarded vault reads. Both rejected
+native file access in the isolation check. One local Qwen3 Coder 30B model passed
+chat and a guarded vault read without cloud inference. All 70 plugin tests and
+installer/release checks passed for the tested candidate.
+
+Grok long prompts and broad discovery, Ollama Cloud sign-in and cross-platform
+workflows still need further verification. See QA.md for the test scope.
+Community directory review and publication remain pending.
+
 # PeriCode 0.3.2 - one clear name
 
 The plugin is now called PeriCode in Obsidian, including settings, onboarding,

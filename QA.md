@@ -1,3 +1,56 @@
+## 0.3.3 local model verification: September 11, 2026
+
+The installed plugin passed two live turns with the existing
+Qwen3-Coder-30B-A3B-Instruct-UD-IQ3_XXS model through its OpenAI-compatible
+connection to a temporary loopback llama.cpp server. A plain chat returned the
+expected reply; a guarded `read_file` returned a random code from a synthetic
+vault note. No cloud inference was used. Context was 32,768 tokens and measured
+generation throughput ranged from 73.75 to 114.30 tokens per second.
+
+The synthetic note and test conversation were removed, original connection
+settings and conversation were restored, and the temporary server was stopped.
+This covers one model and two short turns, not a long-context or multi-model
+benchmark. The local evidence is in
+`security-reviews/2026-09-11/local-llm-test.json` in the parent workspace.
+
+## 0.3.3 Grok subscription verification: September 11, 2026
+
+Live testing used the installed Grok Build 1.0.13 runtime and an authorized
+subscription in PeriCode's separate profile. The account returned Grok 4.5 and
+Grok 4.6. Both models responded in the installed Obsidian chat and read a
+temporary vault note through PeriCode's guarded `read_file`, returning its random
+verification code. Temporary notes were removed and the original provider,
+model and conversation were restored.
+
+The tests found three defects in the published 0.3.2 integration:
+
+- Grok's generated marketplace registration was rejected as custom configuration.
+- ACP permission requests for the PeriCode bridge were cancelled before reaching
+  the vault permission gate.
+- Headless CLI tool filters did not restrict ACP sessions. A synthetic file was
+  read through the native runtime without a PeriCode tool event.
+
+The candidate accepts only the exact known generated configuration, disables
+automatic marketplace registration, permits one-time dispatch only to registered
+PeriCode tools, and places the tool allowlist in the ACP agent profile. It also
+disables skill discovery, instruction-file discovery, default tool injection and
+shared leader use. The bridge still checks vault permissions before execution.
+
+After these fixes, both models failed a deliberate attempt to read a random-code
+file with no MCP tools available. Neither returned the code or executed a
+PeriCode tool. All 70 plugin tests and the installer/release checks passed.
+
+The earlier Grok 4.5 discovery attempt triggered the output scanner and was
+quarantined. The final tests used a verified absolute note path. Grok also tried
+to read its own offloaded prompt outside the vault; the guard denied that read.
+Long prompts and broad discovery therefore need further testing. These results
+do not establish every workflow or cross-platform compatibility.
+
+Version 0.3.3 packages these fixes for release and Community submission.
+The installed candidate was verified in Session Portal Vault.
+Raw test evidence is kept outside the repository under
+`security-reviews/2026-09-11/grok-*` in the parent workspace.
+
 ## 0.3.2 product naming
 
 The installed plugin, settings heading and chat brand all report PeriCode in

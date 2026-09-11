@@ -1,19 +1,15 @@
 # PeriCode for Obsidian
 
+This repository publishes the plugin releases and user documentation.
+[Full source and build instructions](https://github.com/eddyficial/pericode/tree/release/open-source/plugins/obsidian) are in the public source repository.
+
 **Free and open source. Every plugin feature included under MIT.**
-
-[Website](https://www.pericode.ai/) · [Download](https://github.com/eddyficial/pericode-inside-obsidian/releases/latest) · [Plugin source](https://github.com/eddyficial/pericode/tree/HEAD/plugins/obsidian)
-
-This repository publishes the Obsidian plugin releases and user documentation.
-The plugin is not yet listed in Obsidian Community; use the installation guide below.
 
 Research your notes, keep conversations across sessions, and review suggested
 revisions before changing a note. PeriCode runs its own agent loop in
 Obsidian and connects to the model provider you choose.
 
-**0.3.2 open-source preview · Desktop only · Obsidian 1.13.7 or newer**
-
-The chat header displays the PC logo and PeriCode name alongside the saved-conversation selector.
+**0.3.3 open-source preview · Desktop only · Obsidian 1.13.7 or newer**
 
 ## Settings and providers
 
@@ -134,8 +130,8 @@ npm ci
 npm run release
 ```
 
-The candidate files and checksums are in `dist/community-0.3.2/`; the ZIP is in
-`dist/pericode-obsidian-0.3.2.zip`. `npm run dev:install` requires an explicit
+The candidate files and checksums are in `dist/community-0.3.3/`; the ZIP is in
+`dist/pericode-obsidian-0.3.3.zip`. `npm run dev:install` requires an explicit
 `PERICODE_OBSIDIAN_VAULT` environment variable so it never chooses a vault for you.
 
 ## Context and editing
@@ -297,7 +293,7 @@ Real-provider authentication remains a release validation requirement.
 ## Validation and contribution
 
 Run `npm test`, `npm run build`, and `npm run release:check` in this directory.
-See [QA](QA.md) for recorded functional evidence and [submission preparation](https://github.com/eddyficial/pericode/blob/HEAD/plugins/obsidian/SUBMISSION.md)
+See [QA](QA.md) for recorded functional evidence and [submission preparation](SUBMISSION.md)
 for publication steps and remaining gates. No overall superiority or complete
 feature parity with another plugin is claimed by a passing local test suite.
 

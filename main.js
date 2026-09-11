@@ -35046,6 +35046,7 @@ function grokEnvironment() {
   for (const key of Object.keys(env)) if (/^(GROK_|XAI_|ANTHROPIC_|OPENAI_|OPENROUTER_)/i.test(key)) delete env[key];
   env.GROK_HOME = (0, import_node_path31.join)((0, import_node_os5.homedir)(), ".pericode", "grok-build");
   env.GROK_DISABLE_AUTOUPDATER = "1";
+  env.GROK_OFFICIAL_MARKETPLACE_AUTO_REGISTER = "0";
   for (const key of ["GROK_MEMORY", "GROK_SUBAGENTS", "GROK_WEB_FETCH", "GROK_WRITE_FILE", "GROK_LSP_TOOLS"])
     env[key] = "0";
   for (const vendor of ["CLAUDE", "CURSOR"]) for (const kind of ["SKILLS", "RULES", "AGENTS", "MCPS", "HOOKS"])
@@ -35071,23 +35072,27 @@ async function grokWorkspace() {
 }
 function safeGrokGeneratedConfig(text2) {
   const normalized = text2.split(/\r?\n/).map((line) => line.trim()).filter((line) => line && !line.startsWith("#")).join("\n");
-  return !normalized || normalized === "[marketplace]\ndefault_skills_installs_purged = true";
+  const marker = "[marketplace]\ndefault_skills_installs_purged = true";
+  const registered = marker + "\nofficial_marketplace_auto_installed = true";
+  const source = '\n[[marketplace.sources]]\nname = "xAI Official"\ngit = "https://github.com/xai-org/plugin-marketplace.git"';
+  return !normalized || normalized === marker || normalized === registered || normalized === registered + source;
 }
-var grokArguments = (maxTurns = 1) => [
-  "--no-auto-update",
-  "--tools",
-  "mcp__pericode__*",
-  "--no-subagents",
-  "--no-plan",
-  "--disable-web-search",
-  "--max-turns",
-  String(Number.isFinite(maxTurns) ? Math.max(1, Math.floor(maxTurns)) : 1),
-  "--no-memory",
-  "--allow",
-  "MCPTool",
-  "agent",
-  "stdio"
-];
+var grokArguments = () => ["--no-auto-update", "agent", "--no-leader", "stdio"];
+var grokSessionMeta = (maxTurns = 1) => ({
+  yoloMode: false,
+  autoMode: false,
+  agentProfile: {
+    name: "pericode",
+    description: "PeriCode vault tool bridge",
+    tools: ["mcp__pericode__*"],
+    disallowedTools: ["Agent"],
+    discoverSkills: false,
+    inheritSkills: false,
+    agentsMd: false,
+    injectDefaultTools: false,
+    maxTurns: Number.isFinite(maxTurns) ? Math.max(1, Math.floor(maxTurns)) : 1
+  }
+});
 function stopGrok(child) {
   if (!child.pid || child.exitCode !== null) return;
   if (process.platform === "win32") {
@@ -35128,12 +35133,20 @@ var GrokConnection = class {
   pending = /* @__PURE__ */ new Map();
   buffer = "";
   closed = false;
+  pericodeTools = /* @__PURE__ */ new Set();
   onUpdate = () => {
   };
+  allowPericodeTools(names) {
+    this.pericodeTools = new Set(names.map((name) => `pericode__${name}`));
+  }
   receive(message) {
     if (message.method && message.id !== void 0) {
-      if (message.method === "session/request_permission") this.send({ id: message.id, result: { outcome: { outcome: "cancelled" } } });
-      else this.send({ id: message.id, error: { code: -32601, message: "Native host operations are disabled. Use PeriCode MCP tools." } });
+      if (message.method === "session/request_permission") {
+        const input = message.params?.toolCall?.rawInput;
+        const once = Array.isArray(message.params?.options) ? message.params.options.find((option) => option.kind === "allow_once" && typeof option.optionId === "string") : void 0;
+        const allowed = input?.variant === "UseTool" && this.pericodeTools.has(input.tool_name) && once;
+        this.send({ id: message.id, result: { outcome: allowed ? { outcome: "selected", optionId: once.optionId } : { outcome: "cancelled" } } });
+      } else this.send({ id: message.id, error: { code: -32601, message: "Native host operations are disabled. Use PeriCode MCP tools." } });
     } else if (message.method === "session/update") this.onUpdate(message.params);
     else if (typeof message.id === "number") {
       const request = this.pending.get(message.id);
@@ -35177,10 +35190,10 @@ function parseGrokModels(value) {
   if (!models.length) throw new Error("No models are available for this Grok account.");
   return models;
 }
-async function connectGrok(signal, maxTurns = 1) {
+async function connectGrok(signal) {
   const cwd = await grokWorkspace();
   if (signal?.aborted) throw new Error("Grok connection cancelled.");
-  const client = new GrokConnection((0, import_node_child_process9.spawn)(grokExecutable(), grokArguments(maxTurns), { cwd, env: grokEnvironment(), windowsHide: true, stdio: ["pipe", "pipe", "pipe"] }));
+  const client = new GrokConnection((0, import_node_child_process9.spawn)(grokExecutable(), grokArguments(), { cwd, env: grokEnvironment(), windowsHide: true, stdio: ["pipe", "pipe", "pipe"] }));
   const abort = () => client.close(new Error("Grok request cancelled."));
   signal?.addEventListener("abort", abort, { once: true });
   client.child.once("close", () => signal?.removeEventListener("abort", abort));
@@ -35204,7 +35217,7 @@ async function connectGrok(signal, maxTurns = 1) {
 async function grokAccountModels(signal) {
   const { client, cwd } = await connectGrok(signal);
   try {
-    const session = await client.request("session/new", { cwd, mcpServers: [] });
+    const session = await client.request("session/new", { cwd, mcpServers: [], _meta: grokSessionMeta() });
     return { models: parseGrokModels(session.models?.availableModels), label: "Grok subscription" };
   } finally {
     client.close();
@@ -35247,12 +35260,13 @@ async function* grokCodeTurn(options) {
     let client;
     let bridge;
     try {
-      const connected = await connectGrok(controller.signal, options.maxIterations);
+      const connected = await connectGrok(controller.signal);
       client = connected.client;
       if (!connected.init.agentCapabilities?.mcpCapabilities?.http) throw new Error("Update Grok Build to enable the PeriCode tool bridge.");
       bridge = await createClaudeToolBridge({ ...options, signal: controller.signal }, emit, options.signal);
+      client.allowPericodeTools(options.registry.getAllWithSource("coding").map((tool) => tool.definition.name));
       const config2 = bridge.config.mcpServers.pericode;
-      const session = await client.request("session/new", { cwd: connected.cwd, mcpServers: [{
+      const session = await client.request("session/new", { cwd: connected.cwd, _meta: grokSessionMeta(options.maxIterations), mcpServers: [{
         type: "http",
         name: "pericode",
         url: config2.url,
