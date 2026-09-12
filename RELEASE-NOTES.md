@@ -1,3 +1,9 @@
+# PeriCode 0.3.10
+
+Makes PeriCode's capabilities easier to discover with a Features & help page, six practical sidebar starters, and a one-time What's New guide after updates. Vault scaffolding now has direct regression coverage, settings cards have corrected spacing, and Windows conversation saves safely replace existing session files.
+
+Validation: 83 plugin tests, production release checks, installer fixtures, zero production dependency advisories, and live Obsidian checks for feature discovery, scaffold completion, layout, and local conversation persistence.
+
 # PeriCode 0.3.9
 
 Adds a guided five-step setup flow that separates provider sign-in, model discovery, a real connection test, and vault permission selection. Provider-specific repair guidance makes failed setup actionable. Successful setup opens PeriCode with a prepared first vault question that remains unsent until the user chooses to send it.
@@ -130,3 +136,4 @@ remain available.
 The release workflow rebuilds the pinned source, compares all three community
 assets byte for byte, and issues GitHub artifact attestations. Hosted Obsidian
 inspection is still required after publication.
+

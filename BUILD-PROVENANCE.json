@@ -1,17 +1,17 @@
 {
-  "version": "0.3.9",
+  "version": "0.3.10",
   "sourceRepository": "https://github.com/eddyficial/pericode",
-  "sourceCommit": "c2244ff664521b70a0aa507e5542fbabb9079e88",
+  "sourceCommit": "5d3aa6abe3871ae9ad3ae9c22efd0cf68fd9089b",
   "sourceDirectory": "plugins/obsidian",
   "license": "MIT",
   "build": "npm ci && npm test; cd plugins/obsidian && npm ci && npm run release",
   "validation": {
-    "pluginTests": 82,
+    "pluginTests": 83,
     "schemaTestsWithoutCodeGeneration": 4,
     "installerAndReleaseChecks": "passed locally; reproducible CI release build required before publication",
     "productionDependencyAudit": "zero known advisories",
     "sdkTests": 352,
-    "communityReview": "0.3.9 hosted inspection pending",
+    "communityReview": "0.3.10 hosted inspection pending",
     "bundleCapabilityScan": "no Node filesystem, clipboard, or broad Vault enumeration signatures; local process execution disclosed"
   },
   "releaseWorkflow": ".github/workflows/release.yml",

@@ -15712,7 +15712,7 @@ function vaultFileTools(app2, deps) {
 }
 
 // src/main.ts
-var import_obsidian15 = require("obsidian");
+var import_obsidian16 = require("obsidian");
 
 // src/InlineEditModal.ts
 init_scoped_fetch();
@@ -17575,6 +17575,7 @@ var SETTINGS_SECTIONS = [
   { id: "privacy", name: "Privacy & safety", icon: "shield-check", description: "Control what PeriCode can access and when it asks for permission." },
   { id: "integrations", name: "Integrations", icon: "plug", description: "Connect installed MCP servers to give your assistant additional tools." },
   { id: "vault", name: "Vault", icon: "folder", description: "Optional setup tools to organize your vault. Your existing notes stay yours." },
+  { id: "help", name: "Features & help", icon: "circle-help", description: "Discover what PeriCode can do and start each workflow safely." },
   { id: "about", name: "About", icon: "info", description: "Free, open-source software. Every PeriCode feature is included." },
   { id: "advanced", name: "Advanced", icon: "sliders-horizontal", description: "Fine-tune agent limits. Most people can keep the defaults." }
 ];
@@ -17609,6 +17610,7 @@ var OAUTH_LANES = [
 var DEFAULT_SETTINGS = {
   pluginAuth: {},
   setupDismissed: false,
+  lastSeenWhatsNewVersion: "",
   provider: "anthropic",
   model: "claude-sonnet-4-6",
   anthropicApiKey: "",
@@ -17698,6 +17700,7 @@ var PericodeSettingsTab = class extends import_obsidian6.PluginSettingTab {
       void this.renderSecuritySection(panel);
     } else if (this.activeSection === "integrations") this.renderMcpSection(panel);
     else if (this.activeSection === "vault") this.renderScaffoldSection(panel);
+    else if (this.activeSection === "help") this.renderHelpSection(panel);
     else if (this.activeSection === "about") this.renderAboutSection(panel);
     else this.renderAdvanced(panel);
     containerEl.scrollTop = scrollTop;
@@ -18727,6 +18730,27 @@ var PericodeSettingsTab = class extends import_obsidian6.PluginSettingTab {
         }
       })
     );
+  }
+  renderHelpSection(container) {
+    const features = [
+      ["Research your vault", "Find and summarize notes with citations while keeping files unchanged."],
+      ["Review before editing", "Preview revisions and apply them only after you accept the changes."],
+      ["Organize safely", "Create, move, rename, and update vault content through permission-checked tools."],
+      ["Scaffold a knowledge base", "Create raw, wiki, output, user-profile, and playbook structure without overwriting existing notes."],
+      ["Use your preferred AI", "Connect subscriptions, API providers, Ollama, or compatible local endpoints."],
+      ["Resume your work", "Return to saved conversations, drafts, attachments, and tool history."],
+      ["Add integrations", "Connect approved MCP servers and keep each tool behind PeriCode's permission policy."]
+    ];
+    const grid = container.createDiv({ cls: "pericode-feature-grid" });
+    for (const [name, description] of features) {
+      const card = grid.createDiv({ cls: "pericode-feature-card" });
+      card.createEl("h4", { text: name });
+      card.createEl("p", { text: description });
+    }
+    const actions = container.createDiv({ cls: "pericode-help-actions" });
+    actions.createEl("button", { text: "Run setup guide", cls: "mod-cta" }).onclick = () => new OnboardingWizard(this.app, this.plugin).open();
+    actions.createEl("button", { text: "Open PeriCode chat" }).onclick = () => void this.plugin.activateView();
+    container.createEl("p", { cls: "pericode-settings-footnote", text: "Tip: sidebar starters prepare editable drafts. Nothing is sent until you press Send." });
   }
   /**
    * Render the "Discover MCP servers from other clients" sub-section at
@@ -20868,7 +20892,15 @@ var ConversationStore = class {
       await mkdir(this.directory, { recursive: true });
       const temporary = (0, import_node_path16.join)(this.directory, `sessions-${(0, import_node_crypto7.randomUUID)()}.tmp`);
       await writeFile(temporary, snapshot, { encoding: "utf8", mode: 384 });
-      await rename(temporary, (0, import_node_path16.join)(this.directory, "sessions.json"));
+      const destination = (0, import_node_path16.join)(this.directory, "sessions.json");
+      try {
+        await rename(temporary, destination);
+      } catch (err) {
+        const code = err.code;
+        if (code !== "EEXIST" && code !== "EPERM") throw err;
+        await copyFile(temporary, destination);
+        await unlink(temporary);
+      }
     });
     this.queue = write;
     return write;
@@ -22273,7 +22305,10 @@ var PericodeView = class extends import_obsidian10.ItemView {
     const prompts = [
       ["Find a note", "Find notes about [topic] in this vault. Cite the matching notes with [[links]] and explain why each is relevant. Do not change files."],
       ["Summarize notes", "Summarize the notes I attach with @. Cite the source notes with [[links]], highlight decisions and open questions, and do not change files. If I have not attached any notes, ask which notes to summarize."],
-      ["Review a note", "Review the note I attach with @ for clarity, missing details and contradictions. Suggest specific changes with reasons, but do not edit any files yet. If I have not attached a note, ask which note to review."]
+      ["Review a note", "Review the note I attach with @ for clarity, missing details and contradictions. Suggest specific changes with reasons, but do not edit any files yet. If I have not attached a note, ask which note to review."],
+      ["Organize this vault", "Review this vault's structure and propose a clear organization plan. List the files and folders that would change, but do not change anything until I approve the plan."],
+      ["Create vault structure", "Check whether this vault has the PeriCode raw, wiki, output, user-profile, and playbook structure. Explain what is missing and ask before creating it."],
+      ["Plan across notes", "Create a step-by-step plan using the notes I attach with @. Cite each source, identify dependencies and open questions, and do not edit files."]
     ];
     for (const [label, prompt] of prompts) {
       starters.createEl("button", { text: label, cls: "pericode-starter", attr: { title: "Prepare a draft. Nothing is sent until you press Send." } }).addEventListener("click", () => {
@@ -22310,7 +22345,7 @@ var PericodeView = class extends import_obsidian10.ItemView {
 };
 
 // src/main.ts
-var import_obsidian16 = require("obsidian");
+var import_obsidian17 = require("obsidian");
 
 // src/obsidianTools.ts
 init_scoped_fetch();
@@ -25355,7 +25390,42 @@ function formatBytes(bytes) {
 // src/main.ts
 init_safeVaultFs();
 init_pluginAuthStore();
-var PericodeObsidianPlugin = class extends import_obsidian15.Plugin {
+
+// src/WhatsNewModal.ts
+init_scoped_fetch();
+var import_obsidian15 = require("obsidian");
+var WhatsNewModal = class extends import_obsidian15.Modal {
+  constructor(app2, plugin, version2) {
+    super(app2);
+    this.plugin = plugin;
+    this.version = version2;
+  }
+  plugin;
+  version;
+  onOpen() {
+    this.contentEl.addClass("pericode-whats-new");
+    this.contentEl.createEl("p", { text: `PeriCode ${this.version}`, cls: "pericode-whats-new-version" });
+    this.contentEl.createEl("h2", { text: "New ways to get started" });
+    this.contentEl.createEl("p", { text: "Connect and test your AI step by step, choose vault permissions, and discover common workflows from the sidebar." });
+    const list = this.contentEl.createEl("ul");
+    list.createEl("li", { text: "Provider-specific connection checks and repair guidance" });
+    list.createEl("li", { text: "Research, Ask each time, and Trusted permission choices" });
+    list.createEl("li", { text: "Vault organization, scaffold, planning, summary, and review starters" });
+    list.createEl("li", { text: "A Features & help page in PeriCode settings" });
+    const actions = this.contentEl.createDiv({ cls: "pericode-help-actions" });
+    actions.createEl("button", { text: "Explore in chat", cls: "mod-cta" }).onclick = () => {
+      this.close();
+      void this.plugin.activateView();
+    };
+    actions.createEl("button", { text: "Close" }).onclick = () => this.close();
+  }
+  onClose() {
+    this.contentEl.empty();
+  }
+};
+
+// src/main.ts
+var PericodeObsidianPlugin = class extends import_obsidian16.Plugin {
   interactiveTurnActive = false;
   cancelInteractiveTurn = null;
   activeEditModals = /* @__PURE__ */ new Set();
@@ -25469,18 +25539,18 @@ var PericodeObsidianPlugin = class extends import_obsidian15.Plugin {
       );
       void this.mcpManager.start(vault, this.registry).then((status) => {
         if (status.connected.length > 0) {
-          new import_obsidian16.Notice(
+          new import_obsidian17.Notice(
             `PeriCode: ${status.connected.length} MCP server(s) connected \u2014 ${status.connected.join(", ")}.`,
             5e3
           );
         }
         if (status.failed.length > 0) {
           for (const f2 of status.failed) {
-            new import_obsidian16.Notice(`PeriCode MCP '${f2.name}' failed: ${f2.error}`, 8e3);
+            new import_obsidian17.Notice(`PeriCode MCP '${f2.name}' failed: ${f2.error}`, 8e3);
           }
         }
       }).catch((err) => {
-        new import_obsidian16.Notice(
+        new import_obsidian17.Notice(
           `PeriCode: MCP startup failed \u2014 ${err instanceof Error ? err.message : String(err)}`,
           8e3
         );
@@ -25498,7 +25568,7 @@ var PericodeObsidianPlugin = class extends import_obsidian15.Plugin {
             return context.file;
           } }).open();
         } catch (err) {
-          new import_obsidian16.Notice(err instanceof Error ? err.message : String(err));
+          new import_obsidian17.Notice(err instanceof Error ? err.message : String(err));
         }
       }
     });
@@ -25509,7 +25579,7 @@ var PericodeObsidianPlugin = class extends import_obsidian15.Plugin {
         const text2 = editor.getSelection();
         const path = context.file?.path;
         if (!text2 || !path) {
-          new import_obsidian16.Notice("Select a passage in a note first.");
+          new import_obsidian17.Notice("Select a passage in a note first.");
           return;
         }
         void this.activateView().then(() => {
@@ -25558,24 +25628,31 @@ var PericodeObsidianPlugin = class extends import_obsidian15.Plugin {
           }
         }, 1500);
       });
+    } else if (this.settings.lastSeenWhatsNewVersion !== this.manifest.version) {
+      this.app.workspace.onLayoutReady(() => window.setTimeout(() => {
+        if (this.settings.lastSeenWhatsNewVersion === this.manifest.version) return;
+        this.settings.lastSeenWhatsNewVersion = this.manifest.version;
+        void this.saveSettings();
+        new WhatsNewModal(this.app, this, this.manifest.version).open();
+      }, 1200));
     }
   }
   async runScaffoldFromCommand() {
     const { scaffoldVault: scaffoldVault2 } = await Promise.resolve().then(() => (init_vaultScaffold(), vaultScaffold_exports));
-    const note = new import_obsidian16.Notice("Scaffolding vault\u2026", 0);
+    const note = new import_obsidian17.Notice("Scaffolding vault\u2026", 0);
     try {
       const vaultPath2 = this.app.vault.adapter.basePath;
       const report = await scaffoldVault2(vaultPath2);
       note.hide();
       const created = report.created.length;
       const skipped = report.skipped.length;
-      new import_obsidian16.Notice(
+      new import_obsidian17.Notice(
         created === 0 ? `Vault already scaffolded (${skipped} entries existed).` : `Scaffold complete \u2014 created ${created}, skipped ${skipped} existing.`,
         6e3
       );
     } catch (err) {
       note.hide();
-      new import_obsidian16.Notice(
+      new import_obsidian17.Notice(
         `Scaffold failed: ${err instanceof Error ? err.message : String(err)}`,
         8e3
       );
@@ -25625,12 +25702,12 @@ var PericodeObsidianPlugin = class extends import_obsidian15.Plugin {
       this.policyReady = true;
     } catch {
       this.policyReady = false;
-      new import_obsidian16.Notice("PeriCode tools are disabled: repair the security policy in Settings.");
+      new import_obsidian17.Notice("PeriCode tools are disabled: repair the security policy in Settings.");
     }
   }
   /** Surface a scan finding via Notice + audit log. Wired into securityWrap. */
   onScanFinding(toolName, verdict) {
-    new import_obsidian16.Notice(
+    new import_obsidian17.Notice(
       `Untrusted-text hit in '${toolName}': ${verdict.reason}` + (this.cachedPolicy.autoQuarantineOnJailbreak ? " \u2014 session quarantined." : ""),
       8e3
     );

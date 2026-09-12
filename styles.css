@@ -394,11 +394,11 @@
 .pericode-provider-card-label > span { color: var(--text-muted); font-size: 11px; line-height: 1.4; }
 .pericode-provider-check { color: var(--text-accent); }
 .pericode-provider-check svg { width: 16px; height: 16px; }
-.pericode-connection-card { border: 1px solid var(--background-modifier-border); border-radius: 12px; padding: 0 20px; }
+.pericode-connection-card { border: 1px solid var(--background-modifier-border); border-radius: 12px; padding: 4px 24px; }
 .pericode-connection-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 18px 0; }
 .pericode-connection-heading h4 { margin: 0; font-size: 15px; }
 .pericode-settings-badge { color: var(--text-muted); background: var(--background-secondary); border: 1px solid var(--background-modifier-border); border-radius: 20px; padding: 4px 9px; font-size: 11px; }
-.pericode-connection-card .setting-item { padding: 18px 0; gap: 18px; border-top: 1px solid var(--background-modifier-border); }
+.pericode-connection-card .setting-item { padding: 22px 16px; gap: 22px; border-top: 1px solid var(--background-modifier-border); }
 .pericode-settings-panel .setting-item-control { flex-wrap: wrap; gap: 8px; }
 .pericode-settings-panel .setting-item-info { min-width: 0; }
 .pericode-settings-panel .setting-item-description { line-height: 1.5; overflow-wrap: anywhere; }
@@ -407,6 +407,13 @@
 .pericode-settings-callout { margin-top: 16px; padding: 16px 18px; background: var(--background-secondary); border: 1px solid var(--background-modifier-border); border-radius: 10px; font-size: 12px; line-height: 1.6; }
 .pericode-settings-callout p { margin: 6px 0; color: var(--text-muted); }
 .pericode-settings-footnote { color: var(--text-muted); font-size: 11px; line-height: 1.6; margin: 18px 0 0; }
+.pericode-feature-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; }
+.pericode-feature-card { padding: 16px; border: 1px solid var(--background-modifier-border); border-radius: 10px; background: var(--background-secondary); }
+.pericode-feature-card h4 { margin: 0 0 7px; font-size: 14px; }
+.pericode-feature-card p { margin: 0; color: var(--text-muted); font-size: 12px; line-height: 1.5; }
+.pericode-help-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 18px; }
+.pericode-whats-new-version { color: var(--text-accent); font-size: 12px; font-weight: 600; margin-bottom: 4px; }
+.pericode-whats-new ul { padding-left: 22px; line-height: 1.65; }
 @container (max-width: 520px) {
   .pericode-settings-panel .setting-item { flex-direction: column; align-items: stretch; }
   .pericode-settings-panel .setting-item-info { flex: 0 0 auto; }
