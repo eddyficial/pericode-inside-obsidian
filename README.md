@@ -1,3 +1,5 @@
+<p align="center"><img src="assets/pericode-brand.svg" width="390" alt="PeriCode" /></p>
+
 # PeriCode for Obsidian
 
 ## Release verification
