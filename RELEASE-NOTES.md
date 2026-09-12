@@ -1,3 +1,8 @@
+# PeriCode 0.3.11
+
+Adds persistent provider sign-in state, reliable model discovery, universal governed vault tools, deterministic vault scaffolding with a daily activity journal, context compaction, a denser chat transcript, and a polished separated composer. Provider cards and models are alphabetical and category-correct, model selection is searchable and scrollable, and simple greetings respond without invoking vault tools or inheriting prior tool activity.
+
+Validation: 92 plugin tests, 352 SDK tests, Community release and installer checks, zero production dependency advisories, and a live Claude greeting verified with no tool entries.
 # PeriCode 0.3.10
 
 Makes PeriCode's capabilities easier to discover with a Features & help page, six practical sidebar starters, and a one-time What's New guide after updates. Vault scaffolding now has direct regression coverage, settings cards have corrected spacing, and Windows conversation saves safely replace existing session files.

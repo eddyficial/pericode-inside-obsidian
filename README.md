@@ -81,6 +81,34 @@ If the catalog is unavailable on your device, use the same signed release files:
 Installation is per vault. Repeat these steps for each vault where you want
 PeriCode. Requires Obsidian desktop 1.13.7 or newer.
 
+## Everyday workflow
+
+1. Open **Settings → PeriCode → AI connection**, choose a provider and select
+   **Connect**. Successful account connections show **Connected** and
+   **Sign out** and are restored when that vault reopens.
+2. Select **Load models**, then choose one of the models returned for the
+   connected account.
+3. Open a new PeriCode chat. A starter fills an editable draft; review it and
+   press **Send**. Research mode stays read-only. Agent mode can use governed
+   vault, shell, Git, test, web and approved integration tools.
+4. To prepare PeriCode's standard knowledge layout, open **Vault → Scaffold**
+   in settings or select **Scaffold this vault** in a new chat. It creates the
+   raw, wiki, output, user-profile and playbook structure and preserves every
+   existing file.
+5. To delete the current chat, open the chat's **three-dot menu**, select
+   **Delete chat**, then confirm **Delete conversation**.
+
+Type `/` in an empty composer to open commands available with every provider:
+`/new`, `/clear`, `/compact`, `/models`, `/scaffold`, `/tools`, `/settings`, and `/help`.
+`/compact` asks the selected model for a concise continuation brief, replaces
+its older working context with that brief, and preserves the visible transcript.
+Tool activity is grouped and collapsed in the sidebar so the current
+conversation stays visible. Expand **Activity** for details, or expand the
+whole chat to open the execution trace automatically.
+
+Credentials, settings and conversations are stored per vault. Repeat setup in
+another vault when needed; signing out is never required just to reload models.
+
 ## Settings and providers
 
 ### First setup and first question
