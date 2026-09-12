@@ -66,7 +66,7 @@ jobs:
           foreach ($name in @('main.js','manifest.json','styles.css')) {
             $committed = (Get-FileHash -LiteralPath $name -Algorithm SHA256).Hash
             $rebuilt = (Get-FileHash -LiteralPath "source/plugins/obsidian/$name" -Algorithm SHA256).Hash
-            if ($committed -ne $rebuilt) { throw "Build does not reproduce $name" }
+            if ($committed -ne $rebuilt) { throw "Build does not reproduce $name (committed=$committed rebuilt=$rebuilt)" }
           }
       - name: Attest rebuilt plugin files
         uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4
