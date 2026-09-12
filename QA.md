@@ -473,3 +473,32 @@ without any permission prompt. Protected configuration reads remained blocked
 with a security-policy reason. The rebuilt bundle was installed in all five
 registered vaults, and the active Knowledge_Vault plugin was reloaded. Existing
 transcripts retain the errors recorded before this fix.
+## 0.3.6 setup and first questions
+
+All 86 plugin tests and 352 SDK tests pass, including setup with failed or
+empty model lists, obsolete selections, unsaved credentials, deferred setup,
+concurrent requests and closed dialogs. Starter buttons prepare Research
+drafts without inference or context reads and preserve existing text. Sending
+without a selected model preserves the draft and attachments.
+
+In Obsidian 1.13.7, the setup guide loaded seven models from the saved
+ChatGPT/Codex account, accepted the existing selection and opened chat.
+No inference was requested by that check. A live starter click prepared a
+Research draft without starting a request. Native create, read, stale-write
+refusal, exact edit and trash checks passed; the synthetic note was removed.
+
+Installer fixtures and release checks pass. The production dependency audit
+reports zero known advisories. The website passes navigation and installation
+checks across 12 pages, 196 internal links and widths 320, 390, 820 and 1440.
+Existing filesystem, process, clipboard and network disclosures still apply.
+The 0.3.5 community review below is historical evidence, not approval of 0.3.6.
+## 0.3.7 community capability cleanup
+
+- Production bundle: no Node filesystem import, child-process import, clipboard
+  API call, or broad Vault enumeration API call.
+- Vault policy, memory, audit, conversation and scaffold paths continue through
+  the Obsidian adapter; overwrite previews load asynchronously before approval.
+- Bounded note inventory skips hidden folders and preserves protected-path checks.
+- All 82 plugin tests and installer fixtures pass. The release check enforces the
+  four removed capability signatures against the built `main.js`.
+- Hosted Obsidian inspection remains pending until the 0.3.7 release is published.

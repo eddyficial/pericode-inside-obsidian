@@ -1,24 +1,23 @@
 {
-  "version": "0.3.6",
+  "version": "0.3.7",
   "sourceRepository": "https://github.com/eddyficial/pericode",
-  "sourceCommit": "8e66277ac74f3c4fa4033f99af8f1beab3e89085",
+  "sourceCommit": "11951735d5a45ba0e79ea55dde691ccd96e7617d",
   "sourceDirectory": "plugins/obsidian",
   "license": "MIT",
   "build": "npm ci && npm test; cd plugins/obsidian && npm ci && npm run release",
   "validation": {
-    "pluginTests": 86,
+    "pluginTests": 82,
     "schemaTestsWithoutCodeGeneration": 4,
     "installerAndReleaseChecks": "passed locally; reproducible CI release build required before publication",
-    "live": "Obsidian 1.13.7 setup loaded seven ChatGPT/Codex account models and preserved the selected model. Starter draft, native create/read/stale-write refusal/edit/trash passed.",
     "productionDependencyAudit": "zero known advisories",
     "sdkTests": 352,
-    "communityReview": "0.3.6 review pending; prior completed review covers 0.3.5 only",
-    "nativeCommunityInstall": "0.3.5 native reinstall verified previously; 0.3.6 installed with the bundled installer for live QA"
+    "communityReview": "0.3.7 hosted inspection pending",
+    "bundleCapabilityScan": "no Node filesystem, child-process, clipboard, or broad Vault enumeration signatures"
   },
   "releaseWorkflow": ".github/workflows/release.yml",
   "limitations": [
-    "Capability disclosures remain for filesystem, process, clipboard writes, vault enumeration and network use.",
-    "External provider inference was not repeated in this release.",
+    "Claude Code and Grok Build subscription bridges await the separate localhost companion.",
+    "Live provider inference was not repeated in this release.",
     "Community malware and network scans are controlled by the review service."
   ]
 }

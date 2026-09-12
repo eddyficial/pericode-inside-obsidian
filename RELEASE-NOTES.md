@@ -105,3 +105,19 @@ Community-directory approval and broad cross-platform QA remain pending.
 Download main.js, manifest.json and styles.css into your vault's
 `.obsidian/plugins/pericode/` directory, or extract the ZIP and run its optional
 Windows installer. Enable PeriCode in Community plugins, then configure a provider.
+## 0.3.7
+
+PeriCode 0.3.7 removes the four capabilities reported by Obsidian's 0.3.6
+inspection. Vault storage now goes through Obsidian's adapter, process launching
+is refused, clipboard buttons are removed, and note discovery no longer calls
+the broad Vault enumeration APIs.
+
+The release gate checks the built `main.js` and fails if any of those signatures
+return. All 82 plugin tests, 352 SDK tests, installer fixtures, packaging checks,
+and dependency audits passed. Claude Code and Grok Build subscription routes are
+shown as requiring the forthcoming localhost companion; their API connections
+remain available.
+
+The release workflow rebuilds the pinned source, compares all three community
+assets byte for byte, and issues GitHub artifact attestations. Hosted Obsidian
+inspection is still required after publication.

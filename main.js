@@ -99,7 +99,7 @@ function makeNodeHttpFetch() {
     if (body && !Object.keys(headers).some((k2) => k2.toLowerCase() === "content-length")) {
       headers["content-length"] = String(body.byteLength);
     }
-    return new Promise((resolve4, reject) => {
+    return new Promise((resolve5, reject) => {
       let bodyController = null;
       let finished = false;
       const cleanup = () => init?.signal?.removeEventListener("abort", abort);
@@ -160,7 +160,7 @@ function makeNodeHttpFetch() {
             status: res.statusCode ?? 0,
             headers: responseHeaders
           });
-          resolve4(response);
+          resolve5(response);
         }
       );
       req.on("error", (err) => {
@@ -199,6 +199,150 @@ var init_scoped_fetch = __esm({
     "use strict";
     init_fetchAdapter();
     fetch = makeNodeHttpFetch();
+  }
+});
+
+// src/safeVaultFs.ts
+function configureSafeVaultFs(next) {
+  app = next;
+  const adapter2 = next.vault.adapter;
+  root = adapter2.basePath ? (0, import_node_path2.resolve)(adapter2.basePath) : "";
+}
+function adapter() {
+  if (!app) throw new Error("Vault storage is not initialized.");
+  return app.vault.adapter;
+}
+function vaultPath(input) {
+  if (typeof input !== "string" || !input) throw new Error("A vault path is required.");
+  let path = input;
+  if (root) {
+    const absolute = (0, import_node_path2.resolve)(input);
+    const rel = (0, import_node_path2.relative)(root, absolute);
+    if (!rel || rel === ".") return "";
+    if (rel === ".." || rel.startsWith(`..${import_node_path2.sep}`) || (0, import_node_path2.resolve)(root, rel) !== absolute) {
+      throw new Error("Direct access outside the Obsidian vault is unavailable.");
+    }
+    path = rel;
+  } else if (/^(?:[A-Za-z]:[\\/]|[\\/]{2}|\/)/.test(path)) {
+    throw new Error("Absolute filesystem paths are unavailable.");
+  }
+  const normalized = (0, import_obsidian.normalizePath)(path.replace(/\\/g, "/")).replace(/^\.\//, "");
+  if (normalized === ".." || normalized.startsWith("../")) throw new Error("Path leaves the vault.");
+  return normalized === "." ? "" : normalized;
+}
+async function exists(path) {
+  try {
+    return await adapter().exists(vaultPath(path));
+  } catch {
+    return false;
+  }
+}
+async function access(path) {
+  if (!await exists(path)) throw Object.assign(new Error("File not found."), { code: "ENOENT" });
+}
+function stats(path, value) {
+  if (!value) throw Object.assign(new Error(`File not found: ${path}`), { code: "ENOENT" });
+  return {
+    size: value.size,
+    mtimeMs: value.mtime,
+    ctimeMs: value.ctime,
+    isFile: () => value.type === "file",
+    isDirectory: () => value.type === "folder",
+    isSymbolicLink: () => false
+  };
+}
+async function mkdir(path, _options) {
+  const target = vaultPath(path);
+  if (!target || await exists(target)) return;
+  const parts = target.split("/");
+  let current = "";
+  for (const part of parts) {
+    current = current ? `${current}/${part}` : part;
+    if (!await adapter().exists(current)) await adapter().mkdir(current);
+  }
+}
+async function readFile(path, _encoding) {
+  return adapter().read(vaultPath(path));
+}
+async function writeFile(path, data, _options) {
+  const target = vaultPath(path);
+  if (typeof data === "string") await adapter().write(target, data);
+  else await adapter().writeBinary(target, Uint8Array.from(data).buffer);
+}
+async function appendFile(path, data, _encoding) {
+  const target = vaultPath(path);
+  if (await adapter().exists(target)) await adapter().append(target, data);
+  else await adapter().write(target, data);
+}
+async function readdir(path, options) {
+  const target = vaultPath(path);
+  const result = await adapter().list(target);
+  const names = [
+    ...result.folders.map((value) => ({ value, folder: true })),
+    ...result.files.map((value) => ({ value, folder: false }))
+  ].map(({ value, folder }) => ({ name: value.split("/").pop(), folder }));
+  if (!options?.withFileTypes) return names.map((item) => item.name);
+  return names.map((item) => ({ name: item.name, isFile: () => !item.folder, isDirectory: () => item.folder, isSymbolicLink: () => false }));
+}
+async function stat(path) {
+  const target = vaultPath(path);
+  return stats(target, await adapter().stat(target));
+}
+async function lstat(path) {
+  return stat(path);
+}
+async function unlink(path) {
+  await adapter().remove(vaultPath(path));
+}
+async function rmdir(path) {
+  await adapter().rmdir(vaultPath(path), false);
+}
+async function rename(from, to) {
+  await adapter().rename(vaultPath(from), vaultPath(to));
+}
+async function copyFile(from, to) {
+  await adapter().copy(vaultPath(from), vaultPath(to));
+}
+async function realpath(path) {
+  const target = vaultPath(path);
+  return root ? (0, import_node_path2.resolve)(root, target) : target;
+}
+async function mkdtemp(_prefix) {
+  throw new Error("Host temporary directories are unavailable in the Obsidian community plugin.");
+}
+var import_obsidian, import_node_path2, app, root, promises, existsSync, readFileSync, chmodSync, mkdirSync, writeFileSync;
+var init_safeVaultFs = __esm({
+  "src/safeVaultFs.ts"() {
+    "use strict";
+    init_scoped_fetch();
+    import_obsidian = require("obsidian");
+    import_node_path2 = require("node:path");
+    app = null;
+    root = "";
+    promises = {
+      access,
+      appendFile,
+      copyFile,
+      lstat,
+      mkdir,
+      mkdtemp,
+      readFile,
+      readdir,
+      realpath,
+      rename,
+      rmdir,
+      stat,
+      unlink,
+      writeFile
+    };
+    existsSync = (_path) => false;
+    readFileSync = (_path) => {
+      throw new Error("Synchronous filesystem access is unavailable.");
+    };
+    chmodSync = () => {
+    };
+    mkdirSync = readFileSync;
+    writeFileSync = readFileSync;
   }
 });
 
@@ -804,8 +948,8 @@ async function* agentTurn(args) {
             text: chunk.text
           };
         } else {
-          await new Promise((resolve4) => {
-            progressWaiter = resolve4;
+          await new Promise((resolve5) => {
+            progressWaiter = resolve5;
           });
         }
       }
@@ -1065,7 +1209,7 @@ var init_profiles = __esm({
 
 // ../../dist/src/tools/registry-core.js
 function sleep(ms) {
-  return new Promise((resolve4) => setTimeout(resolve4, ms));
+  return new Promise((resolve5) => setTimeout(resolve5, ms));
 }
 function sharedDesktopSettleMs() {
   const raw = process.env.PERICODE_SHARED_DESKTOP_SETTLE_MS;
@@ -1495,7 +1639,7 @@ var init_risk_policy = __esm({
 
 // ../../dist/src/tools/secret-guard.js
 function classifySecretPath2(path) {
-  const name = (0, import_node_path2.basename)(path);
+  const name = (0, import_node_path3.basename)(path);
   for (const rule of SECRET_RULES2) {
     if (rule.test(name))
       return { matched: true, reason: rule.reason };
@@ -1512,12 +1656,12 @@ function isConfirmedSecretOverride(input, key = "confirm_secret") {
   }
   return false;
 }
-var import_node_path2, lowercased2, SECRET_RULES2;
+var import_node_path3, lowercased2, SECRET_RULES2;
 var init_secret_guard = __esm({
   "../../dist/src/tools/secret-guard.js"() {
     "use strict";
     init_scoped_fetch();
-    import_node_path2 = require("node:path");
+    import_node_path3 = require("node:path");
     lowercased2 = (predicate) => (name) => predicate(name.toLowerCase());
     SECRET_RULES2 = [
       {
@@ -1684,12 +1828,45 @@ var init_base2 = __esm({
   }
 });
 
+// src/pluginAuthStore.ts
+function configurePluginAuth(initial, save) {
+  records = structuredClone(initial ?? {});
+  persist = save;
+}
+function getAuth(provider) {
+  return records[provider] ?? null;
+}
+function deleteAuth(provider) {
+  if (!(provider in records)) return false;
+  const next = { ...records };
+  delete next[provider];
+  records = next;
+  persist(structuredClone(records));
+  return true;
+}
+function listAuth() {
+  return Object.fromEntries(Object.entries(records).map(([provider, record2]) => [
+    provider,
+    record2.type === "oauth" ? { type: "oauth", expires: record2.expires, accountId: record2.accountId, enterpriseUrl: record2.enterpriseUrl } : { type: "api", metadata: record2.metadata, hasKey: Boolean(record2.key) }
+  ]));
+}
+var records, persist;
+var init_pluginAuthStore = __esm({
+  "src/pluginAuthStore.ts"() {
+    "use strict";
+    init_scoped_fetch();
+    records = {};
+    persist = () => {
+    };
+  }
+});
+
 // ../../dist/src/paths.js
 function pericodeHome() {
-  return process.env[PERICODE_HOME_ENV] ?? (0, import_node_path3.join)((0, import_node_os.homedir)(), ".pericode");
+  return process.env[PERICODE_HOME_ENV] ?? (0, import_node_path4.join)((0, import_node_os.homedir)(), ".pericode");
 }
 function ownedPath(fileName) {
-  return (0, import_node_path3.join)(pericodeHome(), fileName);
+  return (0, import_node_path4.join)(pericodeHome(), fileName);
 }
 function resolveOwnedPath(options) {
   const ownedOverride = process.env[options.ownedEnv];
@@ -1697,13 +1874,13 @@ function resolveOwnedPath(options) {
     return { path: ownedOverride, source: "env" };
   return { path: ownedPath(options.fileName), source: "owned" };
 }
-var import_node_os, import_node_path3, PERICODE_HOME_ENV;
+var import_node_os, import_node_path4, PERICODE_HOME_ENV;
 var init_paths = __esm({
   "../../dist/src/paths.js"() {
     "use strict";
     init_scoped_fetch();
     import_node_os = require("node:os");
-    import_node_path3 = require("node:path");
+    import_node_path4 = require("node:path");
     PERICODE_HOME_ENV = "PERICODE_HOME";
   }
 });
@@ -1720,10 +1897,10 @@ function authReadPath() {
 }
 function readRaw() {
   const path = authReadPath();
-  if (!(0, import_node_fs.existsSync)(path))
+  if (!existsSync(path))
     return { providers: {} };
   try {
-    const data = JSON.parse((0, import_node_fs.readFileSync)(path, "utf8"));
+    const data = JSON.parse(readFileSync(path, "utf8"));
     if (!data || typeof data !== "object")
       return { providers: {} };
     if (!data.providers || typeof data.providers !== "object") {
@@ -1736,14 +1913,14 @@ function readRaw() {
 }
 function writeRaw(data) {
   const path = authPath();
-  (0, import_node_fs.mkdirSync)((0, import_node_path4.dirname)(path), { recursive: true });
-  (0, import_node_fs.writeFileSync)(path, JSON.stringify(data, null, 2), "utf8");
+  mkdirSync((0, import_node_path5.dirname)(path), { recursive: true });
+  writeFileSync(path, JSON.stringify(data, null, 2), "utf8");
   try {
-    (0, import_node_fs.chmodSync)(path, 384);
+    chmodSync(path, 384);
   } catch {
   }
 }
-function getAuth(provider) {
+function getAuth2(provider) {
   const file = readRaw();
   const record2 = file.providers[provider];
   return record2 ?? null;
@@ -1756,37 +1933,13 @@ function setAuth(provider, record2) {
   file.providers[provider] = record2;
   writeRaw(file);
 }
-function deleteAuth(provider) {
-  const file = readRaw();
-  if (provider in file.providers) {
-    delete file.providers[provider];
-    writeRaw(file);
-    return true;
-  }
-  return false;
-}
-function listAuth() {
-  return Object.fromEntries(Object.entries(readRaw().providers).map(([provider, record2]) => [
-    provider,
-    record2.type === "oauth" ? {
-      type: "oauth",
-      expires: record2.expires,
-      accountId: record2.accountId,
-      enterpriseUrl: record2.enterpriseUrl
-    } : {
-      type: "api",
-      metadata: record2.metadata,
-      hasKey: record2.key.length > 0
-    }
-  ]));
-}
-var import_node_fs, import_node_path4, AUTH_PATH_ENV;
+var import_node_path5, AUTH_PATH_ENV;
 var init_store = __esm({
   "../../dist/src/auth/store.js"() {
     "use strict";
     init_scoped_fetch();
-    import_node_fs = require("node:fs");
-    import_node_path4 = require("node:path");
+    init_safeVaultFs();
+    import_node_path5 = require("node:path");
     init_paths();
     AUTH_PATH_ENV = "PERICODE_AUTH_PATH";
   }
@@ -1831,26 +1984,26 @@ async function postRefresh(refresh) {
   return await res.json();
 }
 async function refreshAccessToken() {
-  const record2 = getAuth(ANTHROPIC_PROVIDER_KEY);
+  const record2 = getAuth2(ANTHROPIC_PROVIDER_KEY);
   if (!record2 || record2.type !== "oauth") {
     throw new AnthropicAuthError("No stored Anthropic OAuth credentials. Run /auth login claude in the TUI (or `pericode auth login claude`).");
   }
   const refreshed = await postRefresh(record2.refresh);
-  const access = refreshed.access_token;
-  if (!access) {
+  const access2 = refreshed.access_token;
+  if (!access2) {
     throw new AnthropicAuthError(`Anthropic refresh returned no access_token: ${JSON.stringify(refreshed)}`);
   }
   const expiresIn = refreshed.expires_in ?? 3600;
   setAuth(ANTHROPIC_PROVIDER_KEY, {
     type: "oauth",
-    access,
+    access: access2,
     refresh: refreshed.refresh_token ?? record2.refresh,
     expires: Date.now() + expiresIn * 1e3
   });
-  return access;
+  return access2;
 }
 async function ensureFreshAccessToken() {
-  const record2 = getAuth(ANTHROPIC_PROVIDER_KEY);
+  const record2 = getAuth2(ANTHROPIC_PROVIDER_KEY);
   if (!record2 || record2.type !== "oauth") {
     throw new AnthropicAuthError("Anthropic OAuth credentials not found. Run /auth login claude in the TUI (or `pericode auth login claude`).");
   }
@@ -1974,8 +2127,8 @@ function modelSupportsThinking(model) {
 async function resolveAuth() {
   const oauthRecord = getAuth(ANTHROPIC_PROVIDER_KEY);
   if (oauthRecord && oauthRecord.type === "oauth") {
-    const access = await ensureFreshAccessToken();
-    return { mode: "oauth", access };
+    const access2 = await ensureFreshAccessToken();
+    return { mode: "oauth", access: access2 };
   }
   const apiKey = process.env.ANTHROPIC_API_KEY?.trim();
   if (apiKey) {
@@ -2010,7 +2163,7 @@ var init_anthropic = __esm({
   "../../dist/src/providers/anthropic.js"() {
     "use strict";
     init_scoped_fetch();
-    init_store();
+    init_pluginAuthStore();
     init_anthropic_oauth();
     init_base2();
     init_sse();
@@ -2511,7 +2664,7 @@ var init_openai = __esm({
 
 // ../../dist/src/auth/oauth-loopback.js
 function captureOAuthCallback(opts) {
-  return new Promise((resolve4, reject) => {
+  return new Promise((resolve5, reject) => {
     const servers = [];
     let settled = false;
     let port = opts.port;
@@ -2569,7 +2722,7 @@ function captureOAuthCallback(opts) {
         res.writeHead(200, { "Content-Type": "text/plain; charset=utf-8" }).end("Sign-in received. Return to PeriCode.");
         settled = true;
         cleanup();
-        resolve4({ code, redirectUri: `http://localhost:${port}/auth/callback` });
+        resolve5({ code, redirectUri: `http://localhost:${port}/auth/callback` });
       });
       servers.push(server);
       server.requestTimeout = 5e3;
@@ -2714,7 +2867,7 @@ async function refreshTokens(refresh) {
   }
   return await res.json();
 }
-function persist(tokens, prevAccountId) {
+function persist2(tokens, prevAccountId) {
   if (!tokens.access_token || !tokens.refresh_token) {
     throw new CodexAuthError(`Codex token response missing fields: ${JSON.stringify(tokens)}`);
   }
@@ -2746,12 +2899,12 @@ async function runBrowserFlow(opts = {}) {
   const tokens = await exchangeCode(callback.code, callback.redirectUri, verifier, opts.signal);
   if (opts.signal?.aborted)
     throw new CodexAuthError("OAuth sign-in cancelled.");
-  persist(tokens);
+  persist2(tokens);
   const accountId = extractAccountId(tokens);
   return { accountId, authorizeUrl: url };
 }
 async function ensureFreshCodexAccess() {
-  const record2 = getAuth(OPENAI_PROVIDER_KEY);
+  const record2 = getAuth2(OPENAI_PROVIDER_KEY);
   if (!record2 || record2.type !== "oauth") {
     throw new CodexAuthError("Codex OAuth credentials not found. Run /auth login codex in the TUI (or `pericode auth login codex`).");
   }
@@ -2759,8 +2912,8 @@ async function ensureFreshCodexAccess() {
     return { access: record2.access, accountId: record2.accountId };
   }
   const refreshed = await refreshTokens(record2.refresh);
-  persist(refreshed, record2.accountId);
-  const after = getAuth(OPENAI_PROVIDER_KEY);
+  persist2(refreshed, record2.accountId);
+  const after = getAuth2(OPENAI_PROVIDER_KEY);
   if (after && after.type === "oauth") {
     return { access: after.access, accountId: after.accountId };
   }
@@ -2889,11 +3042,11 @@ var init_codex = __esm({
     CodexProvider = class {
       name = "openai";
       async *streamChat(args) {
-        const { access, accountId } = await ensureFreshCodexAccess();
+        const { access: access2, accountId } = await ensureFreshCodexAccess();
         const input = buildInput(args.messages);
         const tools = toCodexTools(args.tools);
         const headers = {
-          Authorization: `Bearer ${access}`,
+          Authorization: `Bearer ${access2}`,
           "Content-Type": "application/json",
           Accept: "text/event-stream",
           "User-Agent": "pericode",
@@ -3139,7 +3292,7 @@ async function pollDeviceFlow(init, opts = {}) {
   throw new CopilotAuthError("device-flow polling timed out before login completed");
 }
 function storedCopilotToken() {
-  const record2 = getAuth(COPILOT_PROVIDER_KEY);
+  const record2 = getAuth2(COPILOT_PROVIDER_KEY);
   if (!record2 || record2.type !== "oauth") {
     throw new CopilotAuthError("Copilot OAuth credentials not found. Run /auth login copilot in the TUI (or `pericode auth login copilot`).");
   }
@@ -3208,10 +3361,10 @@ function configReadPath() {
   }).path;
 }
 function readConfigAt(path) {
-  if (!(0, import_node_fs2.existsSync)(path))
+  if (!existsSync(path))
     return {};
   try {
-    return JSON.parse(stripJsonBom((0, import_node_fs2.readFileSync)(path, "utf8")));
+    return JSON.parse(stripJsonBom(readFileSync(path, "utf8")));
   } catch {
     return {};
   }
@@ -3226,14 +3379,14 @@ function configLayerPaths(cwd = process.cwd()) {
   const paths = [];
   const managed = process.env[MANAGED_CONFIG_PATH_ENV];
   if (managed) {
-    paths.push({ scope: "managed", path: managed, exists: (0, import_node_fs2.existsSync)(managed) });
+    paths.push({ scope: "managed", path: managed, exists: existsSync(managed) });
   }
   const user = configReadPath();
-  paths.push({ scope: "user", path: user, exists: (0, import_node_fs2.existsSync)(user) });
-  const project = (0, import_node_path5.join)(cwd, PROJECT_CONFIG_DIR, PROJECT_CONFIG_FILE);
-  paths.push({ scope: "project", path: project, exists: (0, import_node_fs2.existsSync)(project) });
-  const local = (0, import_node_path5.join)(cwd, PROJECT_CONFIG_DIR, LOCAL_PROJECT_CONFIG_FILE);
-  paths.push({ scope: "local", path: local, exists: (0, import_node_fs2.existsSync)(local) });
+  paths.push({ scope: "user", path: user, exists: existsSync(user) });
+  const project = (0, import_node_path6.join)(cwd, PROJECT_CONFIG_DIR, PROJECT_CONFIG_FILE);
+  paths.push({ scope: "project", path: project, exists: existsSync(project) });
+  const local = (0, import_node_path6.join)(cwd, PROJECT_CONFIG_DIR, LOCAL_PROJECT_CONFIG_FILE);
+  paths.push({ scope: "local", path: local, exists: existsSync(local) });
   return paths;
 }
 function resolveConfig(opts = {}) {
@@ -3284,13 +3437,13 @@ function parseEnvInt(raw) {
   const parsed = Number.parseInt(raw, 10);
   return Number.isFinite(parsed) ? parsed : void 0;
 }
-var import_node_fs2, import_node_path5, CONFIG_PATH_ENV, MANAGED_CONFIG_PATH_ENV, PROJECT_CONFIG_DIR, PROJECT_CONFIG_FILE, LOCAL_PROJECT_CONFIG_FILE, DEFAULT_CONFIG;
+var import_node_path6, CONFIG_PATH_ENV, MANAGED_CONFIG_PATH_ENV, PROJECT_CONFIG_DIR, PROJECT_CONFIG_FILE, LOCAL_PROJECT_CONFIG_FILE, DEFAULT_CONFIG;
 var init_loader = __esm({
   "../../dist/src/config/loader.js"() {
     "use strict";
     init_scoped_fetch();
-    import_node_fs2 = require("node:fs");
-    import_node_path5 = require("node:path");
+    init_safeVaultFs();
+    import_node_path6 = require("node:path");
     init_paths();
     init_token_economy();
     init_agent_loop();
@@ -3589,79 +3742,6 @@ var init_system_prompt = __esm({
   }
 });
 
-// ../../dist/src/util/project-context.js
-function readOne(dir, name, ancestorDepth) {
-  const path = (0, import_node_path6.join)(dir, name);
-  if (!(0, import_node_fs3.existsSync)(path))
-    return null;
-  let stat;
-  try {
-    stat = (0, import_node_fs3.statSync)(path);
-  } catch {
-    return null;
-  }
-  if (!stat.isFile())
-    return null;
-  let raw;
-  try {
-    raw = (0, import_node_fs3.readFileSync)(path, "utf8");
-  } catch {
-    return null;
-  }
-  const truncated = raw.length > PROJECT_CONTEXT_MAX_BYTES;
-  const text2 = truncated ? raw.slice(0, PROJECT_CONTEXT_MAX_BYTES) : raw;
-  return { name, path, text: text2, truncated, ancestorDepth };
-}
-function readProjectContext(cwd) {
-  const seen = /* @__PURE__ */ new Map();
-  let dir = cwd;
-  const root = (0, import_node_path6.parse)(dir).root;
-  for (let depth = 0; depth <= PROJECT_CONTEXT_MAX_ANCESTORS; depth += 1) {
-    for (const name of PROJECT_CONTEXT_FILES) {
-      if (seen.has(name))
-        continue;
-      const file = readOne(dir, name, depth);
-      if (file)
-        seen.set(name, file);
-    }
-    if (dir === root)
-      break;
-    const parent = (0, import_node_path6.dirname)(dir);
-    if (parent === dir)
-      break;
-    dir = parent;
-  }
-  const files = [...seen.values()].sort((a, b2) => {
-    if (a.ancestorDepth !== b2.ancestorDepth) {
-      return a.ancestorDepth - b2.ancestorDepth;
-    }
-    return PROJECT_CONTEXT_FILES.indexOf(a.name) - PROJECT_CONTEXT_FILES.indexOf(b2.name);
-  });
-  if (files.length === 0)
-    return { files, text: "" };
-  const sections = files.map((f2) => {
-    const origin = f2.ancestorDepth === 0 ? "cwd" : `${f2.ancestorDepth} dir(s) up`;
-    const header = `### ${f2.name} (${origin})` + (f2.truncated ? " \u2014 truncated" : "");
-    return `${header}
-
-${f2.text.trim()}`;
-  });
-  const text2 = "Project instructions discovered in the working directory and its parents. Closer-to-cwd files appear first and override more general ancestor guidance when they conflict.\n\n" + sections.join("\n\n---\n\n");
-  return { files, text: text2 };
-}
-var import_node_fs3, import_node_path6, PROJECT_CONTEXT_FILES, PROJECT_CONTEXT_MAX_BYTES, PROJECT_CONTEXT_MAX_ANCESTORS;
-var init_project_context = __esm({
-  "../../dist/src/util/project-context.js"() {
-    "use strict";
-    init_scoped_fetch();
-    import_node_fs3 = require("node:fs");
-    import_node_path6 = require("node:path");
-    PROJECT_CONTEXT_FILES = ["CLAUDE.md", "AGENTS.md", "PERICODE.md"];
-    PROJECT_CONTEXT_MAX_BYTES = 64 * 1024;
-    PROJECT_CONTEXT_MAX_ANCESTORS = 6;
-  }
-});
-
 // ../../node_modules/zod/v4/core/core.js
 // @__NO_SIDE_EFFECTS__
 function $constructor(name, initializer3, params) {
@@ -3870,8 +3950,8 @@ function getElementAtPath(obj, path) {
 }
 function promiseAllObject(promisesObj) {
   const keys = Object.keys(promisesObj);
-  const promises = keys.map((key) => promisesObj[key]);
-  return Promise.all(promises).then((results) => {
+  const promises2 = keys.map((key) => promisesObj[key]);
+  return Promise.all(promises2).then((results) => {
     const resolvedObj = {};
     for (let i = 0; i < keys.length; i++) {
       resolvedObj[keys[i]] = results[i];
@@ -7071,13 +7151,13 @@ var init_errors2 = __esm({
 });
 
 // ../../node_modules/zod/v4/classic/parse.js
-var parse3, parseAsync2, safeParse3, safeParseAsync2;
+var parse2, parseAsync2, safeParse3, safeParseAsync2;
 var init_parse3 = __esm({
   "../../node_modules/zod/v4/classic/parse.js"() {
     init_scoped_fetch();
     init_core2();
     init_errors2();
-    parse3 = /* @__PURE__ */ _parse(ZodRealError);
+    parse2 = /* @__PURE__ */ _parse(ZodRealError);
     parseAsync2 = /* @__PURE__ */ _parseAsync(ZodRealError);
     safeParse3 = /* @__PURE__ */ _safeParse(ZodRealError);
     safeParseAsync2 = /* @__PURE__ */ _safeParseAsync(ZodRealError);
@@ -7308,7 +7388,7 @@ var init_schemas3 = __esm({
         reg.add(inst, meta);
         return inst;
       });
-      inst.parse = (data, params) => parse3(inst, data, params, { callee: inst.parse });
+      inst.parse = (data, params) => parse2(inst, data, params, { callee: inst.parse });
       inst.safeParse = (data, params) => safeParse3(inst, data, params);
       inst.parseAsync = async (data, params) => parseAsync2(inst, data, params, { callee: inst.parseAsync });
       inst.safeParseAsync = async (data, params) => safeParseAsync2(inst, data, params);
@@ -10232,7 +10312,7 @@ var init_protocol = __esm({
               return;
             }
             const pollInterval = task2.pollInterval ?? this._options?.defaultTaskPollInterval ?? 1e3;
-            await new Promise((resolve4) => setTimeout(resolve4, pollInterval));
+            await new Promise((resolve5) => setTimeout(resolve5, pollInterval));
             options?.signal?.throwIfAborted();
           }
         } catch (error2) {
@@ -10249,7 +10329,7 @@ var init_protocol = __esm({
        */
       request(request, resultSchema, options) {
         const { relatedRequestId, resumptionToken, onresumptiontoken, task, relatedTask } = options ?? {};
-        return new Promise((resolve4, reject) => {
+        return new Promise((resolve5, reject) => {
           const earlyReject = (error2) => {
             reject(error2);
           };
@@ -10327,7 +10407,7 @@ var init_protocol = __esm({
               if (!parseResult.success) {
                 reject(parseResult.error);
               } else {
-                resolve4(parseResult.data);
+                resolve5(parseResult.data);
               }
             } catch (error2) {
               reject(error2);
@@ -10588,12 +10668,12 @@ var init_protocol = __esm({
           }
         } catch {
         }
-        return new Promise((resolve4, reject) => {
+        return new Promise((resolve5, reject) => {
           if (signal.aborted) {
             reject(new McpError(ErrorCode.InvalidRequest, "Request cancelled"));
             return;
           }
-          const timeoutId = setTimeout(resolve4, interval);
+          const timeoutId = setTimeout(resolve5, interval);
           signal.addEventListener("abort", () => {
             clearTimeout(timeoutId);
             reject(new McpError(ErrorCode.InvalidRequest, "Request cancelled"));
@@ -12657,7 +12737,7 @@ var require_windows = __commonJS({
     init_scoped_fetch();
     module2.exports = isexe;
     isexe.sync = sync;
-    var fs11 = require("fs");
+    var fs = require("fs");
     function checkPathExt(path, options) {
       var pathext = options.pathExt !== void 0 ? options.pathExt : process.env.PATHEXT;
       if (!pathext) {
@@ -12675,19 +12755,19 @@ var require_windows = __commonJS({
       }
       return false;
     }
-    function checkStat(stat, path, options) {
-      if (!stat.isSymbolicLink() && !stat.isFile()) {
+    function checkStat(stat2, path, options) {
+      if (!stat2.isSymbolicLink() && !stat2.isFile()) {
         return false;
       }
       return checkPathExt(path, options);
     }
     function isexe(path, options, cb) {
-      fs11.stat(path, function(er, stat) {
-        cb(er, er ? false : checkStat(stat, path, options));
+      fs.stat(path, function(er, stat2) {
+        cb(er, er ? false : checkStat(stat2, path, options));
       });
     }
     function sync(path, options) {
-      return checkStat(fs11.statSync(path), path, options);
+      return checkStat(fs.statSync(path), path, options);
     }
   }
 });
@@ -12698,22 +12778,22 @@ var require_mode = __commonJS({
     init_scoped_fetch();
     module2.exports = isexe;
     isexe.sync = sync;
-    var fs11 = require("fs");
+    var fs = require("fs");
     function isexe(path, options, cb) {
-      fs11.stat(path, function(er, stat) {
-        cb(er, er ? false : checkStat(stat, options));
+      fs.stat(path, function(er, stat2) {
+        cb(er, er ? false : checkStat(stat2, options));
       });
     }
     function sync(path, options) {
-      return checkStat(fs11.statSync(path), options);
+      return checkStat(fs.statSync(path), options);
     }
-    function checkStat(stat, options) {
-      return stat.isFile() && checkMode(stat, options);
+    function checkStat(stat2, options) {
+      return stat2.isFile() && checkMode(stat2, options);
     }
-    function checkMode(stat, options) {
-      var mod = stat.mode;
-      var uid = stat.uid;
-      var gid = stat.gid;
+    function checkMode(stat2, options) {
+      var mod = stat2.mode;
+      var uid = stat2.uid;
+      var gid = stat2.gid;
       var myUid = options.uid !== void 0 ? options.uid : process.getuid && process.getuid();
       var myGid = options.gid !== void 0 ? options.gid : process.getgid && process.getgid();
       var u3 = parseInt("100", 8);
@@ -12730,7 +12810,7 @@ var require_mode = __commonJS({
 var require_isexe = __commonJS({
   "../../node_modules/isexe/index.js"(exports2, module2) {
     init_scoped_fetch();
-    var fs11 = require("fs");
+    var fs = require("fs");
     var core;
     if (process.platform === "win32" || global.TESTING_WINDOWS) {
       core = require_windows();
@@ -12748,12 +12828,12 @@ var require_isexe = __commonJS({
         if (typeof Promise !== "function") {
           throw new TypeError("callback not provided");
         }
-        return new Promise(function(resolve4, reject) {
+        return new Promise(function(resolve5, reject) {
           isexe(path, options || {}, function(er, is) {
             if (er) {
               reject(er);
             } else {
-              resolve4(is);
+              resolve5(is);
             }
           });
         });
@@ -12820,27 +12900,27 @@ var require_which = __commonJS({
         opt = {};
       const { pathEnv, pathExt, pathExtExe } = getPathInfo(cmd, opt);
       const found = [];
-      const step = (i) => new Promise((resolve4, reject) => {
+      const step = (i) => new Promise((resolve5, reject) => {
         if (i === pathEnv.length)
-          return opt.all && found.length ? resolve4(found) : reject(getNotFoundError(cmd));
+          return opt.all && found.length ? resolve5(found) : reject(getNotFoundError(cmd));
         const ppRaw = pathEnv[i];
         const pathPart = /^".*"$/.test(ppRaw) ? ppRaw.slice(1, -1) : ppRaw;
         const pCmd = path.join(pathPart, cmd);
         const p = !pathPart && /^\.[\\\/]/.test(cmd) ? cmd.slice(0, 2) + pCmd : pCmd;
-        resolve4(subStep(p, i, 0));
+        resolve5(subStep(p, i, 0));
       });
-      const subStep = (p, i, ii) => new Promise((resolve4, reject) => {
+      const subStep = (p, i, ii) => new Promise((resolve5, reject) => {
         if (ii === pathExt.length)
-          return resolve4(step(i + 1));
+          return resolve5(step(i + 1));
         const ext = pathExt[ii];
         isexe(p + ext, { pathExt: pathExtExe }, (er, is) => {
           if (!er && is) {
             if (opt.all)
               found.push(p + ext);
             else
-              return resolve4(p + ext);
+              return resolve5(p + ext);
           }
-          return resolve4(subStep(p, i, ii + 1));
+          return resolve5(subStep(p, i, ii + 1));
         });
       });
       return cb ? step(0).then((res) => cb(null, res), cb) : step(0);
@@ -13001,16 +13081,16 @@ var require_readShebang = __commonJS({
   "../../node_modules/cross-spawn/lib/util/readShebang.js"(exports2, module2) {
     "use strict";
     init_scoped_fetch();
-    var fs11 = require("fs");
+    var fs = require("fs");
     var shebangCommand = require_shebang_command();
     function readShebang(command) {
       const size = 150;
       const buffer = Buffer.alloc(size);
       let fd;
       try {
-        fd = fs11.openSync(command, "r");
-        fs11.readSync(fd, buffer, 0, size, 0);
-        fs11.closeSync(fd);
+        fd = fs.openSync(command, "r");
+        fs.readSync(fd, buffer, 0, size, 0);
+        fs.closeSync(fd);
       } catch (e) {
       }
       return shebangCommand(buffer.toString());
@@ -13059,7 +13139,7 @@ var require_parse = __commonJS({
       }
       return parsed;
     }
-    function parse4(command, args, options) {
+    function parse3(command, args, options) {
       if (args && !Array.isArray(args)) {
         options = args;
         args = null;
@@ -13078,7 +13158,7 @@ var require_parse = __commonJS({
       };
       return options.shell ? parsed : parseNonShell(parsed);
     }
-    module2.exports = parse4;
+    module2.exports = parse3;
   }
 });
 
@@ -13139,24 +13219,24 @@ var require_cross_spawn = __commonJS({
     "use strict";
     init_scoped_fetch();
     var cp = require("child_process");
-    var parse4 = require_parse();
+    var parse3 = require_parse();
     var enoent = require_enoent();
-    function spawn5(command, args, options) {
-      const parsed = parse4(command, args, options);
+    function spawn3(command, args, options) {
+      const parsed = parse3(command, args, options);
       const spawned = cp.spawn(parsed.command, parsed.args, parsed.options);
       enoent.hookChildProcess(spawned, parsed);
       return spawned;
     }
     function spawnSync(command, args, options) {
-      const parsed = parse4(command, args, options);
+      const parsed = parse3(command, args, options);
       const result = cp.spawnSync(parsed.command, parsed.args, parsed.options);
       result.error = result.error || enoent.verifyENOENTSync(result.status, parsed);
       return result;
     }
-    module2.exports = spawn5;
-    module2.exports.spawn = spawn5;
+    module2.exports = spawn3;
+    module2.exports.spawn = spawn3;
     module2.exports.sync = spawnSync;
-    module2.exports._parse = parse4;
+    module2.exports._parse = parse3;
     module2.exports._enoent = enoent;
   }
 });
@@ -13252,7 +13332,7 @@ var init_stdio2 = __esm({
         if (this._process) {
           throw new Error("StdioClientTransport already started! If using Client class, note that connect() calls start() automatically.");
         }
-        return new Promise((resolve4, reject) => {
+        return new Promise((resolve5, reject) => {
           this._process = (0, import_cross_spawn.default)(this._serverParams.command, this._serverParams.args ?? [], {
             // merge default env with server env because mcp server needs some env vars
             env: {
@@ -13269,7 +13349,7 @@ var init_stdio2 = __esm({
             this.onerror?.(error2);
           });
           this._process.on("spawn", () => {
-            resolve4();
+            resolve5();
           });
           this._process.on("close", (_code) => {
             this._process = void 0;
@@ -13328,22 +13408,22 @@ var init_stdio2 = __esm({
         if (this._process) {
           const processToClose = this._process;
           this._process = void 0;
-          const closePromise = new Promise((resolve4) => {
+          const closePromise = new Promise((resolve5) => {
             processToClose.once("close", () => {
-              resolve4();
+              resolve5();
             });
           });
           try {
             processToClose.stdin?.end();
           } catch {
           }
-          await Promise.race([closePromise, new Promise((resolve4) => setTimeout(resolve4, 2e3).unref())]);
+          await Promise.race([closePromise, new Promise((resolve5) => setTimeout(resolve5, 2e3).unref())]);
           if (processToClose.exitCode === null) {
             try {
               processToClose.kill("SIGTERM");
             } catch {
             }
-            await Promise.race([closePromise, new Promise((resolve4) => setTimeout(resolve4, 2e3).unref())]);
+            await Promise.race([closePromise, new Promise((resolve5) => setTimeout(resolve5, 2e3).unref())]);
           }
           if (processToClose.exitCode === null) {
             try {
@@ -13355,15 +13435,15 @@ var init_stdio2 = __esm({
         this._readBuffer.clear();
       }
       send(message) {
-        return new Promise((resolve4) => {
+        return new Promise((resolve5) => {
           if (!this._process?.stdin) {
             throw new Error("Not connected");
           }
           const json = serializeMessage(message);
           if (this._process.stdin.write(json)) {
-            resolve4();
+            resolve5();
           } else {
-            this._process.stdin.once("drain", resolve4);
+            this._process.stdin.once("drain", resolve5);
           }
         });
       }
@@ -13421,29 +13501,29 @@ function resolveConsoleScript(pythonPath, moduleName, envOverrides) {
   const scriptsDir = (0, import_node_path7.dirname)(pythonPath);
   for (const c of candidates) {
     const p = (0, import_node_path7.join)(scriptsDir, c);
-    if ((0, import_node_fs4.existsSync)(p))
+    if (existsSync(p))
       return p;
   }
   const merged = { ...process.env, ...envOverrides ?? {} };
   const pathStr = merged.PATH ?? merged.Path ?? "";
-  const sep2 = process.platform === "win32" ? ";" : ":";
-  for (const dir of pathStr.split(sep2)) {
+  const sep3 = process.platform === "win32" ? ";" : ":";
+  for (const dir of pathStr.split(sep3)) {
     if (!dir)
       continue;
     for (const c of candidates) {
       const p = (0, import_node_path7.join)(dir, c);
-      if ((0, import_node_fs4.existsSync)(p))
+      if (existsSync(p))
         return p;
     }
   }
   return void 0;
 }
-var import_node_fs4, import_node_path7, READ_ONLY_PREFIXES, READ_ONLY_SUFFIXES, READ_ONLY_EXACT, MUTATING_PREFIXES, McpClient, PYTHON_BASENAMES;
+var import_node_path7, READ_ONLY_PREFIXES, READ_ONLY_SUFFIXES, READ_ONLY_EXACT, MUTATING_PREFIXES, McpClient, PYTHON_BASENAMES;
 var init_client3 = __esm({
   "../../dist/src/mcp/client.js"() {
     "use strict";
     init_scoped_fetch();
-    import_node_fs4 = require("node:fs");
+    init_safeVaultFs();
     import_node_path7 = require("node:path");
     init_client2();
     init_stdio2();
@@ -13759,19 +13839,19 @@ async function fetchJson(url, init, timeoutMs = 1e4) {
 }
 async function discoverAnthropic() {
   const record2 = getAuth(ANTHROPIC_PROVIDER_KEY);
-  let access = null;
+  let access2 = null;
   let isOAuth = false;
   if (record2?.type === "oauth") {
     try {
-      access = await ensureFreshAccessToken();
+      access2 = await ensureFreshAccessToken();
     } catch (e) {
       return { models: null, error: `OAuth refresh failed: ${errMsg(e)}` };
     }
     isOAuth = true;
   } else if (process.env.ANTHROPIC_API_KEY) {
-    access = process.env.ANTHROPIC_API_KEY;
+    access2 = process.env.ANTHROPIC_API_KEY;
   }
-  if (!access) {
+  if (!access2) {
     return {
       models: null,
       error: "not logged in (run /auth login claude or set ANTHROPIC_API_KEY)"
@@ -13781,10 +13861,10 @@ async function discoverAnthropic() {
     "anthropic-version": ANTHROPIC_VERSION_HEADER
   };
   if (isOAuth) {
-    headers["Authorization"] = `Bearer ${access}`;
+    headers["Authorization"] = `Bearer ${access2}`;
     headers["anthropic-beta"] = ANTHROPIC_BETA_HEADER;
   } else {
-    headers["x-api-key"] = access;
+    headers["x-api-key"] = access2;
   }
   const out = await fetchJson("https://api.anthropic.com/v1/models?limit=100", { headers });
   if (!out.data)
@@ -13914,8 +13994,8 @@ async function discoverOllama() {
   return await discoverOllamaTags(host, headers);
 }
 async function discoverCodex() {
-  const { access, accountId } = await ensureFreshCodexAccess();
-  const headers = { Authorization: `Bearer ${access}`, originator: ORIGINATOR, "User-Agent": "pericode" };
+  const { access: access2, accountId } = await ensureFreshCodexAccess();
+  const headers = { Authorization: `Bearer ${access2}`, originator: ORIGINATOR, "User-Agent": "pericode" };
   if (accountId)
     headers["ChatGPT-Account-Id"] = accountId;
   const out = await fetchJson(CODEX_API_ENDPOINT.replace(/\/responses$/, "/models?client_version=0.153.4"), { headers });
@@ -13987,7 +14067,7 @@ var init_discover = __esm({
   "../../dist/src/models/discover.js"() {
     "use strict";
     init_scoped_fetch();
-    init_store();
+    init_pluginAuthStore();
     init_anthropic_oauth();
     init_copilot_oauth();
     init_loader();
@@ -14013,15 +14093,31 @@ var init_sdk_entry = __esm({
     init_gate();
     init_providers();
     init_system_prompt();
-    init_project_context();
     init_client3();
-    init_store();
+    init_pluginAuthStore();
     init_anthropic_oauth();
     init_copilot_oauth();
     init_openai_codex_oauth();
     init_discover();
     init_catalog();
     init_openai();
+  }
+});
+
+// src/pathExists.ts
+async function pathExists(path) {
+  try {
+    await access(path);
+    return true;
+  } catch {
+    return false;
+  }
+}
+var init_pathExists = __esm({
+  "src/pathExists.ts"() {
+    "use strict";
+    init_scoped_fetch();
+    init_safeVaultFs();
   }
 });
 
@@ -14140,12 +14236,12 @@ function describeMode(mode) {
       };
   }
 }
-async function readPolicy(vaultPath) {
-  if (!vaultPath) return defaultPolicy();
-  const path = POLICY_PATH(vaultPath);
-  if (!(0, import_node_fs5.existsSync)(path)) return defaultPolicy();
+async function readPolicy(vaultPath2) {
+  if (!vaultPath2) return defaultPolicy();
+  const path = POLICY_PATH(vaultPath2);
+  if (!await pathExists(path)) return defaultPolicy();
   try {
-    const raw = await import_node_fs5.promises.readFile(path, "utf8");
+    const raw = await promises.readFile(path, "utf8");
     if (!raw.trim()) throw new Error("Empty security policy.");
     const parsed = JSON.parse(raw);
     const policy = { ...defaultPolicy(), ...parsed };
@@ -14157,16 +14253,16 @@ async function readPolicy(vaultPath) {
     throw new Error("Cannot load security policy. Tools remain disabled until it is repaired.");
   }
 }
-async function writePolicy(vaultPath, policy) {
-  const path = POLICY_PATH(vaultPath);
-  await import_node_fs5.promises.mkdir((0, import_node_path8.join)(vaultPath, ".pericode"), { recursive: true });
-  await import_node_fs5.promises.writeFile(path, JSON.stringify(policy, null, 2) + "\n", "utf8");
+async function writePolicy(vaultPath2, policy) {
+  const path = POLICY_PATH(vaultPath2);
+  await promises.mkdir((0, import_node_path8.join)(vaultPath2, ".pericode"), { recursive: true });
+  await promises.writeFile(path, JSON.stringify(policy, null, 2) + "\n", "utf8");
 }
-async function ensurePolicy(vaultPath) {
-  if (!vaultPath) return;
-  const path = POLICY_PATH(vaultPath);
-  if ((0, import_node_fs5.existsSync)(path)) return;
-  await writePolicy(vaultPath, defaultPolicy());
+async function ensurePolicy(vaultPath2) {
+  if (!vaultPath2) return;
+  const path = POLICY_PATH(vaultPath2);
+  if (await pathExists(path)) return;
+  await writePolicy(vaultPath2, defaultPolicy());
 }
 function classifyRisk(toolName, isReadOnly) {
   const name = toolName.toLowerCase();
@@ -14325,8 +14421,8 @@ function decideGate(toolName, isReadOnly, source, policy, args = {}) {
   }
   if (toolName.startsWith("mcp__") && policy.approvedMcps.length > 0) {
     const rest = toolName.slice("mcp__".length);
-    const sep2 = rest.indexOf("__");
-    const serverName = sep2 > 0 ? rest.slice(0, sep2) : rest;
+    const sep3 = rest.indexOf("__");
+    const serverName = sep3 > 0 ? rest.slice(0, sep3) : rest;
     if (!policy.approvedMcps.includes(serverName)) {
       return {
         kind: "block",
@@ -14454,8 +14550,8 @@ async function fetchAdminPolicy(url) {
       };
     }
     const json = await response.json();
-    const document2 = validateAdminDocument(json);
-    if (!document2) {
+    const document = validateAdminDocument(json);
+    if (!document) {
       return {
         document: emptyDocument(sourceUrl),
         fetched_at: (/* @__PURE__ */ new Date()).toISOString(),
@@ -14464,17 +14560,17 @@ async function fetchAdminPolicy(url) {
         last_error: "Admin policy JSON is malformed or missing required fields (version, issuer, managed_fields, policy)."
       };
     }
-    if (document2.expires_at && document2.expires_at < (/* @__PURE__ */ new Date()).toISOString()) {
+    if (document.expires_at && document.expires_at < (/* @__PURE__ */ new Date()).toISOString()) {
       return {
-        document: document2,
+        document,
         fetched_at: (/* @__PURE__ */ new Date()).toISOString(),
         source_url: sourceUrl,
         is_fresh: false,
-        last_error: `Admin policy expired at ${document2.expires_at}; falling back to cache.`
+        last_error: `Admin policy expired at ${document.expires_at}; falling back to cache.`
       };
     }
     return {
-      document: document2,
+      document,
       fetched_at: (/* @__PURE__ */ new Date()).toISOString(),
       source_url: sourceUrl,
       is_fresh: true,
@@ -14536,14 +14632,15 @@ function isFieldManagedByOrg(policy, field) {
   if (!snap || !snap.is_fresh) return false;
   return snap.document.managed_fields.includes(field);
 }
-var import_node_fs5, import_node_path8, POLICY_PATH, HIGH_RISK_TOOL_PREFIXES, HIGH_RISK_TOOL_NAMES, MEDIUM_RISK_TOOL_PREFIXES, JAILBREAK_PATTERNS, HIDDEN_UNICODE_PATTERN, SHELL_LANGUAGE_PATTERNS, EMAIL_RE, PHONE_RE, SSN_RE, CARD_RE, _quarantine, _quarantineListeners, ADMIN_MANAGEABLE_FIELDS;
+var import_node_path8, POLICY_PATH, HIGH_RISK_TOOL_PREFIXES, HIGH_RISK_TOOL_NAMES, MEDIUM_RISK_TOOL_PREFIXES, JAILBREAK_PATTERNS, HIDDEN_UNICODE_PATTERN, SHELL_LANGUAGE_PATTERNS, EMAIL_RE, PHONE_RE, SSN_RE, CARD_RE, _quarantine, _quarantineListeners, ADMIN_MANAGEABLE_FIELDS;
 var init_pericodeSecurity = __esm({
   "src/pericodeSecurity.ts"() {
     "use strict";
     init_scoped_fetch();
-    import_node_fs5 = require("node:fs");
+    init_safeVaultFs();
+    init_pathExists();
     import_node_path8 = require("node:path");
-    POLICY_PATH = (vaultPath) => (0, import_node_path8.join)(vaultPath, ".pericode", "policy.json");
+    POLICY_PATH = (vaultPath2) => (0, import_node_path8.join)(vaultPath2, ".pericode", "policy.json");
     HIGH_RISK_TOOL_PREFIXES = [
       "delete_",
       "drop_",
@@ -14659,18 +14756,18 @@ __export(pericodeMcp_exports, {
   revokeMcpEntry: () => revokeMcpEntry,
   writeMcpConfig: () => writeMcpConfig
 });
-function configPath(vaultPath) {
-  return (0, import_node_path13.join)(vaultPath, ".pericode", "mcp.json");
+function configPath(vaultPath2) {
+  return (0, import_node_path13.join)(vaultPath2, ".pericode", "mcp.json");
 }
-function pluginMcpConfigPath(vaultPath) {
-  return configPath(vaultPath);
+function pluginMcpConfigPath(vaultPath2) {
+  return configPath(vaultPath2);
 }
-async function readMcpConfig(vaultPath) {
-  const path = configPath(vaultPath);
-  if (!(0, import_node_fs9.existsSync)(path)) return [];
+async function readMcpConfig(vaultPath2) {
+  const path = configPath(vaultPath2);
+  if (!await pathExists(path)) return [];
   let raw;
   try {
-    raw = await import_node_fs9.promises.readFile(path, "utf8");
+    raw = await promises.readFile(path, "utf8");
   } catch {
     return [];
   }
@@ -14683,13 +14780,13 @@ async function readMcpConfig(vaultPath) {
     return [];
   }
 }
-async function writeMcpConfig(vaultPath, servers) {
-  const path = configPath(vaultPath);
-  await import_node_fs9.promises.mkdir((0, import_node_path13.join)(vaultPath, ".pericode"), { recursive: true });
+async function writeMcpConfig(vaultPath2, servers) {
+  const path = configPath(vaultPath2);
+  await promises.mkdir((0, import_node_path13.join)(vaultPath2, ".pericode"), { recursive: true });
   let existing = {};
-  if ((0, import_node_fs9.existsSync)(path)) {
+  if (await pathExists(path)) {
     try {
-      const raw = await import_node_fs9.promises.readFile(path, "utf8");
+      const raw = await promises.readFile(path, "utf8");
       existing = JSON.parse(raw);
     } catch {
     }
@@ -14698,7 +14795,7 @@ async function writeMcpConfig(vaultPath, servers) {
     _hint: existing._hint ?? "Add MCP servers to `servers`. Each entry: { name, transport: 'stdio', command, args?, env? }. Each server requires approval in Settings for the current plugin session. See https://github.com/modelcontextprotocol/servers for the official catalog.",
     servers
   };
-  await import_node_fs9.promises.writeFile(path, JSON.stringify(next, null, 2) + "\n", "utf8");
+  await promises.writeFile(path, JSON.stringify(next, null, 2) + "\n", "utf8");
 }
 function mcpEntryHash(server) {
   const env = Object.entries(server.env ?? {}).sort(([a], [b2]) => a.localeCompare(b2));
@@ -14711,23 +14808,23 @@ function mcpEntryHash(server) {
     env
   })).digest("hex");
 }
-async function approveMcpEntry(vaultPath, hash) {
+async function approveMcpEntry(vaultPath2, hash) {
   if (!/^[a-f0-9]{64}$/.test(hash)) throw new Error("Invalid MCP approval.");
-  const key = approvalKey(vaultPath);
+  const key = approvalKey(vaultPath2);
   const approved = sessionApprovals.get(key) ?? /* @__PURE__ */ new Set();
   approved.add(hash);
   sessionApprovals.set(key, approved);
 }
-async function revokeMcpEntry(vaultPath, hash) {
-  sessionApprovals.get(approvalKey(vaultPath))?.delete(hash);
+async function revokeMcpEntry(vaultPath2, hash) {
+  sessionApprovals.get(approvalKey(vaultPath2))?.delete(hash);
 }
-function clearMcpApprovals(vaultPath) {
-  sessionApprovals.delete(approvalKey(vaultPath));
+function clearMcpApprovals(vaultPath2) {
+  sessionApprovals.delete(approvalKey(vaultPath2));
 }
-async function ensureMcpConfig(vaultPath) {
-  if (!vaultPath) return;
-  const path = configPath(vaultPath);
-  if ((0, import_node_fs9.existsSync)(path)) return;
+async function ensureMcpConfig(vaultPath2) {
+  if (!vaultPath2) return;
+  const path = configPath(vaultPath2);
+  if (await pathExists(path)) return;
   const stub = JSON.stringify(
     {
       _hint: "Add MCP servers to `servers`. Each entry: { name, transport: 'stdio', command, args?, env? }. Each server requires approval in Settings for the current plugin session. Example servers: GitHub, Jira, Gmail, Slack. See https://modelcontextprotocol.io for available servers.",
@@ -14737,18 +14834,19 @@ async function ensureMcpConfig(vaultPath) {
     2
   );
   try {
-    await import_node_fs9.promises.mkdir((0, import_node_path13.join)(vaultPath, ".pericode"), { recursive: true });
-    await import_node_fs9.promises.writeFile(path, stub, "utf8");
+    await promises.mkdir((0, import_node_path13.join)(vaultPath2, ".pericode"), { recursive: true });
+    await promises.writeFile(path, stub, "utf8");
   } catch {
   }
 }
-var import_node_crypto6, import_node_fs9, import_node_path13, sessionApprovals, approvalKey, PluginMcpManager;
+var import_node_crypto6, import_node_path13, sessionApprovals, approvalKey, PluginMcpManager;
 var init_pericodeMcp = __esm({
   "src/pericodeMcp.ts"() {
     "use strict";
     init_scoped_fetch();
     import_node_crypto6 = require("node:crypto");
-    import_node_fs9 = require("node:fs");
+    init_safeVaultFs();
+    init_pathExists();
     import_node_path13 = require("node:path");
     init_sdk_entry();
     sessionApprovals = /* @__PURE__ */ new Map();
@@ -14775,13 +14873,13 @@ var init_pericodeMcp = __esm({
        * given registry. Returns a status summary the caller can show.
        * If no config or zero servers, returns a no-op summary.
        */
-      async start(vaultPath, registry2) {
-        if (!vaultPath) return { connected: [], failed: [] };
+      async start(vaultPath2, registry2) {
+        if (!vaultPath2) return { connected: [], failed: [] };
         this.pendingApproval = [];
         this.lastFailures = [];
-        let servers = await readMcpConfig(vaultPath);
+        let servers = await readMcpConfig(vaultPath2);
         if (servers.length === 0) return { connected: [], failed: [] };
-        const approvedSet = sessionApprovals.get(approvalKey(vaultPath)) ?? /* @__PURE__ */ new Set();
+        const approvedSet = sessionApprovals.get(approvalKey(vaultPath2)) ?? /* @__PURE__ */ new Set();
         const pendingBefore = [];
         const allowedToSpawn = [];
         for (const s of servers) {
@@ -14811,7 +14909,7 @@ var init_pericodeMcp = __esm({
         }
         try {
           const { readPolicy: readPolicy3 } = await Promise.resolve().then(() => (init_pericodeSecurity(), pericodeSecurity_exports));
-          const policy = await readPolicy3(vaultPath);
+          const policy = await readPolicy3(vaultPath2);
           if (policy.dryRun) {
             this.lastFailures = servers.map((s) => ({ name: s.name, error: "Dry-run policy: MCP startup is disabled." }));
             return { connected: [], failed: this.lastFailures };
@@ -14891,9 +14989,9 @@ var init_pericodeMcp = __esm({
         };
       }
       /** Stop and re-start. Used by settings UI after the operator edits the server list. */
-      async restart(vaultPath, registry2) {
+      async restart(vaultPath2, registry2) {
         await this.stop(registry2);
-        return this.start(vaultPath, registry2);
+        return this.start(vaultPath2, registry2);
       }
     };
   }
@@ -14904,29 +15002,29 @@ var vaultScaffold_exports = {};
 __export(vaultScaffold_exports, {
   scaffoldVault: () => scaffoldVault
 });
-async function scaffoldVault(vaultPath) {
+async function scaffoldVault(vaultPath2) {
   const created = [];
   const skipped = [];
   for (const rel of PIPELINE_DIRS) {
-    const abs = (0, import_node_path15.join)(vaultPath, rel);
-    if ((0, import_node_fs12.existsSync)(abs)) {
+    const abs = (0, import_node_path15.join)(vaultPath2, rel);
+    if (await pathExists(abs)) {
       skipped.push(`${rel}/`);
       continue;
     }
-    await import_node_fs11.promises.mkdir(abs, { recursive: true });
+    await promises.mkdir(abs, { recursive: true });
     created.push(`${rel}/`);
   }
   for (const seed of SEED_FILES) {
-    const abs = (0, import_node_path15.join)(vaultPath, seed.path);
-    if ((0, import_node_fs12.existsSync)(abs)) {
+    const abs = (0, import_node_path15.join)(vaultPath2, seed.path);
+    if (await pathExists(abs)) {
       skipped.push(seed.path);
       continue;
     }
-    await import_node_fs11.promises.mkdir((0, import_node_path15.dirname)(abs), { recursive: true });
-    await import_node_fs11.promises.writeFile(abs, seed.content, "utf8");
+    await promises.mkdir((0, import_node_path15.dirname)(abs), { recursive: true });
+    await promises.writeFile(abs, seed.content, "utf8");
     created.push(seed.path);
   }
-  return { created, skipped, vaultPath };
+  return { created, skipped, vaultPath: vaultPath2 };
 }
 function SEED_MASTER_INDEX() {
   return `# Knowledge Base Index
@@ -15022,13 +15120,13 @@ internal docs. Pointers only \u2014 never duplicate the contents here.
 <!-- pericode:append:references -->
 `;
 }
-var import_node_fs11, import_node_fs12, import_node_path15, PIPELINE_DIRS, SEED_FILES;
+var import_node_path15, PIPELINE_DIRS, SEED_FILES;
 var init_vaultScaffold = __esm({
   "src/vaultScaffold.ts"() {
     "use strict";
     init_scoped_fetch();
-    import_node_fs11 = require("node:fs");
-    import_node_fs12 = require("node:fs");
+    init_safeVaultFs();
+    init_pathExists();
     import_node_path15 = require("node:path");
     PIPELINE_DIRS = [
       "raw",
@@ -15064,13 +15162,13 @@ __export(obsidianHostBridge_exports, {
   readObsidianConfigSnapshot: () => readObsidianConfigSnapshot,
   seedPericodeTemplates: () => seedPericodeTemplates
 });
-async function readDailyNotesConfig(vaultPath) {
-  const path = (0, import_node_path19.join)(vaultPath, ".obsidian", "daily-notes.json");
-  if (!(0, import_node_fs15.existsSync)(path)) {
+async function readDailyNotesConfig(vaultPath2) {
+  const path = (0, import_node_path19.join)(vaultPath2, ".obsidian", "daily-notes.json");
+  if (!await pathExists(path)) {
     return { folder: "", format: DEFAULT_DAILY_FORMAT, template: "", configured: false };
   }
   try {
-    const raw = await import_node_fs15.promises.readFile(path, "utf8");
+    const raw = await promises.readFile(path, "utf8");
     const parsed = JSON.parse(raw);
     return {
       folder: (parsed.folder ?? "").replace(/^\/+|\/+$/g, ""),
@@ -15099,35 +15197,35 @@ function formatToday(format, now = /* @__PURE__ */ new Date()) {
   ][now.getDay()];
   return format.replace(/YYYY/g, String(yyyy)).replace(/YY/g, String(yyyy).slice(-2)).replace(/MM/g, pad(m2)).replace(/M/g, String(m2)).replace(/DD/g, pad(d)).replace(/D(?!d)/g, String(d)).replace(/dddd/g, dayLong).replace(/ddd/g, dayShort);
 }
-async function appendDailyNoteEntry(vaultPath, message) {
-  if (!vaultPath || !message.trim()) return null;
-  const cfg = await readDailyNotesConfig(vaultPath);
+async function appendDailyNoteEntry(vaultPath2, message) {
+  if (!vaultPath2 || !message.trim()) return null;
+  const cfg = await readDailyNotesConfig(vaultPath2);
   if (!cfg.configured) return null;
   const todayName = formatToday(cfg.format) + ".md";
-  const folderAbs = cfg.folder ? (0, import_node_path19.join)(vaultPath, cfg.folder) : vaultPath;
+  const folderAbs = cfg.folder ? (0, import_node_path19.join)(vaultPath2, cfg.folder) : vaultPath2;
   const filePath = (0, import_node_path19.join)(folderAbs, todayName);
-  await import_node_fs15.promises.mkdir(folderAbs, { recursive: true });
+  await promises.mkdir(folderAbs, { recursive: true });
   const now = /* @__PURE__ */ new Date();
   const hh = String(now.getHours()).padStart(2, "0");
   const mm = String(now.getMinutes()).padStart(2, "0");
   const line = `- ${hh}:${mm} ${message.trim()}`;
   const heading = "## PeriCode log";
-  if (!(0, import_node_fs15.existsSync)(filePath)) {
+  if (!await pathExists(filePath)) {
     const initial = `# ${formatToday(cfg.format)}
 
 ${heading}
 
 ${line}
 `;
-    await import_node_fs15.promises.appendFile(filePath, initial, "utf8");
+    await promises.appendFile(filePath, initial, "utf8");
     return filePath;
   }
-  const existing = await import_node_fs15.promises.readFile(filePath, "utf8").catch(() => "");
+  const existing = await promises.readFile(filePath, "utf8").catch(() => "");
   if (existing.includes(heading)) {
-    await import_node_fs15.promises.appendFile(filePath, `${line}
+    await promises.appendFile(filePath, `${line}
 `, "utf8");
   } else {
-    await import_node_fs15.promises.appendFile(filePath, `
+    await promises.appendFile(filePath, `
 ${heading}
 
 ${line}
@@ -15135,30 +15233,30 @@ ${line}
   }
   return filePath;
 }
-async function seedPericodeTemplates(vaultPath) {
+async function seedPericodeTemplates(vaultPath2) {
   const result = { written: [], skipped: [] };
-  if (!vaultPath) return result;
-  const dir = (0, import_node_path19.join)(vaultPath, "templates", "PeriCode");
-  await import_node_fs15.promises.mkdir(dir, { recursive: true });
+  if (!vaultPath2) return result;
+  const dir = (0, import_node_path19.join)(vaultPath2, "templates", "PeriCode");
+  await promises.mkdir(dir, { recursive: true });
   for (const [name, body] of Object.entries(TEMPLATES)) {
     const filePath = (0, import_node_path19.join)(dir, name);
-    if ((0, import_node_fs15.existsSync)(filePath)) {
+    if (await pathExists(filePath)) {
       result.skipped.push(filePath);
       continue;
     }
-    await import_node_fs15.promises.writeFile(filePath, body, "utf8");
+    await promises.writeFile(filePath, body, "utf8");
     result.written.push(filePath);
   }
   return result;
 }
-async function readObsidianConfigSnapshot(vaultPath) {
-  const dir = (0, import_node_path19.join)(vaultPath, ".obsidian");
+async function readObsidianConfigSnapshot(vaultPath2) {
+  const dir = (0, import_node_path19.join)(vaultPath2, ".obsidian");
   const [enabledCommunityPlugins, installedThemes, cssSnippets, customHotkeys, dailyNotes] = await Promise.all([
     readJson((0, import_node_path19.join)(dir, "community-plugins.json"), []),
     listDir((0, import_node_path19.join)(dir, "themes")),
     listDir((0, import_node_path19.join)(dir, "snippets")),
     readJson((0, import_node_path19.join)(dir, "hotkeys.json"), {}),
-    readDailyNotesConfig(vaultPath)
+    readDailyNotesConfig(vaultPath2)
   ]);
   return {
     enabledCommunityPlugins,
@@ -15169,30 +15267,31 @@ async function readObsidianConfigSnapshot(vaultPath) {
   };
 }
 async function readJson(path, fallback) {
-  if (!(0, import_node_fs15.existsSync)(path)) return fallback;
+  if (!await pathExists(path)) return fallback;
   try {
-    const raw = await import_node_fs15.promises.readFile(path, "utf8");
+    const raw = await promises.readFile(path, "utf8");
     return JSON.parse(raw);
   } catch {
     return fallback;
   }
 }
 async function listDir(path) {
-  if (!(0, import_node_fs15.existsSync)(path)) return [];
+  if (!await pathExists(path)) return [];
   try {
-    const entries = await import_node_fs15.promises.readdir(path);
+    const entries = await promises.readdir(path);
     return entries.sort();
   } catch {
     return [];
   }
 }
-var import_node_fs15, import_node_path19, DEFAULT_DAILY_FORMAT, TEMPLATES;
+var import_node_path19, DEFAULT_DAILY_FORMAT, TEMPLATES;
 var init_obsidianHostBridge = __esm({
   "src/obsidianHostBridge.ts"() {
     "use strict";
     init_scoped_fetch();
-    import_node_fs15 = require("node:fs");
+    init_safeVaultFs();
     import_node_path19 = require("node:path");
+    init_pathExists();
     DEFAULT_DAILY_FORMAT = "YYYY-MM-DD";
     TEMPLATES = {
       "Decision.md": `---
@@ -15333,11 +15432,11 @@ function classifySecretPath(path) {
 }
 
 // src/vaultFileTools.ts
-var import_obsidian = require("obsidian");
+var import_obsidian2 = require("obsidian");
 
 // src/guardedRegistry.ts
 init_scoped_fetch();
-var import_promises = require("node:fs/promises");
+init_safeVaultFs();
 var import_node_path9 = require("node:path");
 init_sdk_entry();
 init_pericodeSecurity();
@@ -15353,14 +15452,14 @@ async function checkedVaultPath(path, vault, policy) {
   const portable = rel.replace(/\\/g, "/");
   if (process.platform === "win32" && portable.split("/").some((part) => /[. ]$/.test(part))) throw new Error("Ambiguous Windows path.");
   if (isPathDenylisted(portable, policy.denylistPaths)) throw new Error("Path is excluded by security policy.");
-  const root = await (0, import_promises.realpath)(base);
+  const root2 = await realpath(base);
   let current = base;
   for (const part of rel.split(import_node_path9.sep).filter(Boolean)) {
     current = (0, import_node_path9.resolve)(current, part);
     try {
-      const info = await (0, import_promises.lstat)(current);
+      const info = await lstat(current);
       if (info.isSymbolicLink()) throw new Error("Linked paths are not accessible to tools.");
-      const actual = (0, import_node_path9.relative)(root, await (0, import_promises.realpath)(current));
+      const actual = (0, import_node_path9.relative)(root2, await realpath(current));
       if (actual === ".." || actual.startsWith(`..${import_node_path9.sep}`) || (0, import_node_path9.isAbsolute)(actual)) throw new Error("Path resolves outside the vault.");
       if (isPathDenylisted(actual.replace(/\\/g, "/"), policy.denylistPaths)) throw new Error("Resolved path is excluded by security policy.");
     } catch (e) {
@@ -15486,7 +15585,7 @@ var GuardedRegistry = class extends ToolRegistry {
       if (permit !== checked.fingerprint || this.turn !== turn || turn.signal.aborted || revision !== this.quarantineRevision || getQuarantineState().active) throw new Error("Authorization expired; retry the request.");
       if (checked.policy.dryRun) return { output: `[dry-run] ${name}: no tool was executed.`, isError: false };
       if (name === "read_file") {
-        const info = await (0, import_promises.lstat)(String(checked.args.path));
+        const info = await lstat(String(checked.args.path));
         if (info.size > 2e6) throw new Error("File exceeds the safe read limit (2 MB).");
       }
       const result = await super.execute(name, checked.args, options);
@@ -15510,7 +15609,7 @@ var str = (input, key, empty = false) => {
   if (typeof value !== "string" || !empty && !value.length) throw new Error(`Provide ${key}.`);
   return value;
 };
-function vaultFileTools(app, deps) {
+function vaultFileTools(app2, deps) {
   const path = { type: "string" };
   const edits = { old_str: { type: "string" }, new_str: { type: "string" }, replace_all: { type: "boolean" }, expected_replacements: { type: "integer" } };
   const specs = [
@@ -15531,16 +15630,16 @@ function vaultFileTools(app, deps) {
           return checkedVaultPath(str(input, "path"), vault, deps.getPolicy());
         };
         const target = await check2();
-        const file = app.vault.getAbstractFileByPath(target.relative);
-        if (file && !(file instanceof import_obsidian.TFile)) throw new Error("Path is not a file.");
-        if (file instanceof import_obsidian.TFile && file.stat.size > LIMIT) throw new Error("File exceeds 2 MB.");
+        const file = app2.vault.getAbstractFileByPath(target.relative);
+        if (file && !(file instanceof import_obsidian2.TFile)) throw new Error("Path is not a file.");
+        if (file instanceof import_obsidian2.TFile && file.stat.size > LIMIT) throw new Error("File exceeds 2 MB.");
         const ensureSize = (text2) => {
           if (new TextEncoder().encode(text2).length > LIMIT) throw new Error("Content exceeds 2 MB.");
         };
         if (spec.name === "read_file") {
           if (classifySecretPath(target.relative).matched) throw new Error("Secret-like files are not available to the model.");
-          if (!(file instanceof import_obsidian.TFile)) throw new Error("File not found.");
-          const text2 = await app.vault.read(file);
+          if (!(file instanceof import_obsidian2.TFile)) throw new Error("File not found.");
+          const text2 = await app2.vault.read(file);
           ensureSize(text2);
           if (text2.includes("\0")) throw new Error("Binary files cannot be read as text.");
           const lines = text2.split("\n");
@@ -15553,10 +15652,10 @@ function vaultFileTools(app, deps) {
 [More lines available; next start_line: ${stop + 1}]` : ""), isError: false };
         }
         if (spec.name === "delete_file") {
-          if (!(file instanceof import_obsidian.TFile)) throw new Error("File not found.");
+          if (!(file instanceof import_obsidian2.TFile)) throw new Error("File not found.");
           if (input.permanent !== void 0) throw new Error("Permanent deletion is unavailable.");
           await check2();
-          await app.vault.trash(file, true);
+          await app2.vault.trash(file, true);
           return { output: "Moved to trash.", isError: false };
         }
         if (spec.name === "write_file") {
@@ -15564,10 +15663,10 @@ function vaultFileTools(app, deps) {
           ensureSize(content);
           if (input.create_only !== void 0 && typeof input.create_only !== "boolean") throw new Error("Invalid create_only.");
           if (input.expected_old_content !== void 0 && typeof input.expected_old_content !== "string") throw new Error("Invalid expected_old_content.");
-          if (file instanceof import_obsidian.TFile) {
+          if (file instanceof import_obsidian2.TFile) {
             if (input.create_only) throw new Error("File already exists.");
             await check2();
-            await app.vault.process(file, (before) => {
+            await app2.vault.process(file, (before) => {
               if (context?.signal?.aborted) throw new Error("Cancelled.");
               ensureSize(before);
               if (input.expected_old_content !== void 0 && before !== input.expected_old_content) throw new Error("Stale content; read the file again.");
@@ -15576,17 +15675,17 @@ function vaultFileTools(app, deps) {
           } else {
             if (input.expected_old_content !== void 0) throw new Error("Stale content; file does not exist.");
             const parent = target.relative.split("/").slice(0, -1).join("/");
-            if (parent && !(app.vault.getAbstractFileByPath(parent) instanceof import_obsidian.TFolder)) throw new Error("Create the parent folder first.");
+            if (parent && !(app2.vault.getAbstractFileByPath(parent) instanceof import_obsidian2.TFolder)) throw new Error("Create the parent folder first.");
             await check2();
-            await app.vault.create(target.relative, content);
+            await app2.vault.create(target.relative, content);
           }
           return { output: "File saved through Obsidian.", isError: false };
         }
-        if (!(file instanceof import_obsidian.TFile)) throw new Error("File not found.");
+        if (!(file instanceof import_obsidian2.TFile)) throw new Error("File not found.");
         const batch = input.edits ?? [input];
         if (!Array.isArray(batch) || !batch.length || batch.length > 100) throw new Error("Provide 1 to 100 edits.");
         await check2();
-        await app.vault.process(file, (before) => {
+        await app2.vault.process(file, (before) => {
           if (context?.signal?.aborted) throw new Error("Cancelled.");
           ensureSize(before);
           let after = before;
@@ -15613,7 +15712,7 @@ function vaultFileTools(app, deps) {
 }
 
 // src/main.ts
-var import_obsidian14 = require("obsidian");
+var import_obsidian15 = require("obsidian");
 
 // src/InlineEditModal.ts
 init_scoped_fetch();
@@ -15646,22 +15745,30 @@ async function ollamaAccountModels(host) {
 }
 
 // src/InlineEditModal.ts
-var import_obsidian2 = require("obsidian");
+var import_obsidian3 = require("obsidian");
 init_sdk_entry();
 
 // src/grokCode.ts
 init_scoped_fetch();
-var import_node_child_process2 = require("node:child_process");
-var import_node_fs7 = require("node:fs");
-var import_promises3 = require("node:fs/promises");
+
+// src/noProcessExecution.ts
+init_scoped_fetch();
+function unavailable() {
+  throw new Error("Launching local executables is unavailable in the Obsidian community plugin.");
+}
+var spawn2 = unavailable;
+var execFile = unavailable;
+
+// src/grokCode.ts
+init_safeVaultFs();
+init_safeVaultFs();
 var import_node_os3 = require("node:os");
 var import_node_path11 = require("node:path");
 
 // src/claudeCode.ts
 init_scoped_fetch();
-var import_node_child_process = require("node:child_process");
-var import_node_fs6 = require("node:fs");
-var import_promises2 = require("node:fs/promises");
+init_safeVaultFs();
+init_safeVaultFs();
 var import_node_os2 = require("node:os");
 var import_node_path10 = require("node:path");
 var import_node_http2 = require("node:http");
@@ -15673,7 +15780,7 @@ function claudeExecutable() {
     (0, import_node_path10.join)((0, import_node_os2.homedir)(), ".local", "bin", binary),
     ...(process.env.PATH ?? "").split(import_node_path10.delimiter).filter((p) => p && (0, import_node_path10.isAbsolute)(p)).map((p) => (0, import_node_path10.join)(p, binary))
   ];
-  const found = candidates.find((p) => (0, import_node_fs6.existsSync)(p));
+  const found = candidates.find((p) => existsSync(p));
   if (!found) throw new Error("Install Claude Code from https://code.claude.com/docs/en/setup, then reopen PeriCode sign-in.");
   return found;
 }
@@ -15695,11 +15802,11 @@ function claudeEnvironment() {
   return env;
 }
 async function claudeAuthStatus() {
-  return new Promise((resolve4, reject) => {
-    (0, import_node_child_process.execFile)(claudeExecutable(), ["auth", "status"], { windowsHide: true, env: claudeEnvironment(), timeout: 15e3, maxBuffer: 64e3 }, (error2, stdout) => {
+  return new Promise((resolve5, reject) => {
+    execFile(claudeExecutable(), ["auth", "status"], { windowsHide: true, env: claudeEnvironment(), timeout: 15e3, maxBuffer: 64e3 }, (error2, stdout) => {
       try {
         const status = JSON.parse(stdout);
-        resolve4({ loggedIn: status.loggedIn === true, subscription: status.subscriptionType ?? "" });
+        resolve5({ loggedIn: status.loggedIn === true, subscription: status.subscriptionType ?? "" });
       } catch {
         reject(new Error(error2 ? "Could not check Claude Code sign-in. Run claude auth status in a terminal." : "Claude Code returned an invalid sign-in status."));
       }
@@ -15709,23 +15816,9 @@ async function claudeAuthStatus() {
 function stopProcess(child) {
   if (!child.pid || child.exitCode !== null) return;
   if (process.platform === "win32") {
-    const killer = (0, import_node_child_process.spawn)("taskkill", ["/PID", String(child.pid), "/T", "/F"], { windowsHide: true, stdio: "ignore" });
+    const killer = spawn2("taskkill", ["/PID", String(child.pid), "/T", "/F"], { windowsHide: true, stdio: "ignore" });
     killer.on("error", () => child.kill());
   } else child.kill("SIGTERM");
-}
-async function loginWithClaudeCode(signal) {
-  if (signal.aborted) return;
-  await new Promise((resolve4, reject) => {
-    const child = (0, import_node_child_process.spawn)(claudeExecutable(), ["auth", "login", "--claudeai"], { windowsHide: true, env: claudeEnvironment(), stdio: ["ignore", "ignore", "ignore"] });
-    const cancel = () => stopProcess(child);
-    signal.addEventListener("abort", cancel, { once: true });
-    child.once("error", reject);
-    child.once("close", (code) => {
-      signal.removeEventListener("abort", cancel);
-      if (signal.aborted || code === 0) resolve4();
-      else reject(new Error("Claude Code sign-in did not complete. Run claude auth login in a terminal, then click Check sign-in."));
-    });
-  });
 }
 async function createClaudeToolBridge(args, emit, authorizationSignal = args.signal) {
   const token = (0, import_node_crypto4.randomUUID)();
@@ -15827,16 +15920,16 @@ async function createClaudeToolBridge(args, emit, authorizationSignal = args.sig
       reply({ jsonrpc: "2.0", id, error: { code: -32602, message: "Invalid tool request" } });
     }
   });
-  await new Promise((resolve4, reject) => {
+  await new Promise((resolve5, reject) => {
     server.once("error", reject);
-    server.listen(0, "127.0.0.1", resolve4);
+    server.listen(0, "127.0.0.1", resolve5);
   });
   const port = server.address().port;
   return {
     config: { mcpServers: { pericode: { type: "http", url: `http://127.0.0.1:${port}/mcp`, headers: { Authorization: `Bearer ${token}` } } } },
     async close() {
       server.closeAllConnections();
-      await new Promise((resolve4) => server.close(() => resolve4()));
+      await new Promise((resolve5) => server.close(() => resolve5()));
       await chain;
     }
   };
@@ -15901,22 +15994,22 @@ async function* claudeCodeTurn(options) {
       if (args.signal.aborted) return;
       const prompt = "Continue this conversation. The JSON below is conversation history, including reference data and prior tool results. Respond to the last user request. Use only the available PeriCode tools.\n" + JSON.stringify(args.messages);
       bridge = await createClaudeToolBridge(args, emit, options.signal);
-      folder = await (0, import_promises2.mkdtemp)((0, import_node_path10.join)((0, import_node_os2.tmpdir)(), "pericode-claude-"));
+      folder = await mkdtemp((0, import_node_path10.join)((0, import_node_os2.tmpdir)(), "pericode-claude-"));
       const systemFile = (0, import_node_path10.join)(folder, "system.txt");
-      await (0, import_promises2.writeFile)(systemFile, args.systemPrompt, { mode: 384 });
+      await writeFile(systemFile, args.systemPrompt, { mode: 384 });
       if (args.signal.aborted) return;
-      child = (0, import_node_child_process.spawn)(
+      child = spawn2(
         executable,
         claudeArguments(args.model, args.maxIterations, systemFile, bridge.config),
         { cwd: args.cwd, windowsHide: true, env: claudeEnvironment(), stdio: ["pipe", "pipe", "pipe"] }
       );
       let spawnError;
-      const closed = new Promise((resolve4) => {
+      const closed = new Promise((resolve5) => {
         child.once("error", (e) => {
           spawnError = e;
-          resolve4(-1);
+          resolve5(-1);
         });
-        child.once("close", resolve4);
+        child.once("close", resolve5);
       });
       child.stderr.resume();
       child.stdin.on("error", () => {
@@ -15962,9 +16055,9 @@ async function* claudeCodeTurn(options) {
       args.signal.removeEventListener("abort", cancel);
       await bridge?.close();
       if (folder) {
-        await (0, import_promises2.unlink)((0, import_node_path10.join)(folder, "system.txt")).catch(() => {
+        await unlink((0, import_node_path10.join)(folder, "system.txt")).catch(() => {
         });
-        await (0, import_promises2.rmdir)(folder).catch(() => {
+        await rmdir(folder).catch(() => {
         });
       }
       done = true;
@@ -15974,8 +16067,8 @@ async function* claudeCodeTurn(options) {
   try {
     while (!done || queue.length) {
       if (queue.length) yield queue.shift();
-      else await new Promise((resolve4) => {
-        wake = resolve4;
+      else await new Promise((resolve5) => {
+        wake = resolve5;
       });
     }
   } finally {
@@ -15993,7 +16086,7 @@ function grokExecutable() {
     (0, import_node_path11.join)((0, import_node_os3.homedir)(), ".local", "bin", name),
     ...(process.env.PATH ?? "").split(import_node_path11.delimiter).filter((p) => p && (0, import_node_path11.isAbsolute)(p)).map((p) => (0, import_node_path11.join)(p, name))
   ];
-  const found = paths.find((p) => (0, import_node_fs7.existsSync)(p));
+  const found = paths.find((p) => existsSync(p));
   if (!found) throw new Error("Install Grok Build from https://docs.x.ai/build/overview, then reopen this connection.");
   return found;
 }
@@ -16012,18 +16105,18 @@ function grokEnvironment() {
 async function grokWorkspace() {
   const home = grokEnvironment().GROK_HOME;
   for (const path of [(0, import_node_path11.join)((0, import_node_os3.homedir)(), ".pericode"), home, (0, import_node_path11.join)(home, "workspace")]) {
-    await (0, import_promises3.mkdir)(path, { recursive: true, mode: 448 });
-    if ((await (0, import_promises3.lstat)(path)).isSymbolicLink()) throw new Error("Linked Grok profile directories are not supported.");
+    await mkdir(path, { recursive: true, mode: 448 });
+    if ((await lstat(path)).isSymbolicLink()) throw new Error("Linked Grok profile directories are not supported.");
   }
   for (const name of ["managed_config.toml", "requirements.toml", "plugins", "hooks", "skills"])
-    if ((0, import_node_fs7.existsSync)((0, import_node_path11.join)(home, name))) throw new Error("The PeriCode Grok profile contains custom configuration. Remove it from ~/.pericode/grok-build before connecting; keep custom Grok configuration in your normal ~/.grok profile.");
+    if (existsSync((0, import_node_path11.join)(home, name))) throw new Error("The PeriCode Grok profile contains custom configuration. Remove it from ~/.pericode/grok-build before connecting; keep custom Grok configuration in your normal ~/.grok profile.");
   const config2 = (0, import_node_path11.join)(home, "config.toml");
-  if ((0, import_node_fs7.existsSync)(config2)) {
-    const stat = await (0, import_promises3.lstat)(config2);
-    if (!stat.isFile() || stat.isSymbolicLink() || stat.size > 4096 || !safeGrokGeneratedConfig(await (0, import_promises3.readFile)(config2, "utf8")))
+  if (existsSync(config2)) {
+    const stat2 = await lstat(config2);
+    if (!stat2.isFile() || stat2.isSymbolicLink() || stat2.size > 4096 || !safeGrokGeneratedConfig(await readFile(config2, "utf8")))
       throw new Error("The PeriCode Grok profile has custom configuration. Use a clean integration profile before connecting.");
   }
-  if ((0, import_node_fs7.existsSync)((0, import_node_path11.join)(home, "workspace", ".grok"))) throw new Error("Custom Grok workspace configuration is not supported.");
+  if (existsSync((0, import_node_path11.join)(home, "workspace", ".grok"))) throw new Error("Custom Grok workspace configuration is not supported.");
   return (0, import_node_path11.join)(home, "workspace");
 }
 function safeGrokGeneratedConfig(text2) {
@@ -16052,7 +16145,7 @@ var grokSessionMeta = (maxTurns = 1) => ({
 function stopGrok(child) {
   if (!child.pid || child.exitCode !== null) return;
   if (process.platform === "win32") {
-    const stop = (0, import_node_child_process2.spawn)("taskkill", ["/PID", String(child.pid), "/T", "/F"], { windowsHide: true, stdio: "ignore" });
+    const stop = spawn2("taskkill", ["/PID", String(child.pid), "/T", "/F"], { windowsHide: true, stdio: "ignore" });
     stop.on("error", () => child.kill());
   } else child.kill("SIGTERM");
 }
@@ -16119,13 +16212,13 @@ var GrokConnection = class {
   request(method, params, timeout = 25e3) {
     if (this.closed) return Promise.reject(new Error("Grok connection is closed."));
     const id = this.next++;
-    return new Promise((resolve4, reject) => {
+    return new Promise((resolve5, reject) => {
       const timer = setTimeout(() => {
         this.pending.delete(id);
         reject(new Error(`Grok ${method} timed out. Retry or check sign-in.`));
         this.close();
       }, timeout);
-      this.pending.set(id, { resolve: resolve4, reject, timer });
+      this.pending.set(id, { resolve: resolve5, reject, timer });
       this.send({ id, method, params });
     });
   }
@@ -16149,7 +16242,7 @@ function parseGrokModels(value) {
 async function connectGrok(signal) {
   const cwd = await grokWorkspace();
   if (signal?.aborted) throw new Error("Grok connection cancelled.");
-  const client = new GrokConnection((0, import_node_child_process2.spawn)(grokExecutable(), grokArguments(), { cwd, env: grokEnvironment(), windowsHide: true, stdio: ["pipe", "pipe", "pipe"] }));
+  const client = new GrokConnection(spawn2(grokExecutable(), grokArguments(), { cwd, env: grokEnvironment(), windowsHide: true, stdio: ["pipe", "pipe", "pipe"] }));
   const abort = () => client.close(new Error("Grok request cancelled."));
   signal?.addEventListener("abort", abort, { once: true });
   client.child.once("close", () => signal?.removeEventListener("abort", abort));
@@ -16177,26 +16270,6 @@ async function grokAccountModels(signal) {
     return { models: parseGrokModels(session.models?.availableModels), label: "Grok subscription" };
   } finally {
     client.close();
-  }
-}
-async function loginWithGrok(signal) {
-  const cwd = await grokWorkspace();
-  if (signal.aborted) return;
-  const child = (0, import_node_child_process2.spawn)(grokExecutable(), ["--no-auto-update", "login", "--oauth"], { cwd, env: grokEnvironment(), windowsHide: true, stdio: ["pipe", "pipe", "pipe"] });
-  child.stdout.resume();
-  child.stderr.resume();
-  child.stdin.end();
-  const abort = () => stopGrok(child);
-  signal.addEventListener("abort", abort, { once: true });
-  const timeout = setTimeout(abort, 18e4);
-  try {
-    await new Promise((resolve4, reject) => {
-      child.once("error", () => reject(new Error("Could not start Grok sign-in.")));
-      child.once("close", (code) => code === 0 ? resolve4() : reject(new Error("Grok sign-in did not complete. Retry the connection.")));
-    });
-  } finally {
-    clearTimeout(timeout);
-    signal.removeEventListener("abort", abort);
   }
 }
 async function* grokCodeTurn(options) {
@@ -16263,8 +16336,8 @@ async function* grokCodeTurn(options) {
   try {
     while (!done || queue.length) {
       if (queue.length) yield queue.shift();
-      else await new Promise((resolve4) => {
-        wake = resolve4;
+      else await new Promise((resolve5) => {
+        wake = resolve5;
       });
     }
   } finally {
@@ -16276,7 +16349,7 @@ async function* grokCodeTurn(options) {
 
 // src/providerEnv.ts
 init_scoped_fetch();
-var import_node_fs8 = require("node:fs");
+init_safeVaultFs();
 var import_node_path12 = require("node:path");
 init_sdk_entry();
 var MANAGED_ENV_KEYS = [
@@ -16347,8 +16420,17 @@ var STRATEGIC_TOOLS = "STRATEGIC LAYER \u2014 beyond simple chat, you have these
 var DATA_SOVEREIGNTY = "DATA ACCESS \u2014 chats and notes are stored locally. Prompts, attached content and tool results are sent to the configured model endpoint. OAuth services, configured MCP servers, administrator policy URLs and web tools may use the network. Do not claim all data stays on the machine or that model traffic is the only network activity. SQL Server sync and query tools are not included. Use only tools actually available in the current registry.";
 var OBSIDIAN_AUTHORING_STYLE = 'OBSIDIAN AUTHORING STYLE \u2014 when you write or edit a vault note, use idiomatic Obsidian markdown, not plain CLI-flavored markdown. The vault renders these constructs natively; using them turns flat text into a navigable knowledge graph. WIKILINKS over file paths: - `[[Note name]]` \u2014 link by name (Obsidian resolves by closest match). - `[[Folder/Note name|Display text]]` \u2014 link with custom text. - `[[Note#Heading]]` \u2014 link to a heading inside a note. - `[[Note#^block-id]]` \u2014 link to a specific block (the block must have `^block-id` at the end). - `![[Note]]` \u2014 EMBED a note inline (renders the target\'s content where you write this). - `![[image.png|400]]` \u2014 embed an image with a width. - `![[Note#Heading]]` \u2014 embed just one section. Inside a markdown TABLE cell, escape the pipe in display text: `[[Note\\|Display]]` \u2014 without the backslash, the table renderer eats the link. PROPERTIES (frontmatter) is the canonical metadata surface. Use a YAML block at the top:   ---\n  title: My note\n  aliases: [shortname, alt name]\n  tags: [project, in-progress]\n  created: 2026-05-08\n  status: active\n  ---\nAliases let `[[shortname]]` resolve to this note. Tags here are vault-wide; inline `#tag` in the body works too but properties are queryable from Bases. CALLOUTS \u2014 vault style guide vocabulary in active use:   > [!abstract] One-liner    \u2014 opens project/topic notes.   > [!info]                  \u2014 neutral context, sibling-product references.   > [!success] Use X for     \u2014 capability bullets.   > [!tip]                   \u2014 non-obvious workflow shortcut.   > [!warning]               \u2014 hard rule, gotcha, platform quirk.   > [!danger] Hard rule      \u2014 must-not actions.   > [!example]               \u2014 concrete walkthrough.   > [!quote]                 \u2014 quoting external doc / README verbatim. Foldable variants `> [!info]+` (open) and `> [!info]-` (collapsed) are fine for long sections. Don\'t invent new callout types \u2014 the CSS is themed for these and unknown types render as default. BLOCK IDs \u2014 append `^id` to the end of a paragraph or list item to make it linkable: `Some sentence to be referenced. ^key-finding` then `[[Note^key-finding]]` from elsewhere. OBSIDIAN SEARCH SYNTAX \u2014 when you suggest the operator browse for results themselves, include an Obsidian-search-syntax line they can paste into Ctrl+Shift+F:   `tag:#decision`  \u2014 notes with the #decision tag.   `path:wiki/`     \u2014 notes whose path starts with wiki/.   `file:.md`       \u2014 restrict by filename match.   `line:(error fail)` \u2014 both words on the same line.   `block:(query template)` \u2014 both words in the same block.   `["property":"value"]` \u2014 frontmatter property match (Bases is better for complex queries). Combine with AND (default) and OR. Use `-` for NOT. OBSIDIAN URI \u2014 when you tell the operator about a file you wrote or a note worth opening, include a clickable URI. Format: `obsidian://open?vault=<VaultName>&file=<URL-encoded path>`. Use the `vault_name` value injected into your context (it lives in the vault frontmatter block of this prompt). For search, use `obsidian://search?vault=...&query=...`. Operators click these to navigate without using the file explorer.';
 var VAULT_GUARDRAILS = "VAULT GUARDRAILS \u2014 the vault is the operator's curated knowledge base. Treat ANY request that would rewrite or shrink an index file (`_master-index.md`, `<Topic>/<Topic>.md`, anything matching `index.md` or `_index.md`) or affect more than one file as needing explicit confirmation BEFORE the first write. Confirm by stating the exact files you'll touch and what each change will do, then wait for the operator to say go. Ambiguous verbs in this host \u2014 RESOLVE IN THIS ORDER: 1. UI action via Obsidian-host tools (collapse_folder, run_command, etc.) \u2014 try this FIRST.    'Collapse my wiki' = `obsidian_collapse_folder('wiki')`. NOT 'rewrite the index'.    'Open my Roadmap' = `obsidian_open_note('wiki/PeriCode/Roadmap.md')`. NOT 'read it to me'. 2. Vault-CLAUDE.md verb (compile/audit/lint/reorganize have SPECIFIC meanings \u2014 read CLAUDE.md). 3. Ask \u2014 never invent a destructive interpretation. Examples: - 'collapse my wiki' \u2192 `obsidian_collapse_folder('wiki', recursive=true)` - 'collapse everything' \u2192 `obsidian_collapse_all()` - 'open the Roadmap note' \u2192 `obsidian_open_note('wiki/PeriCode/Roadmap.md')` - 'compile my vault' \u2192 librarian compile workflow per vault CLAUDE.md (raw/ \u2192 wiki/) - 'reorganize the wiki' \u2192 ASK first, this is content work - 'audit the vault' \u2192 run the audit/lint workflow per CLAUDE.md (output to output/audit-YYYY-MM-DD.md) Never overwrite `_master-index.md` with a smaller file than the original unless the operator explicitly told you to remove specific entries.";
-function buildSystemPrompt(options) {
-  const ctx = readProjectContext(options.cwd);
+async function buildSystemPrompt(options) {
+  const contextParts = [];
+  for (const name of ["PERICODE.md", "AGENTS.md", "CLAUDE.md"]) {
+    try {
+      const value = await readFile((0, import_node_path12.join)(options.cwd, name), "utf8");
+      if (value.trim() && value.length <= 128e3) contextParts.push(`# ${name}
+
+${value}`);
+    } catch {
+    }
+  }
   const vaultName = options.vaultName?.trim() || options.cwd.split(/[\\/]/).filter(Boolean).pop() || "";
   const vaultBlock = vaultName ? `VAULT CONTEXT \u2014 vault_name: "${vaultName}". Use this in obsidian:// URIs (e.g. obsidian://open?vault=${encodeURIComponent(vaultName)}&file=<URL-encoded path>).` : "";
   const parts = [
@@ -16366,8 +16448,8 @@ function buildSystemPrompt(options) {
   if (vaultBlock) parts.push(vaultBlock);
   const mcpBlock = formatMcpInventoryBlock(options.mcpInventory);
   if (mcpBlock) parts.push(mcpBlock);
-  if (ctx.text) parts.push(ctx.text);
-  const memorySection = readMemoryIndexSync(options.cwd);
+  if (contextParts.length) parts.push(contextParts.join("\n\n"));
+  const memorySection = await readMemoryIndex(options.cwd);
   if (memorySection) parts.push(memorySection);
   return parts.join("\n\n");
 }
@@ -16401,12 +16483,11 @@ function formatMcpInventoryBlock(inv) {
   }
   return lines.join("\n");
 }
-function readMemoryIndexSync(vaultPath) {
-  if (!vaultPath) return null;
-  const indexPath2 = (0, import_node_path12.join)(vaultPath, ".pericode", "MEMORY.md");
-  if (!(0, import_node_fs8.existsSync)(indexPath2)) return null;
+async function readMemoryIndex(vaultPath2) {
+  if (!vaultPath2) return null;
+  const indexPath2 = (0, import_node_path12.join)(vaultPath2, ".pericode", "MEMORY.md");
   try {
-    const raw = (0, import_node_fs8.readFileSync)(indexPath2, "utf8");
+    const raw = await readFile(indexPath2, "utf8");
     if (!raw.trim()) return null;
     return `PERICODE MEMORY (current state \u2014 load relevant entries via pericode_memory_read):
 
@@ -16418,7 +16499,6 @@ ${raw}`;
 
 // src/subscriptionModels.ts
 init_scoped_fetch();
-var import_node_child_process3 = require("node:child_process");
 var import_node_os4 = require("node:os");
 var import_node_crypto5 = require("node:crypto");
 init_sdk_entry();
@@ -16433,9 +16513,9 @@ function parseClaudeModels(value) {
 async function claudeAccountModels() {
   const status = await claudeAuthStatus();
   if (!status.loggedIn) throw new Error("Connect your Claude subscription in PeriCode settings, then refresh.");
-  const models = await new Promise((resolve4, reject) => {
+  const models = await new Promise((resolve5, reject) => {
     const id = (0, import_node_crypto5.randomUUID)();
-    const child = (0, import_node_child_process3.spawn)(
+    const child = spawn2(
       claudeExecutable(),
       [
         "-p",
@@ -16466,7 +16546,7 @@ async function claudeAccountModels() {
       child.stdin.end();
       child.kill();
       if (error2) reject(error2);
-      else resolve4(models2);
+      else resolve5(models2);
     };
     const timer = setTimeout(() => finish(new Error("Claude account model lookup timed out. Refresh to retry.")), 2e4);
     child.on("error", () => finish(new Error("Could not start Claude Code for model discovery.")));
@@ -16520,9 +16600,9 @@ function requireAccountModel(model, catalog) {
 
 // src/editReview.ts
 init_scoped_fetch();
-function captureEdit(path, document2, from, to) {
-  if (from < 0 || to < from || to > document2.length || from === to) throw new Error("Select the text to revise first.");
-  return { path, document: document2, from, to, selected: document2.slice(from, to) };
+function captureEdit(path, document, from, to) {
+  if (from < 0 || to < from || to > document.length || from === to) throw new Error("Select the text to revise first.");
+  return { path, document, from, to, selected: document.slice(from, to) };
 }
 function applyReviewedEdit(snapshot, currentPath, current, replacement) {
   if (currentPath !== snapshot.path || current !== snapshot.document) throw new Error("The note changed after this preview was created. Generate a new preview to preserve your changes.");
@@ -16568,7 +16648,7 @@ async function* nativeRevision(args, cwd, grok = false) {
     if (event.kind === "error") yield { type: "error", error: event.message };
   }
 }
-var InlineEditModal = class extends import_obsidian2.Modal {
+var InlineEditModal = class extends import_obsidian3.Modal {
   constructor(plugin, view) {
     super(plugin.app);
     this.plugin = plugin;
@@ -16592,7 +16672,7 @@ var InlineEditModal = class extends import_obsidian2.Modal {
     this.contentEl.addClass("pericode-edit-modal");
     this.contentEl.createEl("h2", { text: "Review a revision" });
     this.contentEl.createEl("p", { text: `${this.snapshot.path} \xB7 ${this.snapshot.selected.length.toLocaleString()} selected characters. Only the selected text is sent to your configured provider.` });
-    new import_obsidian2.Setting(this.contentEl).setName("What should change?").addTextArea((t) => {
+    new import_obsidian3.Setting(this.contentEl).setName("What should change?").addTextArea((t) => {
       this.instructionInput = t.inputEl;
       t.setPlaceholder("Make this clearer, preserving facts and links\u2026").onChange((v2) => {
         this.instruction = v2;
@@ -16601,7 +16681,7 @@ var InlineEditModal = class extends import_obsidian2.Modal {
     });
     this.status = this.contentEl.createDiv({ attr: { role: "status", "aria-live": "polite" } });
     this.preview = this.contentEl.createDiv({ cls: "pericode-edit-preview" });
-    new import_obsidian2.Setting(this.contentEl).addButton((b2) => {
+    new import_obsidian3.Setting(this.contentEl).addButton((b2) => {
       this.generate = b2.buttonEl;
       b2.setButtonText("Generate preview").setCta().onClick(() => void this.propose());
     }).addButton((b2) => {
@@ -16689,7 +16769,7 @@ var InlineEditModal = class extends import_obsidian2.Modal {
       this.checkPolicy();
       applyReviewedEdit(this.snapshot, this.view.file?.path ?? "", this.view.editor.getValue(), this.replacement);
       this.view.editor.replaceRange(this.replacement, this.view.editor.offsetToPos(this.snapshot.from), this.view.editor.offsetToPos(this.snapshot.to));
-      new import_obsidian2.Notice("Revision applied. Use Undo in the note to restore the original.");
+      new import_obsidian3.Notice("Revision applied. Use Undo in the note to restore the original.");
       this.close();
     } catch (e) {
       this.status.setText(e instanceof Error ? e.message : String(e));
@@ -16713,7 +16793,7 @@ init_sdk_entry();
 
 // src/AuthModals.ts
 init_scoped_fetch();
-var import_obsidian3 = require("obsidian");
+var import_obsidian4 = require("obsidian");
 init_sdk_entry();
 init_fetchAdapter();
 function openExternal(url) {
@@ -16728,66 +16808,6 @@ function openExternal(url) {
   }
   window.open(url, "_blank");
 }
-async function copyToClipboard(text2) {
-  try {
-    await navigator.clipboard.writeText(text2);
-  } catch {
-  }
-}
-var AnthropicLoginModal = class extends import_obsidian3.Modal {
-  constructor(app, onComplete, lifecycle) {
-    super(app);
-    this.onComplete = onComplete;
-    this.lifecycle = lifecycle;
-  }
-  onComplete;
-  lifecycle;
-  statusEl;
-  controller = null;
-  closed = false;
-  onOpen() {
-    this.lifecycle?.activeEditModals.add(this);
-    this.contentEl.empty();
-    this.contentEl.createEl("h2", { text: "Connect your Claude subscription" });
-    this.contentEl.createEl("p", { text: "PeriCode runs your installed Claude Code. Sign-in happens through Anthropic's own browser flow; PeriCode does not collect or copy your subscription tokens. If Claude Code is already signed in, use Check sign-in." });
-    this.statusEl = this.contentEl.createDiv({ cls: "setting-item-description" });
-    this.statusEl.setText("Checking Claude Code sign-in\u2026");
-    new import_obsidian3.Setting(this.contentEl).addButton((b2) => b2.setButtonText("Sign in with Claude Code").setCta().onClick(() => void this.login())).addButton((b2) => b2.setButtonText("Check sign-in").onClick(() => void this.check(true))).addButton((b2) => b2.setButtonText("Close").onClick(() => this.close()));
-    void this.check(false);
-  }
-  async check(finish) {
-    try {
-      const status = await claudeAuthStatus();
-      if (this.closed) return;
-      this.statusEl.setText(status.loggedIn ? "Claude Code is signed in" + (status.subscription ? " (" + status.subscription + ")" : "") + ". Ready to use." : "Claude Code is not signed in. Click Sign in with Claude Code.");
-      if (status.loggedIn && finish) {
-        this.onComplete(true);
-        this.close();
-      }
-    } catch (e) {
-      if (!this.closed) this.statusEl.setText(e instanceof Error ? e.message : String(e));
-    }
-  }
-  async login() {
-    if (this.controller) return;
-    this.controller = new AbortController();
-    this.statusEl.setText("Finish signing in in the browser opened by Claude Code.");
-    try {
-      await loginWithClaudeCode(this.controller.signal);
-      if (!this.closed) await this.check(true);
-    } catch (e) {
-      if (!this.closed) this.statusEl.setText(e instanceof Error ? e.message : String(e));
-    } finally {
-      this.controller = null;
-    }
-  }
-  onClose() {
-    this.closed = true;
-    this.controller?.abort();
-    this.lifecycle?.activeEditModals.delete(this);
-    this.contentEl.empty();
-  }
-};
 function friendlyAuthError(message) {
   if (message.includes("HTTP 429") || message.includes("rate_limit")) {
     return message + "\n\nThe identity provider is rate-limiting this request. Wait before trying again.";
@@ -16800,9 +16820,9 @@ function friendlyAuthError(message) {
   }
   return message;
 }
-var CopilotLoginModal = class extends import_obsidian3.Modal {
-  constructor(app, onComplete) {
-    super(app);
+var CopilotLoginModal = class extends import_obsidian4.Modal {
+  constructor(app2, onComplete) {
+    super(app2);
     this.onComplete = onComplete;
   }
   onComplete;
@@ -16813,9 +16833,9 @@ var CopilotLoginModal = class extends import_obsidian3.Modal {
     contentEl.empty();
     contentEl.createEl("h2", { text: "Sign in with GitHub Copilot" });
     contentEl.createEl("p", {
-      text: "GitHub uses a device-flow login. Click Start and we'll request a one-time user code from GitHub, open the browser to its verification page, and copy the code to your clipboard."
+      text: "GitHub uses a device-flow login. Click Start and we'll request a one-time user code from GitHub and open its verification page."
     });
-    new import_obsidian3.Setting(contentEl).addButton((b2) => b2.setButtonText("Cancel").onClick(() => this.cancel())).addButton(
+    new import_obsidian4.Setting(contentEl).addButton((b2) => b2.setButtonText("Cancel").onClick(() => this.cancel())).addButton(
       (b2) => b2.setButtonText("Start").setCta().onClick(() => void this.run())
     );
     this.statusEl = contentEl.createEl("div", { cls: "setting-item-description" });
@@ -16825,13 +16845,12 @@ var CopilotLoginModal = class extends import_obsidian3.Modal {
     try {
       const init = await withRequestUrlFetch(() => beginDeviceFlow());
       if (this.aborted) return;
-      await copyToClipboard(init.userCode);
       openExternal(init.verificationUri);
       this.renderActiveFlow(init.verificationUri, init.userCode);
       await withRequestUrlFetch(() => pollDeviceFlow(init));
       if (this.aborted) return;
       this.setStatus("Signed in. Closing\u2026", false);
-      new import_obsidian3.Notice("PeriCode: GitHub Copilot signed in.");
+      new import_obsidian4.Notice("PeriCode: GitHub Copilot signed in.");
       this.onComplete(true);
       window.setTimeout(() => this.close(), 600);
     } catch (err) {
@@ -16856,16 +16875,12 @@ var CopilotLoginModal = class extends import_obsidian3.Modal {
     codeEl.style.padding = "8px 14px";
     codeEl.style.background = "var(--background-secondary)";
     codeEl.style.borderRadius = "6px";
-    const copyBtn = codeRow.createEl("button", { text: "Copy code" });
-    copyBtn.addEventListener("click", () => {
-      void copyToClipboard(userCode);
-      new import_obsidian3.Notice("Copied user code.");
-    });
+    codeEl.setAttribute("aria-label", "GitHub device code");
     contentEl.createEl("p", {
       text: `If the browser didn't open: ${verificationUri}`,
       cls: "setting-item-description"
     });
-    new import_obsidian3.Setting(contentEl).addButton((b2) => b2.setButtonText("Cancel").onClick(() => this.cancel()));
+    new import_obsidian4.Setting(contentEl).addButton((b2) => b2.setButtonText("Cancel").onClick(() => this.cancel()));
     this.statusEl = contentEl.createEl("div", { cls: "setting-item-description" });
     this.setStatus("Waiting for you to authorize in the browser\u2026", false);
   }
@@ -16885,9 +16900,9 @@ var CopilotLoginModal = class extends import_obsidian3.Modal {
     this.contentEl.empty();
   }
 };
-var CodexLoginModal = class extends import_obsidian3.Modal {
-  constructor(app, onComplete) {
-    super(app);
+var CodexLoginModal = class extends import_obsidian4.Modal {
+  constructor(app2, onComplete) {
+    super(app2);
     this.onComplete = onComplete;
   }
   onComplete;
@@ -16901,7 +16916,7 @@ var CodexLoginModal = class extends import_obsidian3.Modal {
     contentEl.createEl("p", {
       text: "We'll open a local listener on port 1455 and route you to OpenAI to sign in. The browser will redirect back to localhost when you're done."
     });
-    new import_obsidian3.Setting(contentEl).addButton((b2) => b2.setButtonText("Cancel").onClick(() => this.cancel())).addButton(
+    new import_obsidian4.Setting(contentEl).addButton((b2) => b2.setButtonText("Cancel").onClick(() => this.cancel())).addButton(
       (b2) => b2.setButtonText("Start").setCta().onClick(() => void this.run())
     );
     this.statusEl = contentEl.createEl("div", { cls: "setting-item-description" });
@@ -16919,7 +16934,7 @@ var CodexLoginModal = class extends import_obsidian3.Modal {
       );
       if (this.aborted) return;
       this.setStatus("Signed in. Closing\u2026", false);
-      new import_obsidian3.Notice("PeriCode: ChatGPT/Codex signed in.");
+      new import_obsidian4.Notice("PeriCode: ChatGPT/Codex signed in.");
       this.onComplete(true);
       window.setTimeout(() => this.close(), 600);
     } catch (err) {
@@ -17074,7 +17089,7 @@ var MCP_PRESETS = [
 
 // src/mcpDiscovery.ts
 init_scoped_fetch();
-var import_node_fs10 = require("node:fs");
+init_safeVaultFs();
 var import_node_os5 = require("node:os");
 var import_node_path14 = require("node:path");
 async function discoverMcpServers() {
@@ -17087,9 +17102,9 @@ async function discoverMcpServers() {
   const found = [];
   for (const s of sources) {
     for (const path of s.paths) {
-      if (!(0, import_node_fs10.existsSync)(path)) continue;
+      if (!existsSync(path)) continue;
       try {
-        const raw = await import_node_fs10.promises.readFile(path, "utf8");
+        const raw = await promises.readFile(path, "utf8");
         const parsed = JSON.parse(raw);
         const block = parsed.mcpServers ?? {};
         for (const [name, entry] of Object.entries(block)) {
@@ -17192,68 +17207,6 @@ function sourceLabel(source) {
 // src/settings.ts
 init_pericodeSecurity();
 
-// src/GrokLoginModal.ts
-init_scoped_fetch();
-var import_obsidian4 = require("obsidian");
-var GrokLoginModal = class extends import_obsidian4.Modal {
-  constructor(app, complete, lifecycle) {
-    super(app);
-    this.complete = complete;
-    this.lifecycle = lifecycle;
-  }
-  complete;
-  lifecycle;
-  controller = null;
-  closed = false;
-  checking = false;
-  lookup = new AbortController();
-  status;
-  onOpen() {
-    this.lifecycle?.activeEditModals.add(this);
-    this.contentEl.createEl("h2", { text: "Connect your Grok subscription" });
-    this.contentEl.createEl("p", { text: "Sign in using the installed Grok Build app. Your account\u2019s model access and usage limits apply. PeriCode uses a separate Grok profile so your normal terminal settings stay intact." });
-    this.status = this.contentEl.createDiv({ cls: "setting-item-description", text: "Connect once, then load your account models." });
-    new import_obsidian4.Setting(this.contentEl).addButton((b2) => b2.setButtonText("Sign in with Grok").setCta().onClick(() => void this.login())).addButton((b2) => b2.setButtonText("Check connection").onClick(() => void this.check())).addButton((b2) => b2.setButtonText("Close").onClick(() => this.close()));
-  }
-  async check() {
-    if (this.closed || this.checking) return;
-    this.checking = true;
-    this.status.setText("Checking Grok subscription access\u2026");
-    try {
-      const catalog = await grokAccountModels(this.lookup.signal);
-      if (!this.closed) {
-        this.status.setText(`${catalog.models.length} account models available.`);
-        this.complete(true);
-        this.close();
-      }
-    } catch (error2) {
-      if (!this.closed) this.status.setText(error2 instanceof Error ? error2.message : "Connection failed.");
-    } finally {
-      this.checking = false;
-    }
-  }
-  async login() {
-    if (this.controller) return;
-    this.controller = new AbortController();
-    this.status.setText("Finish signing in in the browser opened by Grok Build.");
-    try {
-      await loginWithGrok(this.controller.signal);
-      if (!this.closed) await this.check();
-    } catch (error2) {
-      if (!this.closed) this.status.setText(error2 instanceof Error ? error2.message : "Sign-in failed.");
-    } finally {
-      this.controller = null;
-    }
-  }
-  onClose() {
-    this.closed = true;
-    this.controller?.abort();
-    this.lookup.abort();
-    this.lifecycle?.activeEditModals.delete(this);
-    this.contentEl.empty();
-  }
-};
-
 // src/onboardingWizard.ts
 init_scoped_fetch();
 var import_obsidian5 = require("obsidian");
@@ -17271,8 +17224,8 @@ var PROVIDER_LABELS = {
   "openai-compat": "OpenAI-compatible server"
 };
 var OnboardingWizard = class extends import_obsidian5.Modal {
-  constructor(app, plugin) {
-    super(app);
+  constructor(app2, plugin) {
+    super(app2);
     this.plugin = plugin;
   }
   plugin;
@@ -17369,9 +17322,9 @@ var OnboardingWizard = class extends import_obsidian5.Modal {
       this.render();
     };
     if (provider === "grok-oauth") {
-      new import_obsidian5.Setting(el).setName("Grok subscription").setDesc("Connect through your installed Grok Build.").addButton((b2) => b2.setButtonText("Sign in").onClick(() => new GrokLoginModal(this.app, connected, this.plugin).open()));
+      new import_obsidian5.Setting(el).setName("Grok subscription").setDesc("Requires the forthcoming PeriCode localhost companion. Use the Grok API connection for now.");
     } else if (provider === "claude-oauth") {
-      new import_obsidian5.Setting(el).setName("Claude subscription").setDesc("Connect through your installed Claude Code.").addButton((b2) => b2.setButtonText("Connect Claude Code").onClick(() => new AnthropicLoginModal(this.app, connected, this.plugin).open()));
+      new import_obsidian5.Setting(el).setName("Claude subscription").setDesc("Requires the forthcoming PeriCode localhost companion. Use the Anthropic API connection for now.");
     } else if (provider === "copilot" || provider === "codex-oauth") {
       new import_obsidian5.Setting(el).setName("Connect subscription").setDesc("Already signed in? Load models to check your saved connection.").addButton((b2) => b2.setButtonText("Sign in").onClick(() => {
         const Login = provider === "copilot" ? CopilotLoginModal : CodexLoginModal;
@@ -17401,7 +17354,7 @@ var OnboardingWizard = class extends import_obsidian5.Modal {
       }
       this.render();
     }));
-    new import_obsidian5.Setting(el).setName("Available models").addButton((b2) => b2.setButtonText(this.loading ? "Loading models\u2026" : "Load models").setDisabled(this.dirty).onClick(() => void this.checkModels()));
+    new import_obsidian5.Setting(el).setName("Available models").addButton((b2) => b2.setButtonText(this.loading ? "Loading models\u2026" : "Load models").setDisabled(this.dirty || provider === "claude-oauth" || provider === "grok-oauth").onClick(() => void this.checkModels()));
     if (this.catalog) new import_obsidian5.Setting(el).setName("Model").addDropdown((d) => {
       d.selectEl.setAttribute("aria-label", "Model");
       d.addOption("", "Choose a model");
@@ -17500,9 +17453,9 @@ function shouldAutoOpenWizard(plugin) {
 // src/settingsProviders.ts
 init_scoped_fetch();
 var PROVIDER_OPTIONS = [
-  { id: "claude-oauth", name: "Claude", detail: "Claude Code subscription", group: "Subscriptions", icon: "C" },
+  { id: "claude-oauth", name: "Claude", detail: "Companion required", group: "Coming soon", icon: "C" },
   { id: "codex-oauth", name: "ChatGPT / Codex", detail: "ChatGPT subscription", group: "Subscriptions", icon: "O" },
-  { id: "grok-oauth", name: "Grok", detail: "Grok Build subscription", group: "Subscriptions", icon: "X" },
+  { id: "grok-oauth", name: "Grok", detail: "Companion required", group: "Coming soon", icon: "X" },
   { id: "ollama-cloud", name: "Ollama Cloud", detail: "Signed-in Ollama account", group: "Subscriptions", icon: "L" },
   { id: "copilot", name: "GitHub Copilot", detail: "Copilot subscription", group: "Subscriptions", icon: "GH" },
   { id: "anthropic", name: "Anthropic", detail: "API key", group: "API keys", icon: "A" },
@@ -17542,16 +17495,17 @@ var OAUTH_LANES = [
     providerId: "copilot",
     authStoreKey: "github-copilot",
     displayName: "GitHub Copilot",
-    openLogin: (app, onComplete) => new CopilotLoginModal(app, onComplete).open()
+    openLogin: (app2, onComplete) => new CopilotLoginModal(app2, onComplete).open()
   },
   {
     providerId: "codex-oauth",
     authStoreKey: "openai",
     displayName: "ChatGPT (Codex)",
-    openLogin: (app, onComplete) => new CodexLoginModal(app, onComplete).open()
+    openLogin: (app2, onComplete) => new CodexLoginModal(app2, onComplete).open()
   }
 ];
 var DEFAULT_SETTINGS = {
+  pluginAuth: {},
   setupDismissed: false,
   provider: "anthropic",
   model: "claude-sonnet-4-6",
@@ -17568,8 +17522,8 @@ var DEFAULT_SETTINGS = {
   settingsView: "simple"
 };
 var PericodeSettingsTab = class extends import_obsidian6.PluginSettingTab {
-  constructor(app, plugin) {
-    super(app, plugin);
+  constructor(app2, plugin) {
+    super(app2, plugin);
     this.plugin = plugin;
   }
   plugin;
@@ -17727,8 +17681,8 @@ var PericodeSettingsTab = class extends import_obsidian6.PluginSettingTab {
     head.createEl("h4", { text: providerDisplayName(provider) });
     head.createSpan({ text: selected?.detail ?? "Connection", cls: "pericode-settings-badge" });
     this.renderCredentials(card);
-    this.renderModelPicker(card);
-    const subscriptionRoute = { anthropic: "claude-oauth", openai: "codex-oauth", xai: "grok-oauth", ollama: "ollama-cloud" }[provider];
+    if (provider !== "claude-oauth" && provider !== "grok-oauth") this.renderModelPicker(card);
+    const subscriptionRoute = { openai: "codex-oauth", ollama: "ollama-cloud" }[provider];
     if (subscriptionRoute) {
       new import_obsidian6.Setting(container).setName("Already have a subscription?").setDesc("Use the provider's account connection instead of API billing.").addButton((b2) => b2.setButtonText("Use my subscription").onClick(async () => {
         if (this.modelLoading.size || !this.plugin.claimInteractiveTurn()) {
@@ -17752,7 +17706,7 @@ var PericodeSettingsTab = class extends import_obsidian6.PluginSettingTab {
     if (provider === "xai") {
       const note = container.createDiv({ cls: "pericode-settings-callout" });
       note.createEl("strong", { text: "Grok API access" });
-      note.createEl("p", { text: "Connect with an xAI API key. This connection uses API credits. Choose Use my subscription to connect through Grok Build instead." });
+      note.createEl("p", { text: "Connect with an xAI API key. This connection uses API credits. Grok Build support will return through the separate localhost companion." });
       note.createEl("a", { text: "Get an API key \u2197", href: "https://console.x.ai/", attr: { target: "_blank", rel: "noopener noreferrer" } });
     }
     container.createEl("p", { cls: "pericode-settings-footnote", text: "Prompts and attached notes are sent to your selected provider. Review access controls in Privacy & safety." });
@@ -17760,10 +17714,7 @@ var PericodeSettingsTab = class extends import_obsidian6.PluginSettingTab {
   renderCredentials(container) {
     const provider = this.plugin.settings.provider;
     if (provider === "grok-oauth") {
-      new import_obsidian6.Setting(container).setName("Grok subscription").setDesc("Connect through Grok Build. Uses your subscription allowance; no API key fallback.").addButton((b2) => b2.setButtonText("Connect Grok").onClick(() => new GrokLoginModal(this.app, () => {
-        this.resetModels(provider);
-        void this.loadModelsFor(provider);
-      }, this.plugin).open()));
+      new import_obsidian6.Setting(container).setName("Grok subscription").setDesc("Unavailable in the community plugin until the localhost companion is released. Use the Grok API connection for now.");
     } else if (provider === "ollama-cloud") {
       new import_obsidian6.Setting(container).setName("Ollama account").setDesc("Uses the account signed in to your Ollama server. Run ollama signin, then ollama pull <cloud-model> on that server. Load models here after setup.");
       container.createEl("a", { text: "Ollama cloud setup", href: "https://docs.ollama.com/cloud", attr: { target: "_blank", rel: "noopener noreferrer" } });
@@ -18626,7 +18577,7 @@ var PericodeSettingsTab = class extends import_obsidian6.PluginSettingTab {
       status.setText("Vault path unavailable \u2014 scaffolding disabled.");
       return;
     }
-    const refreshStatus = () => {
+    const refreshStatus = async () => {
       status.empty();
       const checks = [
         { rel: "raw", label: "raw/" },
@@ -18637,12 +18588,8 @@ var PericodeSettingsTab = class extends import_obsidian6.PluginSettingTab {
       const present = [];
       const missing = [];
       for (const c of checks) {
-        const abs = `${vault}/${c.rel}`.replace(/\\/g, "/");
         try {
-          const fs11 = window.require(
-            "node:fs"
-          );
-          if (fs11.existsSync(abs)) present.push(c.label);
+          if (await this.app.vault.adapter.exists(c.rel)) present.push(c.label);
           else missing.push(c.label);
         } catch {
           status.setText("Unable to check vault state.");
@@ -18654,7 +18601,7 @@ var PericodeSettingsTab = class extends import_obsidian6.PluginSettingTab {
         missing.length === 0 ? `Scaffolded \u2014 all ${total} pieces present.` : `${present.length}/${total} present. Missing: ${missing.join(", ")}.`
       );
     };
-    refreshStatus();
+    void refreshStatus();
     new import_obsidian6.Setting(container).setName("Scaffold this vault").setDesc(
       "Creates any missing pipeline folders + seed files. Existing files are left untouched."
     ).addButton(
@@ -19194,9 +19141,9 @@ var PericodeSettingsTab = class extends import_obsidian6.PluginSettingTab {
       })
     );
   }
-  async persistMcp(vaultPath) {
+  async persistMcp(vaultPath2) {
     try {
-      await writeMcpConfig(vaultPath, this.mcpServers);
+      await writeMcpConfig(vaultPath2, this.mcpServers);
     } catch (err) {
       new import_obsidian6.Notice(
         `PeriCode: failed to write MCP config \u2014 ${err instanceof Error ? err.message : String(err)}`,
@@ -19204,13 +19151,13 @@ var PericodeSettingsTab = class extends import_obsidian6.PluginSettingTab {
       );
     }
   }
-  async persistMcpAndRestart(vaultPath) {
-    await this.persistMcp(vaultPath);
+  async persistMcpAndRestart(vaultPath2) {
+    await this.persistMcp(vaultPath2);
     this.mcpRestarting = true;
     this.display();
     try {
       const status = await this.plugin.mcpManager.restart(
-        vaultPath,
+        vaultPath2,
         this.plugin.activeRegistry()
       );
       if (status.connected.length > 0) {
@@ -19238,9 +19185,8 @@ var PericodeSettingsTab = class extends import_obsidian6.PluginSettingTab {
    * `deleteAuth` for disconnect.
    */
   renderOAuthStatus(container, selected) {
-    if (!selected || selected === "claude-oauth") new import_obsidian6.Setting(container).setName("Claude subscription").setDesc("Uses your installed Claude Code and its own sign-in. PeriCode does not store subscription tokens.").addButton((b2) => b2.setButtonText("Connect Claude Code").onClick(() => new AnthropicLoginModal(this.app, () => {
-      void this.loadModelsFor("claude-oauth");
-    }, this.plugin).open()));
+    if (!selected || selected === "claude-oauth") new import_obsidian6.Setting(container).setName("Claude subscription").setDesc("Unavailable in the community plugin until the localhost companion is released. Use the Anthropic API connection for now.");
+    if (selected === "claude-oauth") return;
     let stored = {};
     try {
       stored = listAuth();
@@ -20742,11 +20688,11 @@ function renderSafeMarkdown(text2, target, openNote) {
 }
 
 // src/PericodeView.ts
-var import_obsidian9 = require("obsidian");
+var import_obsidian10 = require("obsidian");
 
 // src/conversationStore.ts
 init_scoped_fetch();
-var import_promises4 = require("node:fs/promises");
+init_safeVaultFs();
 var import_node_path16 = require("node:path");
 var import_node_crypto7 = require("node:crypto");
 function newConversation() {
@@ -20799,12 +20745,12 @@ var ConversationStore = class {
   queue = Promise.resolve();
   readable = false;
   directory;
-  constructor(vaultPath) {
-    this.directory = (0, import_node_path16.join)(vaultPath, ".pericode", "conversations");
+  constructor(vaultPath2) {
+    this.directory = (0, import_node_path16.join)(vaultPath2, ".pericode", "conversations");
   }
   async load() {
     try {
-      const data = parseConversations(await (0, import_promises4.readFile)((0, import_node_path16.join)(this.directory, "sessions.json"), "utf8"));
+      const data = parseConversations(await readFile((0, import_node_path16.join)(this.directory, "sessions.json"), "utf8"));
       this.readable = true;
       return data;
     } catch (err) {
@@ -20818,10 +20764,10 @@ var ConversationStore = class {
     const snapshot = JSON.stringify(data);
     const write = this.queue.catch(() => {
     }).then(async () => {
-      await (0, import_promises4.mkdir)(this.directory, { recursive: true });
+      await mkdir(this.directory, { recursive: true });
       const temporary = (0, import_node_path16.join)(this.directory, `sessions-${(0, import_node_crypto7.randomUUID)()}.tmp`);
-      await (0, import_promises4.writeFile)(temporary, snapshot, { encoding: "utf8", mode: 384 });
-      await (0, import_promises4.rename)(temporary, (0, import_node_path16.join)(this.directory, "sessions.json"));
+      await writeFile(temporary, snapshot, { encoding: "utf8", mode: 384 });
+      await rename(temporary, (0, import_node_path16.join)(this.directory, "sessions.json"));
     });
     this.queue = write;
     return write;
@@ -20839,18 +20785,52 @@ ${e.text}`).join("\n\n");
 
 // src/ContextPicker.ts
 init_scoped_fetch();
+var import_obsidian8 = require("obsidian");
+
+// src/vaultInventory.ts
+init_scoped_fetch();
 var import_obsidian7 = require("obsidian");
-var ContextPicker = class extends import_obsidian7.FuzzySuggestModal {
-  constructor(app, picked) {
-    super(app);
+var MAX_ENTRIES = 2e4;
+var cleanPath = (path) => path.replace(/\\/g, "/").replace(/^\.\//, "").replace(/\/{2,}/g, "/");
+async function vaultEntries(app2) {
+  const found = [];
+  const pending = [""];
+  while (pending.length && found.length < MAX_ENTRIES) {
+    const folder = pending.shift();
+    const listed = await app2.vault.adapter.list(folder);
+    for (const path of listed.folders) {
+      const normalized = cleanPath(path);
+      if (normalized.split("/").some((part) => part.startsWith("."))) continue;
+      const entry = app2.vault.getAbstractFileByPath(normalized);
+      if (entry instanceof import_obsidian7.TFolder) found.push(entry);
+      pending.push(normalized);
+    }
+    for (const path of listed.files) {
+      const normalized = cleanPath(path);
+      if (normalized.split("/").some((part) => part.startsWith("."))) continue;
+      const entry = app2.vault.getAbstractFileByPath(normalized);
+      if (entry instanceof import_obsidian7.TFile) found.push(entry);
+      if (found.length >= MAX_ENTRIES) break;
+    }
+  }
+  return found;
+}
+async function markdownFiles(app2) {
+  return (await vaultEntries(app2)).filter((entry) => entry instanceof import_obsidian7.TFile && entry.extension === "md");
+}
+
+// src/ContextPicker.ts
+var ContextPicker = class extends import_obsidian8.FuzzySuggestModal {
+  constructor(app2, items, picked) {
+    super(app2);
+    this.items = items;
     this.picked = picked;
     this.setPlaceholder("Find a note or folder to attach\u2026");
   }
+  items;
   picked;
   getItems() {
-    const files = this.app.vault.getMarkdownFiles().map((f2) => f2.path);
-    const folders = this.app.vault.getAllLoadedFiles().filter((f2) => f2 instanceof import_obsidian7.TFolder && f2.path !== "/").map((f2) => f2.path + "/");
-    return [...files, ...folders].filter((p) => !p.split("/").some((part) => part.startsWith("."))).sort();
+    return this.items;
   }
   getItemText(item) {
     return item;
@@ -20859,6 +20839,12 @@ var ContextPicker = class extends import_obsidian7.FuzzySuggestModal {
     this.picked(item, item.endsWith("/"));
   }
 };
+async function openContextPicker(app2, picked) {
+  const loaded = await vaultEntries(app2);
+  const files = loaded.filter((f2) => f2 instanceof import_obsidian8.TFile && f2.extension === "md").map((f2) => f2.path);
+  const folders = loaded.filter((f2) => f2 instanceof import_obsidian8.TFolder && f2.path !== "/").map((f2) => f2.path + "/");
+  new ContextPicker(app2, [...files, ...folders].sort(), picked).open();
+}
 
 // src/chatContext.ts
 init_scoped_fetch();
@@ -20916,14 +20902,14 @@ init_sdk_entry();
 
 // src/PermissionModal.ts
 init_scoped_fetch();
-var import_obsidian8 = require("obsidian");
-var import_node_fs13 = require("node:fs");
+var import_obsidian9 = require("obsidian");
+init_safeVaultFs();
 var import_node_path17 = require("node:path");
-var PermissionModal = class extends import_obsidian8.Modal {
-  constructor(app, request, resolve4) {
-    super(app);
+var PermissionModal = class extends import_obsidian9.Modal {
+  constructor(app2, request, resolve5) {
+    super(app2);
     this.request = request;
-    this.resolve = resolve4;
+    this.resolve = resolve5;
   }
   request;
   resolve;
@@ -20951,13 +20937,14 @@ var PermissionModal = class extends import_obsidian8.Modal {
       });
     }
     const body = contentEl.createDiv({ cls: "pericode-permission-modal-body" });
-    const overwriteWarning = this.renderOverwritePreview(body);
-    if (overwriteWarning) {
-      contentEl.createEl("div", {
+    void this.renderOverwritePreview(body).then((overwriteWarning) => {
+      if (!overwriteWarning || this.resolved) return;
+      const warning = contentEl.createEl("div", {
         cls: "pericode-permission-risk-warning",
         text: overwriteWarning
       });
-    }
+      body.before(warning);
+    });
     const friendly = formatArgsHumanReadable(request.input);
     if (friendly.length > 0) {
       const list = body.createEl("ul");
@@ -20988,7 +20975,7 @@ var PermissionModal = class extends import_obsidian8.Modal {
         preview.length > 4e3 ? preview.slice(0, 4e3) + "\n\u2026[truncated]" : preview
       );
     }
-    const buttonRow = new import_obsidian8.Setting(contentEl);
+    const buttonRow = new import_obsidian9.Setting(contentEl);
     buttonRow.addButton(
       (b2) => b2.setButtonText("Allow").setCta().onClick(() => this.complete("yes"))
     );
@@ -21015,7 +21002,7 @@ var PermissionModal = class extends import_obsidian8.Modal {
    * less content, render the before/after AND return a plain-English warning
    * line for the modal banner.
    */
-  renderOverwritePreview(body) {
+  async renderOverwritePreview(body) {
     const { toolName, input } = this.request;
     const writeTools = /* @__PURE__ */ new Set(["write_file", "write", "edit_file", "edit"]);
     if (!writeTools.has(toolName)) return null;
@@ -21027,14 +21014,13 @@ var PermissionModal = class extends import_obsidian8.Modal {
     } catch {
       return null;
     }
-    if (!(0, import_node_fs13.existsSync)(absolute)) return null;
     let existingSize = 0;
     let existingContent = "";
     try {
-      const stat = (0, import_node_fs13.statSync)(absolute);
-      existingSize = stat.size;
-      if (stat.size <= 64 * 1024) {
-        existingContent = (0, import_node_fs13.readFileSync)(absolute, "utf8");
+      const info = await stat(absolute);
+      existingSize = info.size;
+      if (info.size <= 64 * 1024) {
+        existingContent = await readFile(absolute, "utf8");
       }
     } catch {
       return null;
@@ -21237,27 +21223,28 @@ function prettySource(source) {
 
 // src/pericodeAudit.ts
 init_scoped_fetch();
-var import_node_fs14 = require("node:fs");
+init_safeVaultFs();
+init_pathExists();
 var import_node_path18 = require("node:path");
 var MAX_OUTPUT_PREVIEW = 4e3;
 var ROTATE_AT_BYTES = 5 * 1024 * 1024;
 var KEEP_AFTER_ROTATE_BYTES = 3 * 1024 * 1024;
 var ROTATION_CHECK_EVERY = 50;
 var _appendsSinceCheck = 0;
-function auditPath(vaultPath) {
-  return (0, import_node_path18.join)(vaultPath, ".pericode", "audit.jsonl");
+function auditPath(vaultPath2) {
+  return (0, import_node_path18.join)(vaultPath2, ".pericode", "audit.jsonl");
 }
 async function maybeRotate(path) {
-  let stats;
+  let stats2;
   try {
-    stats = await import_node_fs14.promises.stat(path);
+    stats2 = await promises.stat(path);
   } catch {
     return;
   }
-  if (stats.size <= ROTATE_AT_BYTES) return;
+  if (stats2.size <= ROTATE_AT_BYTES) return;
   let raw;
   try {
-    raw = await import_node_fs14.promises.readFile(path, "utf8");
+    raw = await promises.readFile(path, "utf8");
   } catch {
     return;
   }
@@ -21266,25 +21253,25 @@ async function maybeRotate(path) {
   if (sliceStart === -1) return;
   const kept = raw.slice(sliceStart + 1);
   try {
-    await import_node_fs14.promises.writeFile(path, kept, "utf8");
+    await promises.writeFile(path, kept, "utf8");
   } catch {
   }
 }
-async function ensureAuditFile(vaultPath) {
-  if (!vaultPath) return;
-  const path = auditPath(vaultPath);
-  await import_node_fs14.promises.mkdir((0, import_node_path18.dirname)(path), { recursive: true });
-  if (!(0, import_node_fs14.existsSync)(path)) {
-    await import_node_fs14.promises.writeFile(path, "", "utf8");
+async function ensureAuditFile(vaultPath2) {
+  if (!vaultPath2) return;
+  const path = auditPath(vaultPath2);
+  await promises.mkdir((0, import_node_path18.dirname)(path), { recursive: true });
+  if (!await pathExists(path)) {
+    await promises.writeFile(path, "", "utf8");
   }
 }
-async function appendAudit(vaultPath, record2) {
-  if (!vaultPath) return;
-  const path = auditPath(vaultPath);
+async function appendAudit(vaultPath2, record2) {
+  if (!vaultPath2) return;
+  const path = auditPath(vaultPath2);
   const truncated = record2.output_preview.length > MAX_OUTPUT_PREVIEW ? record2.output_preview.slice(0, MAX_OUTPUT_PREVIEW) + "\n\u2026[truncated]" : record2.output_preview;
   const line = JSON.stringify({ ...record2, output_preview: truncated }) + "\n";
   try {
-    await import_node_fs14.promises.appendFile(path, line, "utf8");
+    await promises.appendFile(path, line, "utf8");
     _appendsSinceCheck += 1;
     if (_appendsSinceCheck >= ROTATION_CHECK_EVERY) {
       _appendsSinceCheck = 0;
@@ -21293,13 +21280,13 @@ async function appendAudit(vaultPath, record2) {
   } catch {
   }
 }
-async function readRecentAudit(vaultPath, limit = 50) {
-  if (!vaultPath) return [];
-  const path = auditPath(vaultPath);
-  if (!(0, import_node_fs14.existsSync)(path)) return [];
+async function readRecentAudit(vaultPath2, limit = 50) {
+  if (!vaultPath2) return [];
+  const path = auditPath(vaultPath2);
+  if (!await pathExists(path)) return [];
   let raw = "";
   try {
-    raw = await import_node_fs14.promises.readFile(path, "utf8");
+    raw = await promises.readFile(path, "utf8");
   } catch {
     return [];
   }
@@ -21314,13 +21301,13 @@ async function readRecentAudit(vaultPath, limit = 50) {
   }
   return out;
 }
-async function readAuditRange(vaultPath) {
-  if (!vaultPath) return [];
-  const path = auditPath(vaultPath);
-  if (!(0, import_node_fs14.existsSync)(path)) return [];
+async function readAuditRange(vaultPath2) {
+  if (!vaultPath2) return [];
+  const path = auditPath(vaultPath2);
+  if (!await pathExists(path)) return [];
   let raw = "";
   try {
-    raw = await import_node_fs14.promises.readFile(path, "utf8");
+    raw = await promises.readFile(path, "utf8");
   } catch {
     return [];
   }
@@ -21338,7 +21325,7 @@ async function readAuditRange(vaultPath) {
 // src/PericodeView.ts
 init_pericodeSecurity();
 var PERICODE_VIEW_TYPE = "pericode-chat";
-var PericodeView = class extends import_obsidian9.ItemView {
+var PericodeView = class extends import_obsidian10.ItemView {
   constructor(leaf, plugin) {
     super(leaf);
     this.plugin = plugin;
@@ -21389,9 +21376,9 @@ var PericodeView = class extends import_obsidian9.ItemView {
     return "bot";
   }
   async onOpen() {
-    const root = this.containerEl.children[1] ?? this.containerEl;
-    root.empty();
-    const view = root.createDiv({ cls: "pericode-view" });
+    const root2 = this.containerEl.children[1] ?? this.containerEl;
+    root2.empty();
+    const view = root2.createDiv({ cls: "pericode-view" });
     const header = view.createDiv({ cls: "pericode-header" });
     header.createSpan({ cls: "pericode-brand-mark", text: "PC", attr: { "aria-hidden": "true" } });
     const identity = header.createDiv({ cls: "pericode-chat-identity" });
@@ -21467,7 +21454,7 @@ var PericodeView = class extends import_obsidian9.ItemView {
         this.sessions = await this.store.load();
       } catch (err) {
         this.store = null;
-        new import_obsidian9.Notice(`Saved chats could not be loaded: ${String(err)}. Existing data was left intact.`, 1e4);
+        new import_obsidian10.Notice(`Saved chats could not be loaded: ${String(err)}. Existing data was left intact.`, 1e4);
       }
     }
     if (this.closed) return;
@@ -21485,7 +21472,7 @@ var PericodeView = class extends import_obsidian9.ItemView {
   }
   iconButton(parent, icon, label, action) {
     const button = parent.createEl("button", { cls: "pericode-icon-button", attr: { "aria-label": label, title: label } });
-    (0, import_obsidian9.setIcon)(button, icon);
+    (0, import_obsidian10.setIcon)(button, icon);
     button.addEventListener("click", action);
     return button;
   }
@@ -21504,7 +21491,7 @@ var PericodeView = class extends import_obsidian9.ItemView {
     const label = this.expanded ? "Restore sidebar" : "Expand chat";
     this.expandButtonEl.setAttribute("aria-label", label);
     this.expandButtonEl.title = label;
-    (0, import_obsidian9.setIcon)(this.expandButtonEl, this.expanded ? "minimize-2" : "maximize-2");
+    (0, import_obsidian10.setIcon)(this.expandButtonEl, this.expanded ? "minimize-2" : "maximize-2");
     this.resizeComposer();
     this.inputEl.focus();
   }
@@ -21519,22 +21506,18 @@ var PericodeView = class extends import_obsidian9.ItemView {
   }
   openContextMenu(anchor) {
     if (this.busy) return;
-    const menu = new import_obsidian9.Menu();
+    const menu = new import_obsidian10.Menu();
     menu.addItem((item) => item.setTitle("Add note or folder").setIcon("files").onClick(() => this.openContextPicker()));
     menu.addItem((item) => item.setTitle("Attach selected text").setIcon("text-select").onClick(() => {
-      const editor = this.app.workspace.getActiveViewOfType(import_obsidian9.MarkdownView);
+      const editor = this.app.workspace.getActiveViewOfType(import_obsidian10.MarkdownView);
       const text2 = editor?.editor.getSelection();
       if (editor?.file && text2) this.attachSelection(editor.file.path, text2);
-      else new import_obsidian9.Notice("Select text in a note, then use the Attach selection to chat command.");
+      else new import_obsidian10.Notice("Select text in a note, then use the Attach selection to chat command.");
     }));
     this.showMenu(menu, anchor);
   }
   openActions(anchor) {
-    const menu = new import_obsidian9.Menu();
-    menu.addItem((item) => item.setTitle("Copy all").setIcon("copy").onClick(() => {
-      const feedback = document.createElement("button");
-      void this.copyAllToClipboard(feedback);
-    }));
+    const menu = new import_obsidian10.Menu();
     menu.addItem((item) => item.setTitle("Save as note").setIcon("file-output").onClick(() => void this.exportNote()));
     menu.addSeparator();
     const recipes = {
@@ -21563,13 +21546,13 @@ var PericodeView = class extends import_obsidian9.ItemView {
   }
   async openModelMenu() {
     if (this.busy || !this.plugin.claimInteractiveTurn()) {
-      new import_obsidian9.Notice("Finish the active request, then choose a model.");
+      new import_obsidian10.Notice("Finish the active request, then choose a model.");
       return;
     }
     const settings = { ...this.plugin.settings };
     this.headerMetaEl.setText("Loading account models\u2026");
     this.headerMetaEl.toggleAttribute("disabled", true);
-    const menu = new import_obsidian9.Menu();
+    const menu = new import_obsidian10.Menu();
     try {
       const catalog = await loadAccountModels(settings);
       if (this.closed || this.plugin.settings.provider !== settings.provider) return;
@@ -21600,7 +21583,7 @@ var PericodeView = class extends import_obsidian9.ItemView {
     const text2 = this.inputEl.value.trim();
     if (!text2) return;
     if (!this.plugin.settings.model?.trim()) {
-      new import_obsidian9.Notice("Choose a model in AI connection before sending. Your draft is kept here.");
+      new import_obsidian10.Notice("Choose a model in AI connection before sending. Your draft is kept here.");
       this.openPluginSettings();
       return;
     }
@@ -21613,11 +21596,11 @@ var PericodeView = class extends import_obsidian9.ItemView {
       }
       prompt = contextPrompt(text2, this.attachments);
     } catch (err) {
-      new import_obsidian9.Notice(String(err));
+      new import_obsidian10.Notice(String(err));
       return;
     }
     if (!this.plugin.claimInteractiveTurn(() => this.stopTurn())) {
-      new import_obsidian9.Notice("Finish or stop the active PeriCode request first.");
+      new import_obsidian10.Notice("Finish or stop the active PeriCode request first.");
       return;
     }
     this.inputEl.value = "";
@@ -21658,13 +21641,16 @@ var PericodeView = class extends import_obsidian9.ItemView {
     const toolStarts = /* @__PURE__ */ new Map();
     let envScope;
     try {
+      if (settings.provider === "claude-oauth" || settings.provider === "grok-oauth") {
+        throw new Error("This local executable subscription route requires the forthcoming PeriCode localhost companion. Choose the provider's API connection for now.");
+      }
       if (subscriptionProvider(settings.provider)) {
         this.statusEl.setText("Checking subscription models\u2026");
         requireAccountModel(settings.model, await loadAccountModels(settings));
         if (controller.signal.aborted) return;
       }
       envScope = applyProviderEnvFromSettings(settings);
-      const provider = settings.provider === "ollama-cloud" ? ollamaAccountProvider(settings.ollamaHost) : resolveProvider(settings.provider === "grok-oauth" ? "xai" : settings.provider);
+      const provider = settings.provider === "ollama-cloud" ? ollamaAccountProvider(settings.ollamaHost) : resolveProvider(settings.provider);
       const researching = this.modePicker.value === "research";
       const registry2 = researching ? researchRegistry(this.plugin.activeRegistry()) : this.plugin.activeRegistry();
       const gate = this.plugin.registry.beginTurn(this.makeAskFn(), controller.signal, settings.alwaysPromptForTools);
@@ -21688,7 +21674,7 @@ var PericodeView = class extends import_obsidian9.ItemView {
         }),
         failed: mcpStatus.lastFailures
       };
-      const systemPromptForTurn = buildSystemPrompt({
+      const systemPromptForTurn = await buildSystemPrompt({
         cwd: this.plugin.vaultPath ?? process.cwd(),
         vaultName: this.app.vault.getName(),
         mcpInventory
@@ -21706,7 +21692,7 @@ var PericodeView = class extends import_obsidian9.ItemView {
         cwd: this.plugin.vaultPath ?? process.cwd(),
         signal: controller.signal
       };
-      const turn = settings.provider === "claude-oauth" ? claudeCodeTurn(turnOptions) : settings.provider === "grok-oauth" ? grokCodeTurn(turnOptions) : agentTurn(turnOptions);
+      const turn = agentTurn(turnOptions);
       for await (const event of turn) {
         switch (event.kind) {
           case "text_delta":
@@ -21756,7 +21742,7 @@ var PericodeView = class extends import_obsidian9.ItemView {
               try {
                 const verdict = scanUntrustedText(output);
                 if (verdict.hit) {
-                  new import_obsidian9.Notice(
+                  new import_obsidian10.Notice(
                     `Untrusted-text hit in '${event.event.name}': ${verdict.reason}` + (this.plugin.cachedPolicy.autoQuarantineOnJailbreak ? " \u2014 session quarantined." : ""),
                     8e3
                   );
@@ -21810,7 +21796,7 @@ var PericodeView = class extends import_obsidian9.ItemView {
       } else {
         failed = true;
         this.appendSystemMessage(`Agent crashed: ${message}`);
-        new import_obsidian9.Notice(`PeriCode error: ${message}`);
+        new import_obsidian10.Notice(`PeriCode error: ${message}`);
       }
     } finally {
       envScope?.restore();
@@ -21830,13 +21816,13 @@ var PericodeView = class extends import_obsidian9.ItemView {
   makeAskFn() {
     return async (request) => {
       if (this.currentAbort?.signal.aborted || this.closed) return "no";
-      return new Promise((resolve4) => {
+      return new Promise((resolve5) => {
         const signal = this.currentAbort?.signal;
         const abort = () => modal.close();
         const modal = new PermissionModal(this.app, request, (decision) => {
           signal?.removeEventListener("abort", abort);
           this.pendingPermission = null;
-          resolve4(signal?.aborted ? "no" : decision);
+          resolve5(signal?.aborted ? "no" : decision);
         });
         this.pendingPermission = modal;
         signal?.addEventListener("abort", abort, { once: true });
@@ -21850,7 +21836,7 @@ var PericodeView = class extends import_obsidian9.ItemView {
   }
   setBusyState(busy) {
     this.sendButtonEl.disabled = false;
-    (0, import_obsidian9.setIcon)(this.sendButtonEl, busy ? "square" : "arrow-up");
+    (0, import_obsidian10.setIcon)(this.sendButtonEl, busy ? "square" : "arrow-up");
     this.sendButtonEl.setAttribute("aria-label", busy ? "Stop" : "Send");
     this.sendButtonEl.title = busy ? "Stop (Escape)" : "Send (Enter)";
     this.headerMetaEl.toggleAttribute("disabled", busy);
@@ -21860,9 +21846,7 @@ var PericodeView = class extends import_obsidian9.ItemView {
   /**
    * Append a message bubble. Returns the inner content element so the caller
    * can keep mutating its text (e.g. streaming assistant deltas) without
-   * disturbing the wrapper or its hover Copy button. The Copy button reads
-   * `contentEl.textContent` at click time, so streamed content is always
-   * fully captured even if the button was added before streaming finished.
+   * disturbing the wrapper while streamed content is appended.
    */
   appendMessage(extraClass, initialText) {
     const wrapper = this.messagesEl.createDiv({
@@ -21870,15 +21854,6 @@ var PericodeView = class extends import_obsidian9.ItemView {
     });
     const contentEl = wrapper.createDiv({ cls: "pericode-message-content" });
     contentEl.setText(initialText);
-    const copyBtn = wrapper.createEl("button", {
-      cls: "pericode-copy-button",
-      text: "Copy",
-      attr: { title: "Copy this message" }
-    });
-    copyBtn.addEventListener("click", (event) => {
-      event.stopPropagation();
-      void this.copyToClipboard(contentEl.textContent ?? "", copyBtn);
-    });
     this.scrollToBottom();
     return contentEl;
   }
@@ -21980,48 +21955,6 @@ var PericodeView = class extends import_obsidian9.ItemView {
     if (out.length < 1e3) return `${out.length} chars`;
     return `${(out.length / 1e3).toFixed(1)}k chars`;
   }
-  async copyToClipboard(text2, button) {
-    if (!text2) return;
-    try {
-      await navigator.clipboard.writeText(text2);
-      const original = button.textContent ?? "Copy";
-      button.classList.add("pericode-copy-button-copied");
-      button.textContent = "Copied";
-      setTimeout(() => {
-        button.classList.remove("pericode-copy-button-copied");
-        button.textContent = original;
-      }, 1200);
-    } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
-      new import_obsidian9.Notice(`PeriCode: clipboard copy failed \u2014 ${message}`);
-    }
-  }
-  async copyAllToClipboard(button) {
-    const lines = [];
-    const children = Array.from(this.messagesEl.children);
-    for (const wrap of children) {
-      if (wrap.classList.contains("pericode-tool-entry")) {
-        const summary = wrap.querySelector(".pericode-tool-summary");
-        const text3 = summary?.textContent?.trim();
-        if (text3) lines.push("[tool] " + text3);
-        continue;
-      }
-      if (!wrap.classList.contains("pericode-message")) continue;
-      const content = wrap.querySelector(".pericode-message-content");
-      const text2 = content?.textContent?.trim();
-      if (!text2) continue;
-      let prefix = "";
-      if (wrap.classList.contains("pericode-message-user")) prefix = "You: ";
-      else if (wrap.classList.contains("pericode-message-assistant")) prefix = "PeriCode: ";
-      else if (wrap.classList.contains("pericode-message-system")) prefix = "[system] ";
-      lines.push(prefix + text2);
-    }
-    if (lines.length === 0) {
-      new import_obsidian9.Notice("PeriCode: nothing to copy yet.");
-      return;
-    }
-    await this.copyToClipboard(lines.join("\n\n"), button);
-  }
   stopTurn() {
     this.currentAbort?.abort();
     this.pendingPermission?.close();
@@ -22041,7 +21974,7 @@ var PericodeView = class extends import_obsidian9.ItemView {
         if (!file || !this.plugin.vaultPath) throw new Error("Source note not found.");
         await checkedVaultPath(file.path, this.plugin.vaultPath, this.plugin.cachedPolicy);
         await this.app.workspace.openLinkText(file.path, "", false);
-      })().catch((e) => new import_obsidian9.Notice(e instanceof Error ? e.message : String(e)));
+      })().catch((e) => new import_obsidian10.Notice(e instanceof Error ? e.message : String(e)));
     });
   }
   scheduleSave() {
@@ -22094,7 +22027,7 @@ var PericodeView = class extends import_obsidian9.ItemView {
   }
   async startConversation() {
     if (this.busy || !this.loaded || this.transitioning) {
-      new import_obsidian9.Notice("Stop the active request before starting another chat.");
+      new import_obsidian10.Notice("Stop the active request before starting another chat.");
       return;
     }
     this.transitioning = true;
@@ -22131,11 +22064,11 @@ var PericodeView = class extends import_obsidian9.ItemView {
   }
   confirmDelete() {
     if (this.busy || !this.loaded || this.transitioning) {
-      new import_obsidian9.Notice("Stop the active request before deleting a chat.");
+      new import_obsidian10.Notice("Stop the active request before deleting a chat.");
       return;
     }
     const id = this.conversation.id;
-    const modal = new import_obsidian9.Modal(this.app);
+    const modal = new import_obsidian10.Modal(this.app);
     modal.contentEl.createEl("h3", { text: `Delete \u201C${this.conversation.title}\u201D?` });
     modal.contentEl.createEl("p", { text: "This removes the saved conversation from PeriCode. Exported notes are kept." });
     modal.contentEl.createEl("button", { text: "Cancel" }).addEventListener("click", () => modal.close());
@@ -22158,14 +22091,14 @@ var PericodeView = class extends import_obsidian9.ItemView {
     try {
       const path = `PeriCode chat ${(/* @__PURE__ */ new Date()).toISOString().replace(/[:.]/g, "-")}-${this.conversation.id.slice(0, 8)}.md`;
       const file = await this.app.vault.create(path, exportConversation(this.conversation));
-      new import_obsidian9.Notice(`Saved conversation to ${file.path}`);
+      new import_obsidian10.Notice(`Saved conversation to ${file.path}`);
     } catch (err) {
-      new import_obsidian9.Notice(`Export failed: ${String(err)}`);
+      new import_obsidian10.Notice(`Export failed: ${String(err)}`);
     }
   }
   openContextPicker() {
     if (this.busy) return;
-    new ContextPicker(this.app, (path, folder) => void this.attachPath(path, folder)).open();
+    void openContextPicker(this.app, (path, folder) => void this.attachPath(path, folder));
   }
   prepareAttachment(path, text2, kind) {
     const policy = this.plugin.cachedPolicy ?? defaultPolicy();
@@ -22183,12 +22116,12 @@ var PericodeView = class extends import_obsidian9.ItemView {
       this.renderAttachments();
       this.inputEl.focus();
     } catch (err) {
-      new import_obsidian9.Notice(String(err));
+      new import_obsidian10.Notice(String(err));
     }
   }
   async attachPath(path, folder) {
     try {
-      const paths = folder ? folderNotes(path, this.app.vault.getMarkdownFiles().map((f2) => f2.path)) : [path];
+      const paths = folder ? folderNotes(path, (await markdownFiles(this.app)).map((f2) => f2.path)) : [path];
       if (!paths.length) throw new Error("This folder has no Markdown notes.");
       if (paths.length + this.attachments.length > 20) throw new Error("Choose a smaller folder (20 context items maximum).");
       const next = [...this.attachments];
@@ -22197,7 +22130,7 @@ var PericodeView = class extends import_obsidian9.ItemView {
         if (!this.plugin.vaultPath) throw new Error("A local vault is required.");
         await checkedVaultPath(source, this.plugin.vaultPath, this.plugin.cachedPolicy);
         const file = this.app.vault.getAbstractFileByPath(source);
-        if (!(file instanceof import_obsidian9.TFile) || file.extension !== "md") throw new Error(`Note not found: ${source}`);
+        if (!(file instanceof import_obsidian10.TFile) || file.extension !== "md") throw new Error(`Note not found: ${source}`);
         if (file.stat.size > FILE_LIMIT * 4) throw new Error(`${source} is too large. Select a passage instead.`);
         next.push(this.prepareAttachment(source, await this.app.vault.cachedRead(file), "note"));
       }
@@ -22207,7 +22140,7 @@ var PericodeView = class extends import_obsidian9.ItemView {
       this.renderAttachments();
       this.inputEl.focus();
     } catch (err) {
-      new import_obsidian9.Notice(String(err));
+      new import_obsidian10.Notice(String(err));
     }
   }
   renderAttachments() {
@@ -22225,7 +22158,7 @@ var PericodeView = class extends import_obsidian9.ItemView {
   renderWelcomeState() {
     const card = this.messagesEl.createDiv({ cls: "pericode-welcome-card" });
     const icon = card.createDiv({ cls: "pericode-welcome-icon" });
-    (0, import_obsidian9.setIcon)(icon, "messages-square");
+    (0, import_obsidian10.setIcon)(icon, "messages-square");
     card.createEl("h3", { cls: "pericode-welcome-heading", text: "Work with your vault" });
     card.createEl("p", { cls: "pericode-welcome-sub", text: "Choose a starting question, or write your own." });
     const starters = card.createDiv({ cls: "pericode-starters" });
@@ -22238,7 +22171,7 @@ var PericodeView = class extends import_obsidian9.ItemView {
       starters.createEl("button", { text: label, cls: "pericode-starter", attr: { title: "Prepare a draft. Nothing is sent until you press Send." } }).addEventListener("click", () => {
         if (this.busy) return;
         if (this.inputEl.value.trim()) {
-          new import_obsidian9.Notice("Send or clear your current draft before choosing a starting question.");
+          new import_obsidian10.Notice("Send or clear your current draft before choosing a starting question.");
           return;
         }
         this.modePicker.value = "research";
@@ -22269,16 +22202,16 @@ var PericodeView = class extends import_obsidian9.ItemView {
 };
 
 // src/main.ts
-var import_obsidian15 = require("obsidian");
+var import_obsidian16 = require("obsidian");
 
 // src/obsidianTools.ts
 init_scoped_fetch();
-var import_obsidian10 = require("obsidian");
+var import_obsidian11 = require("obsidian");
 
 // src/workspaceSurface.ts
 init_scoped_fetch();
-function settingsHost(app) {
-  return app.setting;
+function settingsHost(app2) {
+  return app2.setting;
 }
 function isVisible(el) {
   if (!el?.isConnected || el.ownerDocument.defaultView?.closed || !el.getClientRects().length) return false;
@@ -22288,8 +22221,8 @@ function isVisible(el) {
 function focused(doc) {
   return doc?.hasFocus() ?? false;
 }
-function settingsSurface(app) {
-  const host = settingsHost(app);
+function settingsSurface(app2) {
+  const host = settingsHost(app2);
   const docs = [...new Set([host?.popout?.win?.document, host?.win?.document, host?.activeTab?.containerEl?.ownerDocument, host?.containerEl?.ownerDocument].filter((d) => !!d))];
   for (const doc of docs) {
     const selected = Array.from(doc.querySelectorAll(".vertical-tab-nav-item.is-active")).find(isVisible);
@@ -22306,14 +22239,14 @@ function settingsSurface(app) {
   }
   return { open: false, focused: false, separateWindow: false, selectedTab: null, visibleSettingLabels: [] };
 }
-function workspaceSurface(app) {
-  const settings = settingsSurface(app);
+function workspaceSurface(app2) {
+  const settings = settingsSurface(app2);
   const leaves = [];
-  app.workspace.iterateAllLeaves((leaf2) => {
+  app2.workspace.iterateAllLeaves((leaf2) => {
     if (isVisible(leaf2.view.containerEl) && leaf2.view.getViewType() !== "pericode-chat") leaves.push(leaf2);
   });
-  const active = app.workspace.activeLeaf;
-  const recent = app.workspace.getMostRecentLeaf();
+  const active = app2.workspace.activeLeaf;
+  const recent = app2.workspace.getMostRecentLeaf();
   const leaf = leaves.find((l) => focused(l.view.containerEl.ownerDocument) && l.view.containerEl.contains(l.view.containerEl.ownerDocument.activeElement)) ?? (active && leaves.includes(active) ? active : null) ?? (recent && leaves.includes(recent) ? recent : null) ?? leaves[0] ?? null;
   const docs = [...new Set(leaves.map((l) => l.view.containerEl.ownerDocument))];
   const modal = docs.flatMap((doc) => Array.from(doc.querySelectorAll(".modal-container"))).find(isVisible);
@@ -22338,9 +22271,9 @@ function surfaceSummary(surface) {
 
 // src/obsidianTools.ts
 var PERICODE_VIEW_TYPE2 = "pericode-chat";
-function getFileExplorerView(app) {
+function getFileExplorerView(app2) {
   try {
-    const leaf = app.workspace.getLeavesOfType("file-explorer")[0];
+    const leaf = app2.workspace.getLeavesOfType("file-explorer")[0];
     if (!leaf) return null;
     return leaf.view;
   } catch {
@@ -22375,7 +22308,7 @@ function collectFolderPaths(explorer, underPath) {
   }
   return out;
 }
-function collapseFolderTool(app) {
+function collapseFolderTool(app2) {
   return {
     readOnly: false,
     definition: {
@@ -22403,7 +22336,7 @@ function collapseFolderTool(app) {
         return { output: "obsidian_collapse_folder requires a non-empty path", isError: true };
       }
       const recursive = input.recursive !== false;
-      const explorer = getFileExplorerView(app);
+      const explorer = getFileExplorerView(app2);
       if (!explorer) {
         return {
           output: "Obsidian file-explorer view is not open. Open it from the left sidebar first.",
@@ -22432,7 +22365,7 @@ function collapseFolderTool(app) {
     }
   };
 }
-function expandFolderTool(app) {
+function expandFolderTool(app2) {
   return {
     readOnly: false,
     definition: {
@@ -22450,7 +22383,7 @@ function expandFolderTool(app) {
     async execute(input) {
       const path = (input.path ?? "").trim().replace(/\\/g, "/").replace(/^\/+|\/+$/g, "");
       if (!path) return { output: "obsidian_expand_folder requires a path", isError: true };
-      const explorer = getFileExplorerView(app);
+      const explorer = getFileExplorerView(app2);
       if (!explorer) return { output: "File-explorer view not open.", isError: true };
       const ok = setItemCollapsed(explorer, path, false);
       if (!ok) return { output: `Could not expand '${path}'. Folder may not exist.`, isError: true };
@@ -22458,7 +22391,7 @@ function expandFolderTool(app) {
     }
   };
 }
-function collapseAllTool(app) {
+function collapseAllTool(app2) {
   return {
     readOnly: false,
     definition: {
@@ -22471,7 +22404,7 @@ function collapseAllTool(app) {
       }
     },
     async execute() {
-      const explorer = getFileExplorerView(app);
+      const explorer = getFileExplorerView(app2);
       if (!explorer) return { output: "File-explorer view not open.", isError: true };
       const folders = collectFolderPaths(explorer);
       let n = 0;
@@ -22482,7 +22415,7 @@ function collapseAllTool(app) {
     }
   };
 }
-function openNoteTool(app) {
+function openNoteTool(app2) {
   return {
     readOnly: false,
     definition: {
@@ -22504,13 +22437,13 @@ function openNoteTool(app) {
     async execute(input) {
       const rawPath = (input.path ?? "").trim().replace(/\\/g, "/").replace(/^\/+/, "");
       if (!rawPath) return { output: "obsidian_open_note requires a path", isError: true };
-      const file = app.vault.getAbstractFileByPath(rawPath);
-      if (!file || !(file instanceof import_obsidian10.TFile)) {
+      const file = app2.vault.getAbstractFileByPath(rawPath);
+      if (!file || !(file instanceof import_obsidian11.TFile)) {
         return { output: `No note at '${rawPath}'.`, isError: true };
       }
       const newPane = input.new_pane === true;
       try {
-        const leaf = app.workspace.getLeaf(newPane);
+        const leaf = app2.workspace.getLeaf(newPane);
         await leaf.openFile(file);
         return { output: `Opened '${rawPath}'.`, isError: false };
       } catch (err) {
@@ -22522,7 +22455,7 @@ function openNoteTool(app) {
     }
   };
 }
-function deleteNoteTool(app) {
+function deleteNoteTool(app2) {
   return {
     readOnly: false,
     definition: {
@@ -22549,14 +22482,14 @@ function deleteNoteTool(app) {
       if (!rawPath) {
         return { output: "obsidian_delete_note requires a path", isError: true };
       }
-      const target = app.vault.getAbstractFileByPath(rawPath);
+      const target = app2.vault.getAbstractFileByPath(rawPath);
       if (!target) {
         return { output: `No file or folder at '${rawPath}'.`, isError: true };
       }
-      const kind = target instanceof import_obsidian10.TFile ? "file" : "folder";
-      if (!(target instanceof import_obsidian10.TFile) || input.permanent === true) return { output: "Only recoverable deletion of individual notes is allowed.", isError: true };
+      const kind = target instanceof import_obsidian11.TFile ? "file" : "folder";
+      if (!(target instanceof import_obsidian11.TFile) || input.permanent === true) return { output: "Only recoverable deletion of individual notes is allowed.", isError: true };
       try {
-        await app.vault.trash(target, true);
+        await app2.vault.trash(target, true);
         return {
           output: `Moved ${kind} '${rawPath}' to trash (recoverable from the OS trash or vault .trash, per your Obsidian settings).`,
           isError: false
@@ -22570,7 +22503,7 @@ function deleteNoteTool(app) {
     }
   };
 }
-function getActiveFileTool(app) {
+function getActiveFileTool(app2) {
   return {
     readOnly: true,
     definition: {
@@ -22579,13 +22512,13 @@ function getActiveFileTool(app) {
       input_schema: { type: "object", properties: {}, additionalProperties: false }
     },
     async execute() {
-      const surface = workspaceSurface(app);
+      const surface = workspaceSurface(app2);
       if (surface.kind !== "workspace") return { output: JSON.stringify(surfaceSummary(surface)), isError: false };
       const file = surface.leaf?.view?.file;
       if (!file) return { output: "No active note in the editor.", isError: false };
       let preview = "";
       try {
-        const text2 = await app.vault.read(file);
+        const text2 = await app2.vault.read(file);
         preview = text2.length > 1500 ? text2.slice(0, 1500) + "\n\u2026[truncated]" : text2;
       } catch {
       }
@@ -22600,7 +22533,7 @@ ${preview}`,
     }
   };
 }
-function getActiveViewTool(app) {
+function getActiveViewTool(app2) {
   return {
     readOnly: true,
     definition: {
@@ -22609,7 +22542,7 @@ function getActiveViewTool(app) {
       input_schema: { type: "object", properties: {}, additionalProperties: false }
     },
     async execute() {
-      const surface = workspaceSurface(app);
+      const surface = workspaceSurface(app2);
       if (surface.kind !== "workspace") return { output: JSON.stringify(surfaceSummary(surface)), isError: false };
       const leaf = surface.leaf;
       const view = leaf?.view;
@@ -22628,11 +22561,11 @@ function getActiveViewTool(app) {
         `display_text: ${displayText || "(none)"}`
       ];
       const file = view.file;
-      if (file instanceof import_obsidian10.TFile) {
+      if (file instanceof import_obsidian11.TFile) {
         lines.push(`file_path: ${file.path}`);
         lines.push(`file_size: ${file.stat?.size ?? "?"} bytes`);
         try {
-          const text2 = await app.vault.read(file);
+          const text2 = await app2.vault.read(file);
           const preview = text2.length > 1500 ? text2.slice(0, 1500) + "\n\u2026[truncated]" : text2;
           lines.push("", "content_preview:", preview);
         } catch {
@@ -22675,7 +22608,7 @@ function describeNonFileView(viewType) {
       return "";
   }
 }
-function inspectViewTool(app) {
+function inspectViewTool(app2) {
   return {
     readOnly: true,
     definition: {
@@ -22684,7 +22617,7 @@ function inspectViewTool(app) {
       input_schema: { type: "object", properties: {}, additionalProperties: false }
     },
     async execute() {
-      const surface = workspaceSurface(app);
+      const surface = workspaceSurface(app2);
       if (surface.kind !== "workspace") return { output: JSON.stringify(surfaceSummary(surface)), isError: false };
       const leaf = surface.leaf;
       const view = leaf?.view;
@@ -22705,7 +22638,7 @@ function inspectViewTool(app) {
         } else if (viewType === "outline") {
           payload = { ...payload, ...inspectOutline(view) };
         } else if (viewType === "markdown") {
-          payload = { ...payload, ...await inspectMarkdown(app, view) };
+          payload = { ...payload, ...await inspectMarkdown(app2, view) };
         } else if (viewType === "file-explorer") {
           payload = { ...payload, ...inspectFileExplorer(view) };
         } else {
@@ -22811,12 +22744,12 @@ function inspectOutline(view) {
     headings: headings.slice(0, 50)
   };
 }
-async function inspectMarkdown(app, view) {
+async function inspectMarkdown(app2, view) {
   const file = view.file;
-  if (!(file instanceof import_obsidian10.TFile)) return { note: "no file associated with view" };
+  if (!(file instanceof import_obsidian11.TFile)) return { note: "no file associated with view" };
   let text2 = "";
   try {
-    text2 = await app.vault.read(file);
+    text2 = await app2.vault.read(file);
   } catch (err) {
     return {
       file: file.path,
@@ -22869,7 +22802,7 @@ function inspectFileExplorer(view) {
     folders_collapsed: folderCollapsed
   };
 }
-function closeActiveTabTool(app) {
+function closeActiveTabTool(app2) {
   return {
     readOnly: false,
     definition: {
@@ -22890,12 +22823,12 @@ function closeActiveTabTool(app) {
       const targetPath = (input.target_path ?? "").trim().replace(/\\/g, "/").replace(/^\/+/, "");
       if (targetPath) {
         let closed = null;
-        app.workspace.iterateAllLeaves((leaf) => {
+        app2.workspace.iterateAllLeaves((leaf) => {
           if (closed) return;
           const view2 = leaf.view;
           if (view2?.getViewType?.() === PERICODE_VIEW_TYPE2) return;
           const file2 = view2.file;
-          if (file2 instanceof import_obsidian10.TFile && file2.path === targetPath) {
+          if (file2 instanceof import_obsidian11.TFile && file2.path === targetPath) {
             try {
               leaf.detach();
               closed = file2.path;
@@ -22911,10 +22844,10 @@ function closeActiveTabTool(app) {
           isError: true
         };
       }
-      const recent = app.workspace.getMostRecentLeaf();
+      const recent = app2.workspace.getMostRecentLeaf();
       let target = recent && recent.view?.getViewType?.() !== PERICODE_VIEW_TYPE2 ? recent : null;
       if (!target) {
-        app.workspace.iterateAllLeaves((leaf) => {
+        app2.workspace.iterateAllLeaves((leaf) => {
           if (target) return;
           if (leaf.view?.getViewType?.() === PERICODE_VIEW_TYPE2) return;
           target = leaf;
@@ -22928,7 +22861,7 @@ function closeActiveTabTool(app) {
       }
       const view = target.view;
       const file = view.file;
-      const label = file instanceof import_obsidian10.TFile ? file.path : view?.getDisplayText?.() ?? "(untitled)";
+      const label = file instanceof import_obsidian11.TFile ? file.path : view?.getDisplayText?.() ?? "(untitled)";
       try {
         target.detach();
         return { output: `Closed tab '${label}'.`, isError: false };
@@ -22941,7 +22874,7 @@ function closeActiveTabTool(app) {
     }
   };
 }
-function listPluginsTool(app) {
+function listPluginsTool(app2) {
   return {
     readOnly: true,
     definition: {
@@ -22960,7 +22893,7 @@ function listPluginsTool(app) {
     },
     async execute(input) {
       const includeDisabled = input.include_disabled === true;
-      const plugins = app.plugins;
+      const plugins = app2.plugins;
       if (!plugins) {
         return { output: JSON.stringify({ error: "plugins API unavailable" }), isError: true };
       }
@@ -23009,7 +22942,7 @@ function listPluginsTool(app) {
     }
   };
 }
-function callPluginApiTool(app) {
+function callPluginApiTool(app2) {
   return {
     readOnly: false,
     // some plugin APIs mutate vault state — let the gate prompt
@@ -23067,7 +23000,7 @@ function callPluginApiTool(app) {
           }
         }
       }
-      const instance = app.plugins?.plugins?.[pluginId];
+      const instance = app2.plugins?.plugins?.[pluginId];
       if (!instance) {
         return {
           output: `Plugin '${pluginId}' is not installed or not enabled. Run obsidian_list_plugins to see what's available.`,
@@ -23139,7 +23072,7 @@ function safeStringifyResult(value) {
 ${JSON.stringify(out, null, 2)}`;
   }
 }
-function listOpenTabsTool(app) {
+function listOpenTabsTool(app2) {
   return {
     readOnly: true,
     definition: {
@@ -23148,12 +23081,12 @@ function listOpenTabsTool(app) {
       input_schema: { type: "object", properties: {}, additionalProperties: false }
     },
     async execute() {
-      const active = app.workspace.getActiveFile();
+      const active = app2.workspace.getActiveFile();
       const lines = [];
-      app.workspace.iterateAllLeaves((leaf) => {
+      app2.workspace.iterateAllLeaves((leaf) => {
         const view = leaf.view;
         const file = view.file;
-        if (file instanceof import_obsidian10.TFile) {
+        if (file instanceof import_obsidian11.TFile) {
           const marker = active?.path === file.path ? " * (focused)" : "";
           lines.push(`${file.path}${marker}`);
         }
@@ -23165,7 +23098,7 @@ function listOpenTabsTool(app) {
     }
   };
 }
-function runObsidianCommandTool(app) {
+function runObsidianCommandTool(app2) {
   return {
     readOnly: false,
     definition: {
@@ -23219,7 +23152,7 @@ function runObsidianCommandTool(app) {
         }
       }
       try {
-        const ok = app.commands?.executeCommandById?.(id);
+        const ok = app2.commands?.executeCommandById?.(id);
         if (ok === false) {
           return { output: `Command '${id}' is not available right now.`, isError: true };
         }
@@ -23233,7 +23166,7 @@ function runObsidianCommandTool(app) {
     }
   };
 }
-function listObsidianCommandsTool(app) {
+function listObsidianCommandsTool(app2) {
   return {
     readOnly: true,
     definition: {
@@ -23251,7 +23184,7 @@ function listObsidianCommandsTool(app) {
     async execute(input) {
       const contains = (input.contains ?? "").trim().toLowerCase();
       const limit = Math.max(1, input.limit || 80);
-      const all = app.commands?.commands ?? {};
+      const all = app2.commands?.commands ?? {};
       const matched = [];
       for (const [id, cmd] of Object.entries(all)) {
         if (contains && !id.toLowerCase().includes(contains) && !(cmd.name ?? "").toLowerCase().includes(contains)) {
@@ -23270,26 +23203,26 @@ ${matched.join("\n")}` + (matched.length >= limit ? "\n\u2026(truncated)" : ""),
     }
   };
 }
-function createObsidianHostTools(app) {
+function createObsidianHostTools(app2) {
   return [
-    collapseFolderTool(app),
-    expandFolderTool(app),
-    collapseAllTool(app),
-    openNoteTool(app),
-    deleteNoteTool(app),
-    getActiveFileTool(app),
-    getActiveViewTool(app),
-    inspectViewTool(app),
-    closeActiveTabTool(app),
-    listPluginsTool(app),
-    callPluginApiTool(app),
-    listOpenTabsTool(app),
-    runObsidianCommandTool(app),
-    listObsidianCommandsTool(app),
-    inspectConfigTool(app)
+    collapseFolderTool(app2),
+    expandFolderTool(app2),
+    collapseAllTool(app2),
+    openNoteTool(app2),
+    deleteNoteTool(app2),
+    getActiveFileTool(app2),
+    getActiveViewTool(app2),
+    inspectViewTool(app2),
+    closeActiveTabTool(app2),
+    listPluginsTool(app2),
+    callPluginApiTool(app2),
+    listOpenTabsTool(app2),
+    runObsidianCommandTool(app2),
+    listObsidianCommandsTool(app2),
+    inspectConfigTool(app2)
   ];
 }
-function inspectConfigTool(app) {
+function inspectConfigTool(app2) {
   return {
     readOnly: true,
     definition: {
@@ -23309,16 +23242,16 @@ function inspectConfigTool(app) {
     },
     async execute(input) {
       const section = input.section ?? "all";
-      const adapter = app.vault.adapter;
-      const vaultPath = adapter.basePath ?? "";
-      if (!vaultPath) {
+      const adapter2 = app2.vault.adapter;
+      const vaultPath2 = adapter2.basePath ?? "";
+      if (!vaultPath2) {
         return {
           output: JSON.stringify({ error: "vault path unavailable" }),
           isError: true
         };
       }
       const { readObsidianConfigSnapshot: readObsidianConfigSnapshot2 } = await Promise.resolve().then(() => (init_obsidianHostBridge(), obsidianHostBridge_exports));
-      const snap = await readObsidianConfigSnapshot2(vaultPath);
+      const snap = await readObsidianConfigSnapshot2(vaultPath2);
       let payload = snap;
       if (section === "plugins") payload = { enabledCommunityPlugins: snap.enabledCommunityPlugins };
       else if (section === "themes") payload = { installedThemes: snap.installedThemes };
@@ -23332,7 +23265,7 @@ function inspectConfigTool(app) {
 
 // src/vaultReadTools.ts
 init_scoped_fetch();
-var import_promises5 = require("node:fs/promises");
+init_safeVaultFs();
 var import_node_path20 = require("node:path");
 function vaultReadTools(deps) {
   return ["list_dir", "search_files"].map((name) => ({
@@ -23346,7 +23279,7 @@ function vaultReadTools(deps) {
       const vault = deps.getVaultPath();
       if (!vault) throw new Error("No local vault.");
       const policy = deps.getPolicy();
-      const root = await checkedVaultPath(String(input.path ?? "") || ".", vault, policy);
+      const root2 = await checkedVaultPath(String(input.path ?? "") || ".", vault, policy);
       const pattern = String(input.pattern ?? "");
       if (name === "search_files" && (!pattern || pattern.length > 1e3)) throw new Error("Provide 1\u20131000 characters of literal search text.");
       const output = [];
@@ -23360,12 +23293,12 @@ function vaultReadTools(deps) {
         } catch {
           return;
         }
-        const info = await (0, import_promises5.lstat)(path);
+        const info = await lstat(path);
         if (info.isSymbolicLink()) return;
         const label = (0, import_node_path20.relative)(vault, path).replace(/\\/g, "/");
         if (info.isDirectory()) {
           if (name === "list_dir" && label) output.push(label + "/");
-          for (const entry of (await (0, import_promises5.readdir)(path)).slice(0, 1e3)) {
+          for (const entry of (await readdir(path)).slice(0, 1e3)) {
             if (entry.startsWith(".") || ["node_modules", "dist", "build"].includes(entry)) continue;
             await visit((0, import_node_path20.join)(path, entry), depth + 1);
           }
@@ -23377,14 +23310,14 @@ function vaultReadTools(deps) {
           }
           if (info.size > 1e6 || /(?:secret|credential|^\.env|\.pem$|\.pfx$|\.p12$|^id_rsa|\.kdbx$)/i.test(label.split("/").pop())) return;
           bytes += info.size;
-          const content = await (0, import_promises5.readFile)(path, "utf8");
+          const content = await readFile(path, "utf8");
           if (content.includes("\0")) return;
           for (const [i, line] of content.split(/\r?\n/).entries()) {
             if (line.includes(pattern) && output.length < 50) output.push(`${label}:${i + 1}:${line.slice(0, 1e3)}`);
           }
         }
       };
-      await visit(root.absolute, 0);
+      await visit(root2.absolute, 0);
       return { output: (output.join("\n") || "(no accessible matches)") + "\n[Bounded vault scan]", isError: false };
     }
   }));
@@ -23392,8 +23325,8 @@ function vaultReadTools(deps) {
 
 // src/vaultManagementTools.ts
 init_scoped_fetch();
-var import_promises6 = require("node:fs/promises");
-var import_obsidian11 = require("obsidian");
+init_safeVaultFs();
+var import_obsidian12 = require("obsidian");
 init_pericodeSecurity();
 var MAX_TEXT = 2e6;
 var pathProperty = { type: "string", description: "Exact vault-relative path, including extension for files." };
@@ -23406,7 +23339,7 @@ function boundedText(value) {
   if (Buffer.byteLength(value) > MAX_TEXT) throw new Error("Text exceeds the 2 MB limit.");
   return value;
 }
-function createVaultManagementTools(app, deps) {
+function createVaultManagementTools(app2, deps) {
   const tool = (name, description, readOnly, properties, required2, run) => ({
     readOnly,
     definition: { name, description, input_schema: { type: "object", properties, required: required2, additionalProperties: false } },
@@ -23431,17 +23364,17 @@ function createVaultManagementTools(app, deps) {
     }
   });
   const file = (path, markdown = false) => {
-    const entry = app.vault.getAbstractFileByPath(path);
-    if (!(entry instanceof import_obsidian11.TFile)) throw new Error("File not found. Use list_dir to locate its exact path.");
+    const entry = app2.vault.getAbstractFileByPath(path);
+    if (!(entry instanceof import_obsidian12.TFile)) throw new Error("File not found. Use list_dir to locate its exact path.");
     if (markdown && entry.extension !== "md") throw new Error("This operation requires a Markdown note.");
     return entry;
   };
   const target = async (value, check2) => {
     const path = await check2(value);
     if (!path) throw new Error("The vault root cannot be changed.");
-    if (app.vault.getAbstractFileByPath(path) || await app.vault.adapter.exists(path)) throw new Error("Destination already exists; nothing was overwritten.");
+    if (app2.vault.getAbstractFileByPath(path) || await app2.vault.adapter.exists(path)) throw new Error("Destination already exists; nothing was overwritten.");
     const parent = path.includes("/") ? path.slice(0, path.lastIndexOf("/")) : "";
-    if (parent && !(app.vault.getAbstractFileByPath(parent) instanceof import_obsidian11.TFolder)) throw new Error("Create the destination parent folder first.");
+    if (parent && !(app2.vault.getAbstractFileByPath(parent) instanceof import_obsidian12.TFolder)) throw new Error("Create the destination parent folder first.");
     return path;
   };
   return [
@@ -23456,7 +23389,7 @@ function createVaultManagementTools(app, deps) {
         const path = await target(text(input, "path"), check2);
         if (!path.endsWith(".md")) throw new Error("Note path must end in .md.");
         active();
-        await app.vault.create(path, content);
+        await app2.vault.create(path, content);
         return { created: path };
       }
     ),
@@ -23469,7 +23402,7 @@ function createVaultManagementTools(app, deps) {
       async (input, check2, active) => {
         const path = await target(text(input, "path"), check2);
         active();
-        await app.vault.createFolder(path);
+        await app2.vault.createFolder(path);
         return { created: path };
       }
     ),
@@ -23482,7 +23415,7 @@ function createVaultManagementTools(app, deps) {
       async (input, check2, active) => {
         const path = await check2(text(input, "path"));
         if (!path) throw new Error("The vault root cannot be moved.");
-        const entry = app.vault.getAbstractFileByPath(path);
+        const entry = app2.vault.getAbstractFileByPath(path);
         if (!entry) throw new Error("Source not found.");
         const destination = await target(text(input, "target_path"), check2);
         if (destination.toLowerCase().startsWith(path.toLowerCase() + "/")) throw new Error("Cannot move a folder inside itself.");
@@ -23492,12 +23425,12 @@ function createVaultManagementTools(app, deps) {
           await check2(source);
           await check2(dest);
           const absolute = (await checkedVaultPath(source, deps.getVaultPath(), deps.getPolicy())).absolute;
-          const info = await (0, import_promises6.lstat)(absolute);
-          if (info.isDirectory()) for (const child of await (0, import_promises6.readdir)(absolute)) await inspectTree(`${source}/${child}`, `${dest}/${child}`);
+          const info = await lstat(absolute);
+          if (info.isDirectory()) for (const child of await readdir(absolute)) await inspectTree(`${source}/${child}`, `${dest}/${child}`);
         };
         await inspectTree(path, destination);
         active();
-        await app.vault.rename(entry, destination);
+        await app2.vault.rename(entry, destination);
         return { moved: path, to: destination, linksUpdated: false, message: "Review backlinks and update affected notes separately." };
       }
     ),
@@ -23511,12 +23444,12 @@ function createVaultManagementTools(app, deps) {
         const source = file(await check2(text(input, "path")));
         if (source.stat.size > 2e7) throw new Error("Copy exceeds the 20 MB limit.");
         const destination = await target(text(input, "target_path"), check2);
-        const bytes = await app.vault.readBinary(source);
+        const bytes = await app2.vault.readBinary(source);
         if (bytes.byteLength > 2e7) throw new Error("Copy exceeds the 20 MB limit.");
         await check2(source.path);
         await check2(destination);
         active();
-        await app.vault.createBinary(destination, bytes);
+        await app2.vault.createBinary(destination, bytes);
         return { copied: source.path, to: destination };
       }
     ),
@@ -23531,7 +23464,7 @@ function createVaultManagementTools(app, deps) {
         const note = file(await check2(text(input, "path")), true);
         if (note.stat.size > MAX_TEXT) throw new Error("Note exceeds the 2 MB limit.");
         active();
-        await app.vault.process(note, (before) => {
+        await app2.vault.process(note, (before) => {
           active();
           return boundedText(before + content);
         });
@@ -23560,7 +23493,7 @@ function createVaultManagementTools(app, deps) {
         const note = file(await check2(text(input, "path")), true);
         if (note.stat.size > MAX_TEXT) throw new Error("Note exceeds the 2 MB limit.");
         active();
-        await app.fileManager.processFrontMatter(note, (fm) => {
+        await app2.fileManager.processFrontMatter(note, (fm) => {
           active();
           for (const [key, value] of Object.entries(changes)) {
             if (value === null) delete fm[key];
@@ -23579,12 +23512,12 @@ function createVaultManagementTools(app, deps) {
       async (input, check2, active) => {
         const path = await check2(text(input, "path"));
         if (!path) throw new Error("The vault root cannot be deleted.");
-        const folder = app.vault.getAbstractFileByPath(path);
-        if (!(folder instanceof import_obsidian11.TFolder)) throw new Error("Folder not found.");
+        const folder = app2.vault.getAbstractFileByPath(path);
+        if (!(folder instanceof import_obsidian12.TFolder)) throw new Error("Folder not found.");
         const absolute = (await checkedVaultPath(path, deps.getVaultPath(), deps.getPolicy())).absolute;
-        if ((await (0, import_promises6.readdir)(absolute)).length) throw new Error("Folder is not empty. Trash individual files first.");
+        if ((await readdir(absolute)).length) throw new Error("Folder is not empty. Trash individual files first.");
         active();
-        await app.vault.trash(folder, true);
+        await app2.vault.trash(folder, true);
         return { trashed: path };
       }
     ),
@@ -23596,7 +23529,7 @@ function createVaultManagementTools(app, deps) {
       ["path"],
       async (input, check2) => {
         const note = file(await check2(text(input, "path")), true);
-        const cache = app.metadataCache.getFileCache(note);
+        const cache = app2.metadataCache.getFileCache(note);
         const visible = async (paths) => {
           const output = [];
           for (const path of paths.slice(0, 1e3)) {
@@ -23608,7 +23541,7 @@ function createVaultManagementTools(app, deps) {
           }
           return output;
         };
-        const links = app.metadataCache.resolvedLinks;
+        const links = app2.metadataCache.resolvedLinks;
         return {
           path: note.path,
           size: note.stat.size,
@@ -23636,7 +23569,7 @@ function createVaultManagementTools(app, deps) {
         if (!Number.isSafeInteger(cursor) || Number(cursor) < 0) throw new Error("cursor must be a non-negative integer.");
         const query = String(input.query ?? "").toLowerCase();
         const tag = String(input.tag ?? "").replace(/^#/, "").toLowerCase();
-        const files = app.vault.getMarkdownFiles().sort((a, b2) => a.path.localeCompare(b2.path));
+        const files = (await markdownFiles(app2)).sort((a, b2) => a.path.localeCompare(b2.path));
         const end = Math.min(Number(cursor) + 200, files.length);
         const notes = [];
         for (const note of files.slice(Number(cursor), end)) {
@@ -23647,7 +23580,7 @@ function createVaultManagementTools(app, deps) {
           } catch {
             continue;
           }
-          const cache = app.metadataCache.getFileCache(note);
+          const cache = app2.metadataCache.getFileCache(note);
           const rawTags = cache?.frontmatter?.tags;
           const tags = [...cache?.tags?.map((t) => t.tag) ?? [], ...Array.isArray(rawTags) ? rawTags.filter((t) => typeof t === "string") : typeof rawTags === "string" ? rawTags.split(/[ ,]+/) : []];
           if (tag && !tags.some((t) => t.replace(/^#/, "").toLowerCase() === tag)) continue;
@@ -23661,12 +23594,12 @@ function createVaultManagementTools(app, deps) {
 
 // src/workspaceTools.ts
 init_scoped_fetch();
-function createWorkspaceTools(app) {
+function createWorkspaceTools(app2) {
   return [{
     readOnly: true,
     definition: { name: "obsidian_get_settings", description: "Report whether Obsidian Settings is open, including a separate Settings window, its selected tab and visible setting labels. Does not read saved configuration, control values, API keys or passwords.", input_schema: { type: "object", properties: {}, additionalProperties: false } },
     async execute() {
-      return { output: JSON.stringify(settingsSurface(app)), isError: false };
+      return { output: JSON.stringify(settingsSurface(app2)), isError: false };
     }
   }, {
     readOnly: false,
@@ -23680,18 +23613,18 @@ function createWorkspaceTools(app) {
       if (typeof type !== "string" || !["graph", "search", "file-explorer", "settings"].includes(type)) throw new Error("Choose graph, search, file-explorer or settings.");
       context?.signal?.throwIfAborted();
       if (type === "settings") {
-        const host = settingsHost(app);
+        const host = settingsHost(app2);
         if (!host?.open) throw new Error("This Obsidian version does not expose the Settings window opener.");
         host.open();
-        const state = settingsSurface(app);
+        const state = settingsSurface(app2);
         return { output: JSON.stringify({ requested: type, ...state }), isError: !state.open };
       }
-      const existing = app.workspace.getLeavesOfType(type)[0];
-      const leaf = existing ?? (type === "graph" ? app.workspace.getLeaf("tab") : app.workspace.getLeftLeaf(false));
+      const existing = app2.workspace.getLeavesOfType(type)[0];
+      const leaf = existing ?? (type === "graph" ? app2.workspace.getLeaf("tab") : app2.workspace.getLeftLeaf(false));
       if (!leaf) throw new Error("No workspace pane is available.");
       if (!existing) await leaf.setViewState({ type, active: true });
       context?.signal?.throwIfAborted();
-      await app.workspace.revealLeaf(leaf);
+      await app2.workspace.revealLeaf(leaf);
       context?.signal?.throwIfAborted();
       leaf.view.containerEl.ownerDocument.defaultView?.focus();
       const visible = leaf.view.getViewType() === type && isVisible(leaf.view.containerEl);
@@ -23699,7 +23632,7 @@ function createWorkspaceTools(app) {
         requested: type,
         opened: visible,
         reused: !!existing,
-        ...surfaceSummary(workspaceSurface(app)),
+        ...surfaceSummary(workspaceSurface(app2)),
         message: visible ? "Requested view is visible in its Obsidian window. Any separately open Settings window is reported alongside it." : "Requested view did not become visible. Its core plugin may be disabled."
       }), isError: !visible };
     }
@@ -23711,7 +23644,8 @@ init_scoped_fetch();
 
 // src/pericodeMemory.ts
 init_scoped_fetch();
-var import_node_fs16 = require("node:fs");
+init_safeVaultFs();
+init_pathExists();
 var import_node_path21 = require("node:path");
 var MEMORY_DIR = ".pericode";
 var MEMORY_INDEX = "MEMORY.md";
@@ -23722,17 +23656,17 @@ var INDEX_HEADER = `# PeriCode memory
 
 ## Index
 `;
-function memoryRoot(vaultPath) {
-  return (0, import_node_path21.join)(vaultPath, MEMORY_DIR);
+function memoryRoot(vaultPath2) {
+  return (0, import_node_path21.join)(vaultPath2, MEMORY_DIR);
 }
-function indexPath(vaultPath) {
-  return (0, import_node_path21.join)(memoryRoot(vaultPath), MEMORY_INDEX);
+function indexPath(vaultPath2) {
+  return (0, import_node_path21.join)(memoryRoot(vaultPath2), MEMORY_INDEX);
 }
-function memoriesDir(vaultPath) {
-  return (0, import_node_path21.join)(memoryRoot(vaultPath), MEMORY_FILES);
+function memoriesDir(vaultPath2) {
+  return (0, import_node_path21.join)(memoryRoot(vaultPath2), MEMORY_FILES);
 }
-function memoryPath(vaultPath, name) {
-  return (0, import_node_path21.join)(memoriesDir(vaultPath), `${slugify(name)}.md`);
+function memoryPath(vaultPath2, name) {
+  return (0, import_node_path21.join)(memoriesDir(vaultPath2), `${slugify(name)}.md`);
 }
 function slugify(name) {
   return name.trim().toLowerCase().replace(/[^a-z0-9_-]+/g, "_").replace(/^_+|_+$/g, "").slice(0, 80) || "memory";
@@ -23740,20 +23674,20 @@ function slugify(name) {
 function todayIso() {
   return (/* @__PURE__ */ new Date()).toISOString().slice(0, 10);
 }
-async function ensureMemoryStore(vaultPath) {
-  if (!vaultPath) return;
-  await import_node_fs16.promises.mkdir(memoriesDir(vaultPath), { recursive: true });
-  const idx = indexPath(vaultPath);
-  if (!(0, import_node_fs16.existsSync)(idx)) {
-    await import_node_fs16.promises.writeFile(idx, INDEX_HEADER + "\n_(empty \u2014 no memories saved yet.)_\n", "utf8");
+async function ensureMemoryStore(vaultPath2) {
+  if (!vaultPath2) return;
+  await promises.mkdir(memoriesDir(vaultPath2), { recursive: true });
+  const idx = indexPath(vaultPath2);
+  if (!await pathExists(idx)) {
+    await promises.writeFile(idx, INDEX_HEADER + "\n_(empty \u2014 no memories saved yet.)_\n", "utf8");
   }
 }
-async function listMemories(vaultPath) {
-  if (!vaultPath) return [];
-  const dir = memoriesDir(vaultPath);
+async function listMemories(vaultPath2) {
+  if (!vaultPath2) return [];
+  const dir = memoriesDir(vaultPath2);
   let entries;
   try {
-    entries = await import_node_fs16.promises.readdir(dir);
+    entries = await promises.readdir(dir);
   } catch {
     return [];
   }
@@ -23762,7 +23696,7 @@ async function listMemories(vaultPath) {
     if (!entry.endsWith(".md")) continue;
     const full = (0, import_node_path21.join)(dir, entry);
     try {
-      const raw = await import_node_fs16.promises.readFile(full, "utf8");
+      const raw = await promises.readFile(full, "utf8");
       const parsed = parseMemoryFile(raw);
       if (parsed) out.push(parsed);
     } catch {
@@ -23771,15 +23705,15 @@ async function listMemories(vaultPath) {
   out.sort((a, b2) => a.created.localeCompare(b2.created));
   return out;
 }
-async function readMemory(vaultPath, name) {
-  if (!vaultPath || !name) return null;
+async function readMemory(vaultPath2, name) {
+  if (!vaultPath2 || !name) return null;
   const candidates = [
-    memoryPath(vaultPath, name),
-    (0, import_node_path21.join)(memoriesDir(vaultPath), `${name}.md`)
+    memoryPath(vaultPath2, name),
+    (0, import_node_path21.join)(memoriesDir(vaultPath2), `${name}.md`)
   ];
   for (const path of candidates) {
     try {
-      const raw = await import_node_fs16.promises.readFile(path, "utf8");
+      const raw = await promises.readFile(path, "utf8");
       const parsed = parseMemoryFile(raw);
       if (parsed) return parsed;
     } catch {
@@ -23787,13 +23721,13 @@ async function readMemory(vaultPath, name) {
   }
   return null;
 }
-async function saveMemory(vaultPath, record2) {
-  if (!vaultPath) {
+async function saveMemory(vaultPath2, record2) {
+  if (!vaultPath2) {
     throw new Error("saveMemory: vault path unknown \u2014 cannot persist memory");
   }
-  await ensureMemoryStore(vaultPath);
+  await ensureMemoryStore(vaultPath2);
   const created = record2.created ?? todayIso();
-  const filePath = memoryPath(vaultPath, record2.name);
+  const filePath = memoryPath(vaultPath2, record2.name);
   const frontmatter = `---
 name: ${escapeYaml(record2.name)}
 description: ${escapeYaml(record2.description)}
@@ -23802,45 +23736,45 @@ created: ${created}
 ---
 
 `;
-  await import_node_fs16.promises.mkdir((0, import_node_path21.dirname)(filePath), { recursive: true });
-  await import_node_fs16.promises.writeFile(filePath, frontmatter + record2.content.trim() + "\n", "utf8");
-  await rewriteIndex(vaultPath);
+  await promises.mkdir((0, import_node_path21.dirname)(filePath), { recursive: true });
+  await promises.writeFile(filePath, frontmatter + record2.content.trim() + "\n", "utf8");
+  await rewriteIndex(vaultPath2);
   return { path: filePath, created };
 }
-async function deleteMemory(vaultPath, name) {
-  if (!vaultPath) return false;
+async function deleteMemory(vaultPath2, name) {
+  if (!vaultPath2) return false;
   const candidates = [
-    memoryPath(vaultPath, name),
-    (0, import_node_path21.join)(memoriesDir(vaultPath), `${name}.md`)
+    memoryPath(vaultPath2, name),
+    (0, import_node_path21.join)(memoriesDir(vaultPath2), `${name}.md`)
   ];
   let removed = false;
   for (const path of candidates) {
     try {
-      await import_node_fs16.promises.unlink(path);
+      await promises.unlink(path);
       removed = true;
       break;
     } catch {
     }
   }
-  if (removed) await rewriteIndex(vaultPath);
+  if (removed) await rewriteIndex(vaultPath2);
   return removed;
 }
-async function rewriteIndex(vaultPath) {
-  const memories = await listMemories(vaultPath);
+async function rewriteIndex(vaultPath2) {
+  const memories = await listMemories(vaultPath2);
   let body = INDEX_HEADER + "\n";
   if (memories.length === 0) {
     body += "_(empty \u2014 no memories saved yet.)_\n";
   } else {
     for (const m2 of memories) {
       const slug = slugify(m2.name);
-      const rel = (0, import_node_path21.relative)(memoryRoot(vaultPath), memoryPath(vaultPath, m2.name));
+      const rel = (0, import_node_path21.relative)(memoryRoot(vaultPath2), memoryPath(vaultPath2, m2.name));
       const link = rel.replace(/\\/g, "/");
       body += `- [${m2.name}](${link}) \u2014 *${m2.type}* \xB7 ${m2.description.replace(/\n/g, " ")}
 `;
       void slug;
     }
   }
-  await import_node_fs16.promises.writeFile(indexPath(vaultPath), body, "utf8");
+  await promises.writeFile(indexPath(vaultPath2), body, "utf8");
 }
 function parseMemoryFile(raw) {
   if (!raw.startsWith("---")) return null;
@@ -24038,7 +23972,7 @@ function deleteMemoryTool(getVaultPath) {
 
 // src/strategicTools.ts
 init_scoped_fetch();
-var import_node_fs17 = require("node:fs");
+init_safeVaultFs();
 var import_node_path22 = require("node:path");
 var DECISIONS_DIR = "Decisions";
 function todayIso2() {
@@ -24047,7 +23981,7 @@ function todayIso2() {
 function slugify2(value, maxLen = 60) {
   return value.trim().toLowerCase().replace(/[^a-z0-9_-]+/g, "_").replace(/^_+|_+$/g, "").slice(0, maxLen) || "decision";
 }
-function logDecisionTool(app, getVaultPath) {
+function logDecisionTool(app2, getVaultPath) {
   return {
     readOnly: false,
     definition: {
@@ -24135,8 +24069,8 @@ _Update later \u2014 was this the right call? What did we learn?_
 `;
       const full = fmLines.join("\n") + body;
       const absPath = (0, import_node_path22.join)(vault, relPath);
-      await import_node_fs17.promises.mkdir((0, import_node_path22.join)(vault, DECISIONS_DIR), { recursive: true });
-      await import_node_fs17.promises.writeFile(absPath, full, "utf8");
+      await promises.mkdir((0, import_node_path22.join)(vault, DECISIONS_DIR), { recursive: true });
+      await promises.writeFile(absPath, full, "utf8");
       return {
         output: `Logged decision '${decision}' at ${relPath}.`,
         isError: false
@@ -24144,7 +24078,7 @@ _Update later \u2014 was this the right call? What did we learn?_
     }
   };
 }
-function queryDecisionsTool(app, getVaultPath) {
+function queryDecisionsTool(app2, getVaultPath) {
   return {
     readOnly: true,
     definition: {
@@ -24166,23 +24100,23 @@ function queryDecisionsTool(app, getVaultPath) {
       const dir = (0, import_node_path22.join)(vault, DECISIONS_DIR);
       let files;
       try {
-        files = await import_node_fs17.promises.readdir(dir);
+        files = await promises.readdir(dir);
       } catch {
         return { output: JSON.stringify({ count: 0, decisions: [] }, null, 2), isError: false };
       }
       const contains = String(input.contains ?? "").trim().toLowerCase();
       const status = input.status ?? "any";
       const limit = Math.max(1, Math.min(200, Number(input.limit) || 30));
-      const records = [];
+      const records2 = [];
       for (const file of files.sort().reverse()) {
         if (!file.endsWith(".md")) continue;
         try {
-          const raw = await import_node_fs17.promises.readFile((0, import_node_path22.join)(dir, file), "utf8");
+          const raw = await promises.readFile((0, import_node_path22.join)(dir, file), "utf8");
           const meta = parseFrontmatter(raw);
           if (!meta) continue;
           if (contains && !String(meta.decision ?? "").toLowerCase().includes(contains)) continue;
           if (status !== "any" && String(meta.status ?? "open") !== status) continue;
-          records.push({
+          records2.push({
             id: meta.id,
             decision: meta.decision,
             confidence: meta.confidence,
@@ -24191,18 +24125,18 @@ function queryDecisionsTool(app, getVaultPath) {
             created: meta.created,
             path: `${DECISIONS_DIR}/${file}`
           });
-          if (records.length >= limit) break;
+          if (records2.length >= limit) break;
         } catch {
         }
       }
       return {
-        output: JSON.stringify({ count: records.length, decisions: records }, null, 2),
+        output: JSON.stringify({ count: records2.length, decisions: records2 }, null, 2),
         isError: false
       };
     }
   };
 }
-function vaultHealthTool(app, getVaultPath) {
+function vaultHealthTool(app2, getVaultPath) {
   return {
     readOnly: true,
     definition: {
@@ -24213,7 +24147,7 @@ function vaultHealthTool(app, getVaultPath) {
     async execute() {
       const vault = getVaultPath();
       if (!vault) return { output: "vault path unknown", isError: true };
-      const allFiles = app.vault.getMarkdownFiles();
+      const allFiles = await markdownFiles(app2);
       const totalNotes = allFiles.length;
       const pathSet = new Set(allFiles.map((f2) => f2.path));
       const basenameToPath = /* @__PURE__ */ new Map();
@@ -24232,7 +24166,7 @@ function vaultHealthTool(app, getVaultPath) {
       for (const f2 of allFiles) {
         let raw;
         try {
-          raw = await app.vault.cachedRead(f2);
+          raw = await app2.vault.cachedRead(f2);
         } catch {
           continue;
         }
@@ -24264,7 +24198,7 @@ function vaultHealthTool(app, getVaultPath) {
       for (const [, count] of inbound) {
         if (count === 0) orphans += 1;
       }
-      const folders = app.vault.getAllLoadedFiles().filter((f2) => "children" in f2);
+      const folders = (await vaultEntries(app2)).filter((f2) => "children" in f2);
       const totalFolders = folders.length;
       const summary = {
         total_notes: totalNotes,
@@ -24298,19 +24232,19 @@ function auditRecentTool(getVaultPath) {
       const vault = getVaultPath();
       if (!vault) return { output: "vault path unknown", isError: true };
       const limit = Math.max(1, Math.min(500, Number(input.limit) || 50));
-      const records = await readRecentAudit(vault, limit);
+      const records2 = await readRecentAudit(vault, limit);
       return {
-        output: JSON.stringify({ count: records.length, records }, null, 2),
+        output: JSON.stringify({ count: records2.length, records: records2 }, null, 2),
         isError: false
       };
     }
   };
 }
-function createStrategicTools(app, getVaultPath) {
+function createStrategicTools(app2, getVaultPath) {
   return [
-    logDecisionTool(app, getVaultPath),
-    queryDecisionsTool(app, getVaultPath),
-    vaultHealthTool(app, getVaultPath),
+    logDecisionTool(app2, getVaultPath),
+    queryDecisionsTool(app2, getVaultPath),
+    vaultHealthTool(app2, getVaultPath),
     auditRecentTool(getVaultPath)
   ];
 }
@@ -24375,8 +24309,8 @@ function resolveWikilink(target, pathSet, basenameToPath) {
 
 // src/pericodeAgents.ts
 init_scoped_fetch();
-var import_obsidian12 = require("obsidian");
-var import_node_fs18 = require("node:fs");
+var import_obsidian13 = require("obsidian");
+init_safeVaultFs();
 var import_node_path23 = require("node:path");
 var ALL_AGENTS = [
   "memory_curator",
@@ -24388,9 +24322,9 @@ var REPORTS_DIR = (0, import_node_path23.join)(".pericode", "agent-reports");
 function todayIso3() {
   return (/* @__PURE__ */ new Date()).toISOString().slice(0, 10);
 }
-async function writeReport(vaultPath, agent, body) {
-  const dir = (0, import_node_path23.join)(vaultPath, REPORTS_DIR);
-  await import_node_fs18.promises.mkdir(dir, { recursive: true });
+async function writeReport(vaultPath2, agent, body) {
+  const dir = (0, import_node_path23.join)(vaultPath2, REPORTS_DIR);
+  await promises.mkdir(dir, { recursive: true });
   const fileName = `${agent}-${todayIso3()}.md`;
   const path = (0, import_node_path23.join)(dir, fileName);
   const header = `---
@@ -24402,17 +24336,17 @@ type: agent_report
 # ${humanize(agent)} \u2014 ${todayIso3()}
 
 `;
-  await import_node_fs18.promises.writeFile(path, header + body, "utf8");
+  await promises.writeFile(path, header + body, "utf8");
   return path;
 }
 function humanize(agent) {
   return agent.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
 }
-async function runMemoryCurator(vaultPath, app) {
-  const memDir = (0, import_node_path23.join)(vaultPath, ".pericode", "memory");
+async function runMemoryCurator(vaultPath2, app2) {
+  const memDir = (0, import_node_path23.join)(vaultPath2, ".pericode", "memory");
   let entries = [];
   try {
-    entries = await import_node_fs18.promises.readdir(memDir);
+    entries = await promises.readdir(memDir);
   } catch {
     return "No memories yet \u2014 nothing to curate.";
   }
@@ -24420,13 +24354,13 @@ async function runMemoryCurator(vaultPath, app) {
   for (const file of entries) {
     if (!file.endsWith(".md")) continue;
     try {
-      const stat = await import_node_fs18.promises.stat((0, import_node_path23.join)(memDir, file));
-      const raw = await import_node_fs18.promises.readFile((0, import_node_path23.join)(memDir, file), "utf8");
+      const stat2 = await promises.stat((0, import_node_path23.join)(memDir, file));
+      const raw = await promises.readFile((0, import_node_path23.join)(memDir, file), "utf8");
       const created = /^created:\s*(\d{4}-\d{2}-\d{2})/m.exec(raw)?.[1] ?? "";
       memories.push({
         name: file.replace(/\.md$/, ""),
         created,
-        bytes: stat.size
+        bytes: stat2.size
       });
     } catch {
     }
@@ -24445,18 +24379,18 @@ async function runMemoryCurator(vaultPath, app) {
     lines.push(`  - **${m2.name}** \u2014 created ${m2.created || "(unknown)"}, ${m2.bytes} bytes`);
   }
   lines.push("", "## Recommendation", "", "Read the oldest memories and either confirm they're still load-bearing or delete them.");
-  void app;
+  void app2;
   return lines.join("\n");
 }
-async function runRiskDetection(vaultPath, app) {
+async function runRiskDetection(vaultPath2, app2) {
   const lines = [`## Summary`, ``];
-  const allFiles = app.vault.getMarkdownFiles();
+  const allFiles = await markdownFiles(app2);
   const now = Date.now();
   const THIRTY_DAYS = 30 * 24 * 60 * 60 * 1e3;
   const stale = [];
   for (const f2 of allFiles) {
     try {
-      const raw = await app.vault.cachedRead(f2);
+      const raw = await app2.vault.cachedRead(f2);
       const m2 = /^status:\s*active\b/m.exec(raw);
       if (!m2) continue;
       const lastEdit = f2.stat?.mtime ?? 0;
@@ -24478,7 +24412,7 @@ async function runRiskDetection(vaultPath, app) {
   const openDecisions = [];
   for (const f2 of allFiles) {
     try {
-      const raw = await app.vault.cachedRead(f2);
+      const raw = await app2.vault.cachedRead(f2);
       const isDecision = /^type:\s*decision\b/m.test(raw);
       const isOpen = /^status:\s*open\b/m.test(raw);
       if (!isDecision || !isOpen) continue;
@@ -24495,8 +24429,8 @@ async function runRiskDetection(vaultPath, app) {
   if (openDecisions.length > 20) lines.push(`- _\u2026${openDecisions.length - 20} more_`);
   lines.push("");
   try {
-    const auditPath2 = (0, import_node_path23.join)(vaultPath, ".pericode", "audit.jsonl");
-    const raw = await import_node_fs18.promises.readFile(auditPath2, "utf8");
+    const auditPath2 = (0, import_node_path23.join)(vaultPath2, ".pericode", "audit.jsonl");
+    const raw = await promises.readFile(auditPath2, "utf8");
     const tail = raw.split(/\r?\n/).filter(Boolean).slice(-500);
     const errorCounts = /* @__PURE__ */ new Map();
     for (const line of tail) {
@@ -24518,8 +24452,8 @@ async function runRiskDetection(vaultPath, app) {
   lines.push("");
   return lines.join("\n");
 }
-async function runExecutiveSummary(vaultPath, app) {
-  const allFiles = app.vault.getMarkdownFiles();
+async function runExecutiveSummary(vaultPath2, app2) {
+  const allFiles = await markdownFiles(app2);
   const totalNotes = allFiles.length;
   const now = Date.now();
   const ONE_DAY = 24 * 60 * 60 * 1e3;
@@ -24527,8 +24461,8 @@ async function runExecutiveSummary(vaultPath, app) {
   const editedWeek = allFiles.filter((f2) => now - (f2.stat?.mtime ?? 0) < 7 * ONE_DAY).length;
   let auditTail = [];
   try {
-    const auditPath2 = (0, import_node_path23.join)(vaultPath, ".pericode", "audit.jsonl");
-    const raw = await import_node_fs18.promises.readFile(auditPath2, "utf8");
+    const auditPath2 = (0, import_node_path23.join)(vaultPath2, ".pericode", "audit.jsonl");
+    const raw = await promises.readFile(auditPath2, "utf8");
     auditTail = raw.split(/\r?\n/).filter(Boolean).slice(-200);
   } catch {
   }
@@ -24555,15 +24489,15 @@ async function runExecutiveSummary(vaultPath, app) {
     ...topTools.map(([t, c]) => `- \`${t}\` \u2014 ${c} calls`)
   ].join("\n");
 }
-async function runKnowledgeGap(vaultPath, app) {
-  const allFiles = app.vault.getMarkdownFiles();
+async function runKnowledgeGap(vaultPath2, app2) {
+  const allFiles = await markdownFiles(app2);
   const thinNotes = [];
   const MIN_BYTES = 200;
   for (const f2 of allFiles) {
     try {
-      const stat = f2.stat;
-      if (!stat) continue;
-      if (stat.size < MIN_BYTES) thinNotes.push({ path: f2.path, bytes: stat.size });
+      const stat2 = f2.stat;
+      if (!stat2) continue;
+      if (stat2.size < MIN_BYTES) thinNotes.push({ path: f2.path, bytes: stat2.size });
     } catch {
     }
   }
@@ -24580,35 +24514,35 @@ async function runKnowledgeGap(vaultPath, app) {
     lines.push(`- [[${n.path}]] \u2014 ${n.bytes} bytes`);
   }
   if (thinNotes.length > 30) lines.push(`- _\u2026${thinNotes.length - 30} more_`);
-  void vaultPath;
+  void vaultPath2;
   return lines.join("\n");
 }
-async function runAgent(agent, vaultPath, app) {
+async function runAgent(agent, vaultPath2, app2) {
   let body;
   switch (agent) {
     case "memory_curator":
-      body = await runMemoryCurator(vaultPath, app);
+      body = await runMemoryCurator(vaultPath2, app2);
       break;
     case "risk_detection":
-      body = await runRiskDetection(vaultPath, app);
+      body = await runRiskDetection(vaultPath2, app2);
       break;
     case "executive_summary":
-      body = await runExecutiveSummary(vaultPath, app);
+      body = await runExecutiveSummary(vaultPath2, app2);
       break;
     case "knowledge_gap":
-      body = await runKnowledgeGap(vaultPath, app);
+      body = await runKnowledgeGap(vaultPath2, app2);
       break;
   }
-  const path = await writeReport(vaultPath, agent, body);
+  const path = await writeReport(vaultPath2, agent, body);
   return {
     path,
     preview: body.length > 600 ? body.slice(0, 600) + "\n\u2026[truncated]" : body
   };
 }
-function createAgentTools(app, getVaultPath) {
-  return [runAgentTool(app, getVaultPath), listReportsTool(getVaultPath)];
+function createAgentTools(app2, getVaultPath) {
+  return [runAgentTool(app2, getVaultPath), listReportsTool(getVaultPath)];
 }
-function runAgentTool(app, getVaultPath) {
+function runAgentTool(app2, getVaultPath) {
   return {
     readOnly: false,
     definition: {
@@ -24635,7 +24569,7 @@ function runAgentTool(app, getVaultPath) {
         return { output: `Unknown agent '${agent}'. Choose: ${ALL_AGENTS.join(", ")}.`, isError: true };
       }
       try {
-        const { path, preview } = await runAgent(agent, vault, app);
+        const { path, preview } = await runAgent(agent, vault, app2);
         return {
           output: `Wrote ${path}.
 
@@ -24672,7 +24606,7 @@ function listReportsTool(getVaultPath) {
       const dir = (0, import_node_path23.join)(vault, REPORTS_DIR);
       let files;
       try {
-        files = await import_node_fs18.promises.readdir(dir);
+        files = await promises.readdir(dir);
       } catch {
         return { output: JSON.stringify({ count: 0, reports: [] }, null, 2), isError: false };
       }
@@ -24694,7 +24628,7 @@ function listReportsTool(getVaultPath) {
   };
 }
 var ONE_DAY_MS = 24 * 60 * 60 * 1e3;
-function startAgentScheduler(app, getVaultPath, intervalMs = ONE_DAY_MS) {
+function startAgentScheduler(app2, getVaultPath, intervalMs = ONE_DAY_MS) {
   let cancelled = false;
   const tick = async () => {
     if (cancelled) return;
@@ -24703,7 +24637,7 @@ function startAgentScheduler(app, getVaultPath, intervalMs = ONE_DAY_MS) {
     const dir = (0, import_node_path23.join)(vault, REPORTS_DIR);
     let files = [];
     try {
-      files = await import_node_fs18.promises.readdir(dir);
+      files = await promises.readdir(dir);
     } catch {
     }
     for (const agent of ALL_AGENTS) {
@@ -24711,14 +24645,14 @@ function startAgentScheduler(app, getVaultPath, intervalMs = ONE_DAY_MS) {
       let needsRun = true;
       if (lastReportFile) {
         try {
-          const stat = await import_node_fs18.promises.stat((0, import_node_path23.join)(dir, lastReportFile));
-          if (Date.now() - stat.mtimeMs < intervalMs) needsRun = false;
+          const stat2 = await promises.stat((0, import_node_path23.join)(dir, lastReportFile));
+          if (Date.now() - stat2.mtimeMs < intervalMs) needsRun = false;
         } catch {
         }
       }
       if (needsRun) {
         try {
-          await runAgent(agent, vault, app);
+          await runAgent(agent, vault, app2);
         } catch {
         }
       }
@@ -24734,14 +24668,14 @@ function startAgentScheduler(app, getVaultPath, intervalMs = ONE_DAY_MS) {
   };
 }
 function broadcastAgentStartup() {
-  new import_obsidian12.Notice("PeriCode: background agents running daily.", 3e3);
+  new import_obsidian13.Notice("PeriCode: background agents running daily.", 3e3);
 }
 var KEEP_REPORTS_PER_AGENT = 30;
-async function pruneOldReports(vaultPath) {
-  const dir = (0, import_node_path23.join)(vaultPath, REPORTS_DIR);
+async function pruneOldReports(vaultPath2) {
+  const dir = (0, import_node_path23.join)(vaultPath2, REPORTS_DIR);
   let files;
   try {
-    files = await import_node_fs18.promises.readdir(dir);
+    files = await promises.readdir(dir);
   } catch {
     return;
   }
@@ -24750,7 +24684,7 @@ async function pruneOldReports(vaultPath) {
     const stale = matching.slice(KEEP_REPORTS_PER_AGENT);
     for (const file of stale) {
       try {
-        await import_node_fs18.promises.unlink((0, import_node_path23.join)(dir, file));
+        await promises.unlink((0, import_node_path23.join)(dir, file));
       } catch {
       }
     }
@@ -24763,7 +24697,7 @@ init_pericodeSecurity();
 
 // src/auditExportTools.ts
 init_scoped_fetch();
-var import_node_fs19 = require("node:fs");
+init_safeVaultFs();
 var import_node_path24 = require("node:path");
 function createAuditExportTools(ctx) {
   return [exportTool(ctx), reportTool(ctx)];
@@ -24792,13 +24726,13 @@ function escapeCsvCell(value) {
   }
   return str2;
 }
-function defaultExportPath(vaultPath, format) {
+function defaultExportPath(vaultPath2, format) {
   const ts = (/* @__PURE__ */ new Date()).toISOString().replace(/[:.]/g, "-").slice(0, 19);
-  return (0, import_node_path24.join)(vaultPath, "output", `audit-export-${ts}.${format}`);
+  return (0, import_node_path24.join)(vaultPath2, "output", `audit-export-${ts}.${format}`);
 }
-function defaultReportPath(vaultPath) {
+function defaultReportPath(vaultPath2) {
   const date3 = (/* @__PURE__ */ new Date()).toISOString().slice(0, 10);
-  return (0, import_node_path24.join)(vaultPath, "output", `compliance-report-${date3}.md`);
+  return (0, import_node_path24.join)(vaultPath2, "output", `compliance-report-${date3}.md`);
 }
 function exportTool(ctx) {
   return {
@@ -24859,9 +24793,9 @@ function exportTool(ctx) {
       try {
         const all = await readAuditRange(vault);
         const filtered = all.filter((e) => passesFilters(e, filters));
-        await import_node_fs19.promises.mkdir((0, import_node_path24.dirname)(outputPath), { recursive: true });
+        await promises.mkdir((0, import_node_path24.dirname)(outputPath), { recursive: true });
         if (format === "json") {
-          await import_node_fs19.promises.writeFile(
+          await promises.writeFile(
             outputPath,
             JSON.stringify(filtered, null, 2),
             "utf8"
@@ -24893,7 +24827,7 @@ function exportTool(ctx) {
               ].map(escapeCsvCell).join(",")
             );
           }
-          await import_node_fs19.promises.writeFile(outputPath, rows.join("\n") + "\n", "utf8");
+          await promises.writeFile(outputPath, rows.join("\n") + "\n", "utf8");
         }
         return {
           output: JSON.stringify(
@@ -24955,16 +24889,16 @@ function reportTool(ctx) {
       const outputPath = outputPathRaw ? outputPathRaw.startsWith("/") || outputPathRaw.match(/^[A-Za-z]:[/\\]/) ? outputPathRaw : (0, import_node_path24.join)(vault, outputPathRaw) : defaultReportPath(vault);
       try {
         const all = await readAuditRange(vault);
-        const records = all.filter((e) => passesFilters(e, filters));
-        const md = buildComplianceReport(records, filters, all.length);
-        await import_node_fs19.promises.mkdir((0, import_node_path24.dirname)(outputPath), { recursive: true });
-        await import_node_fs19.promises.writeFile(outputPath, md, "utf8");
+        const records2 = all.filter((e) => passesFilters(e, filters));
+        const md = buildComplianceReport(records2, filters, all.length);
+        await promises.mkdir((0, import_node_path24.dirname)(outputPath), { recursive: true });
+        await promises.writeFile(outputPath, md, "utf8");
         return {
           output: JSON.stringify(
             {
               ok: true,
               records_total: all.length,
-              records_in_window: records.length,
+              records_in_window: records2.length,
               path: outputPath
             },
             null,
@@ -24981,7 +24915,7 @@ function reportTool(ctx) {
     }
   };
 }
-function buildComplianceReport(records, filters, totalAll) {
+function buildComplianceReport(records2, filters, totalAll) {
   const lines = [];
   const generatedAt = (/* @__PURE__ */ new Date()).toISOString();
   lines.push("---");
@@ -24990,7 +24924,7 @@ function buildComplianceReport(records, filters, totalAll) {
   lines.push(
     `range: ${filters.since ?? "(start of audit)"} to ${filters.until ?? "(now)"}`
   );
-  lines.push(`records_in_window: ${records.length}`);
+  lines.push(`records_in_window: ${records2.length}`);
   lines.push(`records_total_audit: ${totalAll}`);
   lines.push("type: compliance_report");
   lines.push("---");
@@ -25001,41 +24935,41 @@ function buildComplianceReport(records, filters, totalAll) {
     `Generated ${generatedAt} from \`<vault>/.pericode/audit.jsonl\`.`
   );
   lines.push("");
-  if (records.length === 0) {
+  if (records2.length === 0) {
     lines.push("No records match the configured filters.");
     return lines.join("\n");
   }
-  const earliest = records[0]?.ts ?? "";
-  const latest = records[records.length - 1]?.ts ?? "";
+  const earliest = records2[0]?.ts ?? "";
+  const latest = records2[records2.length - 1]?.ts ?? "";
   lines.push("## Window");
   lines.push("");
   lines.push(`- Earliest record: ${earliest}`);
   lines.push(`- Latest record:   ${latest}`);
-  lines.push(`- Records in window: ${records.length}`);
+  lines.push(`- Records in window: ${records2.length}`);
   lines.push(`- Records in full audit: ${totalAll}`);
   lines.push("");
-  const errors = records.filter((r) => r.is_error);
-  const totalDuration = records.reduce((s, r) => s + (r.duration_ms ?? 0), 0);
+  const errors = records2.filter((r) => r.is_error);
+  const totalDuration = records2.reduce((s, r) => s + (r.duration_ms ?? 0), 0);
   lines.push("## Totals");
   lines.push("");
   lines.push("| Metric | Value |");
   lines.push("|---|---|");
-  lines.push(`| Total tool calls | ${records.length} |`);
+  lines.push(`| Total tool calls | ${records2.length} |`);
   lines.push(
-    `| Errors | ${errors.length} (${records.length === 0 ? 0 : Math.round(errors.length / records.length * 100)}%) |`
+    `| Errors | ${errors.length} (${records2.length === 0 ? 0 : Math.round(errors.length / records2.length * 100)}%) |`
   );
   lines.push(`| Total agent time on tools | ${formatDuration(totalDuration)} |`);
   lines.push(
-    `| Average call duration | ${records.length === 0 ? 0 : Math.round(totalDuration / records.length)} ms |`
+    `| Average call duration | ${records2.length === 0 ? 0 : Math.round(totalDuration / records2.length)} ms |`
   );
   lines.push("");
-  const byTool = countBy(records, (r) => r.tool);
+  const byTool = countBy(records2, (r) => r.tool);
   lines.push("## Tools used (by call count, top 25)");
   lines.push("");
   lines.push("| Tool | Calls | Errors | Avg ms |");
   lines.push("|---|---|---|---|");
   for (const [tool, count] of byTool.slice(0, 25)) {
-    const ofTool = records.filter((r) => r.tool === tool);
+    const ofTool = records2.filter((r) => r.tool === tool);
     const errs = ofTool.filter((r) => r.is_error).length;
     const avg = ofTool.length === 0 ? 0 : Math.round(
       ofTool.reduce((s, r) => s + (r.duration_ms ?? 0), 0) / ofTool.length
@@ -25043,7 +24977,7 @@ function buildComplianceReport(records, filters, totalAll) {
     lines.push(`| ${escapeMd(tool)} | ${count} | ${errs} | ${avg} |`);
   }
   lines.push("");
-  const bySource = countBy(records, (r) => r.source);
+  const bySource = countBy(records2, (r) => r.source);
   lines.push("## Sources");
   lines.push("");
   lines.push("| Source | Calls |");
@@ -25085,13 +25019,13 @@ function buildComplianceReport(records, filters, totalAll) {
     lines.push("None in this window.");
     lines.push("");
   }
-  const byDay = countBy(records, (r) => r.ts.slice(0, 10));
+  const byDay = countBy(records2, (r) => r.ts.slice(0, 10));
   lines.push("## Daily call counts");
   lines.push("");
   lines.push("| Date | Calls | Errors |");
   lines.push("|---|---|---|");
   for (const [day, count] of byDay) {
-    const errs = records.filter(
+    const errs = records2.filter(
       (r) => r.ts.slice(0, 10) === day && r.is_error
     ).length;
     lines.push(`| ${day} | ${count} | ${errs} |`);
@@ -25119,10 +25053,10 @@ function escapeMd(s) {
 
 // src/removeArtifactsModal.ts
 init_scoped_fetch();
-var import_obsidian13 = require("obsidian");
-var RemoveArtifactsModal = class extends import_obsidian13.Modal {
-  constructor(app, plugin) {
-    super(app);
+var import_obsidian14 = require("obsidian");
+var RemoveArtifactsModal = class extends import_obsidian14.Modal {
+  constructor(app2, plugin) {
+    super(app2);
     this.plugin = plugin;
   }
   plugin;
@@ -25154,7 +25088,7 @@ var RemoveArtifactsModal = class extends import_obsidian13.Modal {
       listWrap.createEl("p", {
         text: "Nothing to remove \u2014 no PeriCode-owned folders found in this vault."
       });
-      new import_obsidian13.Setting(contentEl).addButton(
+      new import_obsidian14.Setting(contentEl).addButton(
         (b2) => b2.setButtonText("Close").setCta().onClick(() => this.close())
       );
       return;
@@ -25197,7 +25131,7 @@ var RemoveArtifactsModal = class extends import_obsidian13.Modal {
     this.confirmInput.style.width = "120px";
     this.confirmInput.placeholder = "DELETE";
     this.confirmInput.oninput = () => this.updateDeleteButton();
-    const buttonRow = new import_obsidian13.Setting(contentEl);
+    const buttonRow = new import_obsidian14.Setting(contentEl);
     buttonRow.addButton(
       (b2) => b2.setButtonText("Cancel").onClick(() => this.close())
     );
@@ -25211,7 +25145,7 @@ var RemoveArtifactsModal = class extends import_obsidian13.Modal {
         b2.setDisabled(true);
         b2.setButtonText("Removing\u2026");
         const removed = await this.removeSelected();
-        new import_obsidian13.Notice(
+        new import_obsidian14.Notice(
           `Moved ${removed.length} folder(s) to trash. Recoverable from your OS trash.`,
           8e3
         );
@@ -25248,14 +25182,14 @@ var RemoveArtifactsModal = class extends import_obsidian13.Modal {
     const out = [];
     for (const { path, label, rationale } of known) {
       const node = vault.getAbstractFileByPath(path);
-      if (!(node instanceof import_obsidian13.TFolder)) continue;
-      const stats = await this.measureFolder(node);
+      if (!(node instanceof import_obsidian14.TFolder)) continue;
+      const stats2 = await this.measureFolder(node);
       out.push({
         path,
         label,
         rationale,
-        fileCount: stats.fileCount,
-        byteSize: stats.byteSize
+        fileCount: stats2.fileCount,
+        byteSize: stats2.byteSize
       });
     }
     return out;
@@ -25268,16 +25202,16 @@ var RemoveArtifactsModal = class extends import_obsidian13.Modal {
   async measureFolder(folder) {
     let fileCount = 0;
     let byteSize = 0;
-    const adapter = this.app.vault.adapter;
+    const adapter2 = this.app.vault.adapter;
     const walk = async (entry) => {
-      if (entry instanceof import_obsidian13.TFolder) {
+      if (entry instanceof import_obsidian14.TFolder) {
         for (const child of entry.children) await walk(child);
         return;
       }
       fileCount += 1;
       try {
-        const stat = await adapter.stat(entry.path);
-        if (stat?.size) byteSize += stat.size;
+        const stat2 = await adapter2.stat(entry.path);
+        if (stat2?.size) byteSize += stat2.size;
       } catch {
       }
     };
@@ -25294,7 +25228,7 @@ var RemoveArtifactsModal = class extends import_obsidian13.Modal {
         await this.app.vault.trash(node, true);
         removed.push(c.path);
       } catch (err) {
-        new import_obsidian13.Notice(
+        new import_obsidian14.Notice(
           `Failed to remove ${c.path}: ${err instanceof Error ? err.message : String(err)}`,
           8e3
         );
@@ -25311,7 +25245,9 @@ function formatBytes(bytes) {
 }
 
 // src/main.ts
-var PericodeObsidianPlugin = class extends import_obsidian14.Plugin {
+init_safeVaultFs();
+init_pluginAuthStore();
+var PericodeObsidianPlugin = class extends import_obsidian15.Plugin {
   interactiveTurnActive = false;
   cancelInteractiveTurn = null;
   activeEditModals = /* @__PURE__ */ new Set();
@@ -25359,14 +25295,19 @@ var PericodeObsidianPlugin = class extends import_obsidian14.Plugin {
    * concrete adapter type isn't part of Obsidian's public type surface.
    */
   get vaultPath() {
-    const adapter = this.app.vault.adapter;
-    return adapter.basePath ?? null;
+    const adapter2 = this.app.vault.adapter;
+    return adapter2.basePath ?? null;
   }
   activeRegistry() {
     return this.registry;
   }
   async onload() {
     await this.loadSettings();
+    configureSafeVaultFs(this.app);
+    configurePluginAuth(this.settings.pluginAuth, (next) => {
+      this.settings.pluginAuth = next;
+      void this.saveSettings();
+    });
     const vault = this.vaultPath;
     for (const tool of vaultReadTools({ getPolicy: () => this.cachedPolicy, getVaultPath: () => this.vaultPath })) this.registry.registerBuiltin(tool);
     for (const tool of vaultFileTools(this.app, { getPolicy: () => this.cachedPolicy, getVaultPath: () => this.vaultPath })) this.registry.registerBuiltin(tool);
@@ -25420,18 +25361,18 @@ var PericodeObsidianPlugin = class extends import_obsidian14.Plugin {
       );
       void this.mcpManager.start(vault, this.registry).then((status) => {
         if (status.connected.length > 0) {
-          new import_obsidian15.Notice(
+          new import_obsidian16.Notice(
             `PeriCode: ${status.connected.length} MCP server(s) connected \u2014 ${status.connected.join(", ")}.`,
             5e3
           );
         }
         if (status.failed.length > 0) {
           for (const f2 of status.failed) {
-            new import_obsidian15.Notice(`PeriCode MCP '${f2.name}' failed: ${f2.error}`, 8e3);
+            new import_obsidian16.Notice(`PeriCode MCP '${f2.name}' failed: ${f2.error}`, 8e3);
           }
         }
       }).catch((err) => {
-        new import_obsidian15.Notice(
+        new import_obsidian16.Notice(
           `PeriCode: MCP startup failed \u2014 ${err instanceof Error ? err.message : String(err)}`,
           8e3
         );
@@ -25449,7 +25390,7 @@ var PericodeObsidianPlugin = class extends import_obsidian14.Plugin {
             return context.file;
           } }).open();
         } catch (err) {
-          new import_obsidian15.Notice(err instanceof Error ? err.message : String(err));
+          new import_obsidian16.Notice(err instanceof Error ? err.message : String(err));
         }
       }
     });
@@ -25460,7 +25401,7 @@ var PericodeObsidianPlugin = class extends import_obsidian14.Plugin {
         const text2 = editor.getSelection();
         const path = context.file?.path;
         if (!text2 || !path) {
-          new import_obsidian15.Notice("Select a passage in a note first.");
+          new import_obsidian16.Notice("Select a passage in a note first.");
           return;
         }
         void this.activateView().then(() => {
@@ -25513,20 +25454,20 @@ var PericodeObsidianPlugin = class extends import_obsidian14.Plugin {
   }
   async runScaffoldFromCommand() {
     const { scaffoldVault: scaffoldVault2 } = await Promise.resolve().then(() => (init_vaultScaffold(), vaultScaffold_exports));
-    const note = new import_obsidian15.Notice("Scaffolding vault\u2026", 0);
+    const note = new import_obsidian16.Notice("Scaffolding vault\u2026", 0);
     try {
-      const vaultPath = this.app.vault.adapter.basePath;
-      const report = await scaffoldVault2(vaultPath);
+      const vaultPath2 = this.app.vault.adapter.basePath;
+      const report = await scaffoldVault2(vaultPath2);
       note.hide();
       const created = report.created.length;
       const skipped = report.skipped.length;
-      new import_obsidian15.Notice(
+      new import_obsidian16.Notice(
         created === 0 ? `Vault already scaffolded (${skipped} entries existed).` : `Scaffold complete \u2014 created ${created}, skipped ${skipped} existing.`,
         6e3
       );
     } catch (err) {
       note.hide();
-      new import_obsidian15.Notice(
+      new import_obsidian16.Notice(
         `Scaffold failed: ${err instanceof Error ? err.message : String(err)}`,
         8e3
       );
@@ -25576,12 +25517,12 @@ var PericodeObsidianPlugin = class extends import_obsidian14.Plugin {
       this.policyReady = true;
     } catch {
       this.policyReady = false;
-      new import_obsidian15.Notice("PeriCode tools are disabled: repair the security policy in Settings.");
+      new import_obsidian16.Notice("PeriCode tools are disabled: repair the security policy in Settings.");
     }
   }
   /** Surface a scan finding via Notice + audit log. Wired into securityWrap. */
   onScanFinding(toolName, verdict) {
-    new import_obsidian15.Notice(
+    new import_obsidian16.Notice(
       `Untrusted-text hit in '${toolName}': ${verdict.reason}` + (this.cachedPolicy.autoQuarantineOnJailbreak ? " \u2014 session quarantined." : ""),
       8e3
     );

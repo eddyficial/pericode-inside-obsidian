@@ -87,7 +87,7 @@ Obsidian approval. Some fresh provider sign-ins and live inference paths still
 require account verification; fixture tests do not prove provider availability.
 
 Privacy filtering is not comprehensive DLP. Other installed native plugins share
-the host process; MCP servers and provider runtimes remain trusted native software.
+the host process; remote HTTP MCP servers remain separately trusted software.
 Review configurations before enabling them. Local filesystem races caused by a
 separate malicious same-user process require OS isolation, not just path checks.
 
