@@ -17203,6 +17203,8 @@ init_pericodeSecurity();
 // src/onboardingWizard.ts
 init_scoped_fetch();
 var import_obsidian5 = require("obsidian");
+init_sdk_entry();
+init_pericodeSecurity();
 var PROVIDER_LABELS = {
   "codex-oauth": "ChatGPT / Codex subscription",
   "claude-oauth": "Claude subscription (Claude Code)",
@@ -17216,6 +17218,14 @@ var PROVIDER_LABELS = {
   openrouter: "OpenRouter API key",
   "openai-compat": "OpenAI-compatible server"
 };
+var REPAIR = {
+  "claude-oauth": "Install Claude Code and run claude login, then retry.",
+  "grok-oauth": "Install Grok Build and run grok login, then retry.",
+  "codex-oauth": "Use Sign in, then retry.",
+  copilot: "Use Sign in, then retry.",
+  ollama: "Start Ollama, verify the server address, then retry.",
+  "ollama-cloud": "Run ollama signin, pull a cloud model, then retry."
+};
 var OnboardingWizard = class extends import_obsidian5.Modal {
   constructor(app2, plugin) {
     super(app2);
@@ -17226,9 +17236,12 @@ var OnboardingWizard = class extends import_obsidian5.Modal {
   drafts = {};
   catalog;
   checkedConnection = "";
+  testedKey = "";
+  permissionChoice = "ask";
   loading = false;
   closed = false;
   error = "";
+  status = "";
   onOpen() {
     this.closed = false;
     this.containerEl.addClass("pericode-onboarding-modal");
@@ -17241,57 +17254,66 @@ var OnboardingWizard = class extends import_obsidian5.Modal {
     this.plugin.settings.setupDismissed = true;
     void this.plugin.saveSettings().catch(() => new import_obsidian5.Notice("Could not save setup preferences. You may see the guide again."));
   }
-  /** Compare connection inputs in memory only; never log credentials. */
+  /** A secret-bearing fingerprint is kept only in memory and is never rendered or logged. */
   connectionKey(s = this.plugin.settings) {
-    return JSON.stringify([
-      s.provider,
-      s.anthropicApiKey,
-      s.openaiApiKey,
-      s.openrouterApiKey,
-      s.xaiApiKey,
-      s.openaiCompatApiKey,
-      s.openaiCompatBaseUrl,
-      s.ollamaHost
-    ]);
+    return JSON.stringify([s.provider, s.anthropicApiKey, s.openaiApiKey, s.openrouterApiKey, s.xaiApiKey, s.openaiCompatApiKey, s.openaiCompatBaseUrl, s.ollamaHost]);
+  }
+  modelKey() {
+    return JSON.stringify([this.connectionKey(), this.plugin.settings.model]);
   }
   get dirty() {
     return Object.keys(this.drafts).length > 0;
   }
-  get ready() {
+  get modelsReady() {
     return !this.dirty && this.checkedConnection === this.connectionKey() && !!this.catalog?.models.some((m2) => m2.id === this.plugin.settings.model);
   }
-  invalidate() {
+  get tested() {
+    return this.testedKey === this.modelKey();
+  }
+  invalidateConnection() {
     this.catalog = void 0;
     this.checkedConnection = "";
+    this.testedKey = "";
     this.error = "";
+    this.status = "";
+  }
+  invalidateTest() {
+    this.testedKey = "";
+    this.error = "";
+    this.status = "";
+  }
+  show(step) {
+    this.step = step === "provider" ? "connection" : step;
+    this.error = "";
+    this.render();
   }
   render() {
     if (this.closed) return;
     this.contentEl.empty();
-    const steps = ["welcome", "provider", "done"];
-    this.contentEl.createEl("p", { cls: "setting-item-description", text: `Step ${steps.indexOf(this.step) + 1} of 3` });
-    if (this.step === "welcome") {
-      this.contentEl.createEl("h2", { text: "Welcome to PeriCode" });
-      this.contentEl.createEl("p", { text: "Your AI subscription, working with your Obsidian vault. Find notes, follow sources, and review changes before accepting them." });
-      const list = this.contentEl.createEl("ul");
-      list.createEl("li", { text: "Use a supported subscription, an API key, or a local model." });
-      list.createEl("li", { text: "Chats stay in this vault. Prompts, attached notes and tool results go to your selected model endpoint when you send a message." });
-      list.createEl("li", { text: "Start in Research to read notes. Switch to Agent when you want to make changes, subject to your permission settings." });
-      new import_obsidian5.Setting(this.contentEl).addButton((b2) => b2.setButtonText("Set up later").onClick(() => this.show("done"))).addButton((b2) => b2.setButtonText("Get started").setCta().onClick(() => this.show("provider")));
-    } else if (this.step === "provider") this.renderProvider();
+    const steps = ["welcome", "connection", "test", "permissions", "done"];
+    this.contentEl.createEl("p", { cls: "setting-item-description", text: `Step ${steps.indexOf(this.step) + 1} of 5` });
+    if (this.step === "welcome") this.renderWelcome();
+    else if (this.step === "connection") this.renderConnection();
+    else if (this.step === "test") this.renderTest();
+    else if (this.step === "permissions") this.renderPermissions();
     else this.renderDone();
     if (this.loading) this.contentEl.querySelectorAll("button, input, select").forEach((el) => {
       el.disabled = true;
     });
   }
-  show(step) {
-    this.step = step;
-    this.render();
+  renderWelcome() {
+    this.contentEl.createEl("h2", { text: "Welcome to PeriCode" });
+    this.contentEl.createEl("p", { text: "Connect an AI you already use, prove it can answer, and choose how PeriCode may work with your vault." });
+    const list = this.contentEl.createEl("ul");
+    list.createEl("li", { text: "Connection checks never send vault content." });
+    list.createEl("li", { text: "The response test uses no vault tools and runs only when you click Test connection." });
+    list.createEl("li", { text: "Your first vault question is prepared but never sent automatically." });
+    new import_obsidian5.Setting(this.contentEl).addButton((b2) => b2.setButtonText("Set up later").onClick(() => this.show("done"))).addButton((b2) => b2.setButtonText("Get started").setCta().onClick(() => this.show("connection")));
   }
-  renderProvider() {
+  renderConnection() {
     const el = this.contentEl;
-    el.createEl("h2", { text: "Connect and choose a model" });
-    el.createEl("p", { text: "Connect your account, then load its available models. This check sends no prompt or vault content and does not generate a response. Your provider's plan and limits apply." });
+    el.createEl("h2", { text: "Connect your AI" });
+    el.createEl("p", { text: "Choose a provider. PeriCode checks its sign-in or endpoint first, then lists models as a separate step." });
     new import_obsidian5.Setting(el).setName("Provider").addDropdown((d) => {
       for (const [id, label] of Object.entries(PROVIDER_LABELS)) d.addOption(id, label);
       d.setValue(this.plugin.settings.provider).onChange(async (value) => {
@@ -17299,7 +17321,7 @@ var OnboardingWizard = class extends import_obsidian5.Modal {
         this.plugin.settings.provider = value;
         this.plugin.settings.model = "";
         this.drafts = {};
-        this.invalidate();
+        this.invalidateConnection();
         try {
           await this.plugin.saveSettings();
         } catch {
@@ -17310,132 +17332,219 @@ var OnboardingWizard = class extends import_obsidian5.Modal {
       });
     });
     const provider = this.plugin.settings.provider;
-    const connected = () => {
-      this.invalidate();
-      this.render();
-    };
-    if (provider === "grok-oauth") {
-      new import_obsidian5.Setting(el).setName("Grok subscription").setDesc("Uses your installed and signed-in Grok Build.");
-    } else if (provider === "claude-oauth") {
-      new import_obsidian5.Setting(el).setName("Claude subscription").setDesc("Uses your installed and signed-in Claude Code.");
+    if (provider === "claude-oauth" || provider === "grok-oauth") {
+      new import_obsidian5.Setting(el).setName(provider === "claude-oauth" ? "Claude Code" : "Grok Build").setDesc(`PeriCode checks the installed application and its sign-in. ${REPAIR[provider]}`);
     } else if (provider === "copilot" || provider === "codex-oauth") {
-      new import_obsidian5.Setting(el).setName("Connect subscription").setDesc("Already signed in? Load models to check your saved connection.").addButton((b2) => b2.setButtonText("Sign in").onClick(() => {
+      new import_obsidian5.Setting(el).setName("Account sign-in").setDesc("Sign in inside PeriCode, then check the connection.").addButton((b2) => b2.setButtonText("Sign in").onClick(() => {
         const Login = provider === "copilot" ? CopilotLoginModal : CodexLoginModal;
         new Login(this.app, (success) => {
-          if (success) connected();
+          if (success) {
+            this.invalidateConnection();
+            this.render();
+          }
         }).open();
       }));
-    } else if (provider === "ollama" || provider === "ollama-cloud") {
-      if (provider === "ollama-cloud") el.createEl("p", { text: "Run ollama signin on your Ollama server, then pull a cloud model. Your account plan and limits apply." });
-      this.renderField("Ollama server", "ollamaHost", false, "http://localhost:11434");
-    } else {
+    } else if (provider === "ollama" || provider === "ollama-cloud") this.renderField("Ollama server", "ollamaHost", false, "http://localhost:11434");
+    else {
       const fields = { anthropic: "anthropicApiKey", openai: "openaiApiKey", openrouter: "openrouterApiKey", xai: "xaiApiKey", "openai-compat": "openaiCompatApiKey" };
       if (provider === "openai-compat") this.renderField("Base URL", "openaiCompatBaseUrl", false, "http://localhost:1234/v1");
       this.renderField("API key", fields[provider], true, "");
-      el.createEl("p", { cls: "setting-item-description", text: "API access is billed separately from chat subscriptions. Local servers may not require a key." });
     }
-    new import_obsidian5.Setting(el).addButton((b2) => b2.setButtonText("Save connection").setDisabled(!this.dirty).onClick(async () => {
-      const previous = { ...this.plugin.settings };
-      Object.assign(this.plugin.settings, this.drafts);
-      this.invalidate();
-      try {
-        await this.plugin.saveSettings();
-        this.drafts = {};
-      } catch {
-        Object.assign(this.plugin.settings, previous);
-        this.error = "Could not save the connection. Your changes are still in the form.";
-      }
-      this.render();
-    }));
-    new import_obsidian5.Setting(el).setName("Available models").addButton((b2) => b2.setButtonText(this.loading ? "Loading models\u2026" : "Load models").setDisabled(this.dirty).onClick(() => void this.checkModels()));
-    if (this.catalog) new import_obsidian5.Setting(el).setName("Model").addDropdown((d) => {
+    new import_obsidian5.Setting(el).addButton((button) => {
+      button.setButtonText("Save connection").setDisabled(!this.dirty).onClick(() => void this.saveConnection());
+      if (this.dirty) button.setCta();
+    });
+    new import_obsidian5.Setting(el).setName("1. Connection").setDesc(this.checkedConnection === this.connectionKey() ? "Connection found and model catalog reached." : "Checks installation or endpoint and account access.").addButton((b2) => b2.setButtonText(this.loading ? "Checking..." : "Check connection").setDisabled(this.dirty).onClick(() => void this.checkModels()));
+    if (this.catalog) new import_obsidian5.Setting(el).setName("2. Model").addDropdown((d) => {
       d.selectEl.setAttribute("aria-label", "Model");
       d.addOption("", "Choose a model");
       for (const m2 of this.catalog.models) d.addOption(m2.id, m2.description || m2.id);
       d.setValue(this.plugin.settings.model).onChange(async (value) => {
-        const previous = this.plugin.settings.model;
+        const old = this.plugin.settings.model;
         this.plugin.settings.model = value;
-        this.error = "";
+        this.invalidateTest();
         try {
           await this.plugin.saveSettings();
         } catch {
-          this.plugin.settings.model = previous;
-          this.error = "Could not save the model. Try again.";
+          this.plugin.settings.model = old;
+          this.error = "Could not save the model.";
         }
         this.render();
       });
     });
-    el.createEl("p", {
-      cls: "pericode-setup-status",
-      attr: { role: "status", "aria-live": "polite" },
-      text: this.error || (this.dirty ? "Save your connection changes before loading models." : this.ready ? "Model list loaded. Your selected model is available; a chat response has not been tested yet." : "Load models and choose one to finish setup.")
+    this.renderStatus(REPAIR[provider]);
+    new import_obsidian5.Setting(el).addButton((b2) => b2.setButtonText("Back").onClick(() => this.show("welcome"))).addButton((button) => {
+      button.setButtonText("Continue").setDisabled(!this.modelsReady).onClick(() => this.show("test"));
+      if (this.modelsReady) button.setCta();
     });
-    new import_obsidian5.Setting(el).addButton((b2) => b2.setButtonText("Back").onClick(() => this.show("welcome"))).addButton((b2) => b2.setButtonText("Set up later").onClick(() => {
-      this.drafts = {};
-      this.invalidate();
-      this.show("done");
-    })).addButton((b2) => b2.setButtonText("Continue").setCta().setDisabled(!this.ready).onClick(() => {
-      if (this.ready) this.show("done");
-    }));
   }
   renderField(label, field, secret, placeholder) {
-    new import_obsidian5.Setting(this.contentEl).setName(label).setDesc(secret ? "Saved in the plugin's data.json only when you choose Save connection. Protect this file if you sync or share your vault." : "").addText((t) => {
+    new import_obsidian5.Setting(this.contentEl).setName(label).setDesc(secret ? "Saved only when you choose Save connection." : "").addText((t) => {
       t.inputEl.type = secret ? "password" : "text";
       t.inputEl.setAttribute("aria-label", label);
       t.setPlaceholder(placeholder).setValue(this.drafts[field] ?? this.plugin.settings[field]).onChange((value) => {
         this.drafts[field] = value.trim();
-        this.invalidate();
-        this.contentEl.querySelectorAll("button").forEach((b2) => {
-          if (b2.textContent === "Save connection") b2.disabled = false;
-          if (b2.textContent === "Load models" || b2.textContent === "Continue") b2.disabled = true;
+        this.invalidateConnection();
+        this.contentEl.querySelectorAll("button").forEach((button) => {
+          if (button.textContent === "Save connection") button.disabled = false;
+          if (button.textContent === "Check connection" || button.textContent === "Continue") button.disabled = true;
         });
-        this.contentEl.querySelector('[aria-label="Model"]')?.remove();
-        this.contentEl.querySelector(".pericode-setup-status")?.setText("Save your connection changes before loading models.");
       });
     });
+  }
+  async saveConnection() {
+    const old = { ...this.plugin.settings };
+    Object.assign(this.plugin.settings, this.drafts);
+    this.invalidateConnection();
+    try {
+      await this.plugin.saveSettings();
+      this.drafts = {};
+      this.status = "Connection saved. Check it now.";
+    } catch {
+      Object.assign(this.plugin.settings, old);
+      this.error = "Could not save the connection.";
+    }
+    this.render();
   }
   async checkModels() {
     if (this.loading || this.dirty || this.closed) return;
     if (!this.plugin.claimInteractiveTurn()) {
-      this.error = "Finish the active request, then load models.";
+      this.error = "Finish the active request, then retry.";
       this.render();
       return;
     }
-    const settings = { ...this.plugin.settings };
-    const key = this.connectionKey(settings);
-    this.invalidate();
+    const key = this.connectionKey();
+    this.invalidateConnection();
     this.loading = true;
+    this.status = "Checking installation, sign-in, endpoint, and models...";
     this.render();
     try {
-      const catalog = await loadAccountModels(settings);
+      const catalog = await loadAccountModels({ ...this.plugin.settings });
       if (this.closed || key !== this.connectionKey()) return;
       this.catalog = catalog;
       this.checkedConnection = key;
-      if (!catalog.models.some((m2) => m2.id === this.plugin.settings.model)) {
-        this.error = this.plugin.settings.model ? "Your saved model is no longer listed. Choose an available model." : "Choose a model from the list.";
-      }
-    } catch (error2) {
-      if (!this.closed) this.error = error2 instanceof Error ? error2.message : "Could not load models. Check the connection and retry.";
+      this.status = `Connection passed. ${catalog.models.length} model${catalog.models.length === 1 ? "" : "s"} available.`;
+      if (!catalog.models.some((m2) => m2.id === this.plugin.settings.model)) this.error = this.plugin.settings.model ? "Your saved model is no longer listed. Choose an available model." : "Choose an available model.";
+    } catch (e) {
+      if (!this.closed) this.error = this.classifyConnectionError(e);
     } finally {
       this.loading = false;
       this.plugin.releaseInteractiveTurn();
       this.render();
     }
   }
+  classifyConnectionError(error2) {
+    const raw = error2 instanceof Error ? error2.message : String(error2);
+    const lower = raw.toLowerCase();
+    if (/enoent|not found|could not find|not installed/.test(lower)) return `Application not found. ${REPAIR[this.plugin.settings.provider] ?? "Check the connection settings, then retry."}`;
+    if (/auth|login|sign.in|unauthor|forbidden|401|403/.test(lower)) return `Sign-in failed. Sign in again, then retry. ${REPAIR[this.plugin.settings.provider] ?? "Check the credential."}`;
+    if (/connect|network|fetch|endpoint|econn|timeout/.test(lower)) return `Endpoint could not be reached. ${REPAIR[this.plugin.settings.provider] ?? "Check the address and network, then retry."}`;
+    return `Model discovery failed: ${raw}`;
+  }
+  renderTest() {
+    this.contentEl.createEl("h2", { text: "Test a real response" });
+    this.contentEl.createEl("p", { text: `PeriCode will ask ${PROVIDER_LABELS[this.plugin.settings.provider]} (${this.plugin.settings.model}) for a two-word confirmation. No notes, files, or vault tools are included.` });
+    new import_obsidian5.Setting(this.contentEl).setName("3. Response test").setDesc(this.tested ? "A non-empty response was received from this provider and model." : "Model listing alone does not prove inference works.").addButton((b2) => b2.setButtonText(this.loading ? "Testing..." : this.tested ? "Test again" : "Test connection").onClick(() => void this.testInference()));
+    this.renderStatus("Check the provider sign-in and selected model, then retry.");
+    new import_obsidian5.Setting(this.contentEl).addButton((b2) => b2.setButtonText("Back").onClick(() => this.show("connection"))).addButton((button) => {
+      button.setButtonText("Continue").setDisabled(!this.tested).onClick(() => this.show("permissions"));
+      if (this.tested) button.setCta();
+    });
+  }
+  async testInference() {
+    if (this.loading || !this.modelsReady || this.closed) return;
+    if (!this.plugin.claimInteractiveTurn()) {
+      this.error = "Finish the active request, then retry.";
+      this.render();
+      return;
+    }
+    const key = this.modelKey();
+    this.loading = true;
+    this.error = "";
+    this.status = "Waiting for a short provider response...";
+    this.render();
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 3e4);
+    let output = "";
+    let scope;
+    try {
+      const settings = { ...this.plugin.settings };
+      scope = applyProviderEnvFromSettings(settings);
+      const args = { model: settings.model, signal: controller.signal, tools: [], systemPrompt: "Return exactly two words: CONNECTION READY. Do not use tools.", messages: [{ role: "user", content: "Confirm this model can respond." }] };
+      const stream = settings.provider === "claude-oauth" || settings.provider === "grok-oauth" ? nativeRevision(args, this.plugin.vaultPath ?? process.cwd(), settings.provider === "grok-oauth") : (settings.provider === "ollama-cloud" ? ollamaAccountProvider(settings.ollamaHost) : resolveProvider(settings.provider)).streamChat(args);
+      for await (const chunk of stream) {
+        if (chunk.type === "error") throw new Error(chunk.error);
+        if (chunk.type === "text_delta") output += chunk.text;
+        if (output.length > 200) controller.abort();
+      }
+      if (!output.trim()) throw new Error("The provider returned no text.");
+      if (key !== this.modelKey()) return;
+      this.testedKey = key;
+      this.status = "Response received. This provider and model are ready.";
+    } catch (e) {
+      this.error = controller.signal.aborted ? "The response test timed out. Check the provider and retry." : `Response test failed: ${e instanceof Error ? e.message : String(e)}`;
+    } finally {
+      clearTimeout(timeout);
+      scope?.restore();
+      this.loading = false;
+      this.plugin.releaseInteractiveTurn();
+      this.render();
+    }
+  }
+  renderPermissions() {
+    this.contentEl.createEl("h2", { text: "Choose vault permissions" });
+    this.contentEl.createEl("p", { text: "This choice affects later chats. The connection test never receives vault tools." });
+    const choices = [
+      ["research", "Research", "Read-focused strict policy with confirmation for sensitive actions."],
+      ["ask", "Ask each time (recommended)", "Standard protection and clear prompts before consequential actions."],
+      ["trusted", "Trusted", "Fewer prompts for routine work; protected paths and destructive safeguards still apply."]
+    ];
+    for (const [id, name, desc] of choices) {
+      const row = new import_obsidian5.Setting(this.contentEl).setName(name).setDesc(desc);
+      row.addButton((button) => {
+        button.setButtonText(this.permissionChoice === id ? "Selected" : "Choose");
+        if (this.permissionChoice === id) button.setCta();
+        button.onClick(() => {
+          this.permissionChoice = id;
+          this.render();
+        });
+      });
+    }
+    new import_obsidian5.Setting(this.contentEl).addButton((b2) => b2.setButtonText("Back").onClick(() => this.show("test"))).addButton((b2) => b2.setButtonText("Save permissions").setCta().onClick(() => void this.savePermissions()));
+  }
+  async savePermissions() {
+    if (!this.plugin.vaultPath) {
+      this.error = "Vault path is unavailable. Reopen the vault and retry.";
+      this.render();
+      return;
+    }
+    this.loading = true;
+    this.render();
+    try {
+      const current = await readPolicy(this.plugin.vaultPath).catch(() => defaultPolicy());
+      const mode = this.permissionChoice === "trusted" ? "open" : this.permissionChoice === "research" ? "strict" : "standard";
+      const next = applyModePreset(mode, current);
+      await writePolicy(this.plugin.vaultPath, next);
+      this.plugin.cachedPolicy = next;
+      this.show("done");
+    } catch (e) {
+      this.error = `Could not save permissions: ${e instanceof Error ? e.message : String(e)}`;
+    } finally {
+      this.loading = false;
+      this.render();
+    }
+  }
   renderDone() {
-    const el = this.contentEl;
-    el.createEl("h2", { text: this.ready ? "Ready for your first message" : "Finish connecting when you're ready" });
-    el.createEl("p", { text: this.ready ? `${PROVIDER_LABELS[this.plugin.settings.provider]} \xB7 ${this.plugin.settings.model}. The model list check passed. Open chat, choose a starting question, and send it when ready.` : "Your connection has not been checked. Open AI connection in PeriCode settings to connect and choose a model before sending a message." });
-    el.createEl("p", { text: "Research reads notes without changing files. Agent can make changes with your configured permissions. Review proposed edits before accepting them." });
-    new import_obsidian5.Setting(el).addButton((b2) => b2.setButtonText("Back").onClick(() => this.show("provider"))).addButton((b2) => b2.setButtonText("Open chat").setCta().onClick(() => {
+    const configured = this.tested;
+    this.contentEl.createEl("h2", { text: configured ? "PeriCode is ready" : "Finish connecting when you are ready" });
+    this.contentEl.createEl("p", { text: configured ? `${PROVIDER_LABELS[this.plugin.settings.provider]} and ${this.plugin.settings.model} returned a real response. Open chat to review the prepared question before sending it.` : "Open the setup guide again from PeriCode settings when you are ready." });
+    new import_obsidian5.Setting(this.contentEl).addButton((b2) => b2.setButtonText("Back").onClick(() => this.show(configured ? "permissions" : "connection"))).addButton((b2) => b2.setButtonText("Open chat").setCta().onClick(() => {
       this.close();
-      void this.plugin.activateView();
-    })).addButton((b2) => b2.setButtonText("Open settings").onClick(() => {
-      this.close();
-      const settings = this.app.setting;
-      settings?.open?.();
-      settings?.openTabById?.("pericode");
+      void this.plugin.activateView("What should I know about this vault?", true);
     }));
+  }
+  renderStatus(repair) {
+    this.contentEl.createEl("p", { cls: "pericode-setup-status", attr: { role: "status", "aria-live": "polite" }, text: this.error || this.status || repair || "Ready." });
   }
 };
 function shouldAutoOpenWizard(plugin) {
@@ -21529,6 +21638,16 @@ var PericodeView = class extends import_obsidian10.ItemView {
     menu.addItem((item) => item.setTitle("Delete chat").setIcon("trash-2").setDisabled(this.busy).onClick(() => this.confirmDelete()));
     this.showMenu(menu, anchor);
   }
+  /** Prepare an onboarding draft without sending it or attaching vault context. */
+  prepareDraft(text2, research = true) {
+    if (!this.inputEl || this.busy || this.inputEl.value.trim()) return;
+    if (research && this.modePicker) this.modePicker.value = "research";
+    this.inputEl.value = text2;
+    this.conversation.draft = text2;
+    this.resizeComposer();
+    this.scheduleSave();
+    this.inputEl.focus();
+  }
   /** Called by the plugin when settings change so the header reflects new provider/model. */
   refreshHeaderMeta() {
     if (!this.headerMetaEl) return;
@@ -25604,7 +25723,7 @@ var PericodeObsidianPlugin = class extends import_obsidian15.Plugin {
       registry2.registerBuiltin(tool);
     }
   }
-  async activateView() {
+  async activateView(draft = "", research = false) {
     const { workspace } = this.app;
     let leaf = workspace.getLeavesOfType(PERICODE_VIEW_TYPE)[0] ?? null;
     if (!leaf) {
@@ -25616,7 +25735,10 @@ var PericodeObsidianPlugin = class extends import_obsidian15.Plugin {
         });
       }
     }
-    if (leaf) workspace.revealLeaf(leaf);
+    if (leaf) {
+      workspace.revealLeaf(leaf);
+      if (leaf.view instanceof PericodeView && draft) leaf.view.prepareDraft(draft, research);
+    }
   }
 };
 

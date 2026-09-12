@@ -1,7 +1,7 @@
 {
   "id": "pericode",
   "name": "PeriCode",
-  "version": "0.3.8",
+  "version": "0.3.9",
   "minAppVersion": "1.13.7",
   "description": "Research your notes with multiple AI providers, resume saved conversations, and review revisions before applying them, with a configurable permission policy.",
   "author": "Eddy Ogutu",

@@ -1,3 +1,8 @@
+# PeriCode 0.3.9
+
+Adds a guided five-step setup flow that separates provider sign-in, model discovery, a real connection test, and vault permission selection. Provider-specific repair guidance makes failed setup actionable. Successful setup opens PeriCode with a prepared first vault question that remains unsent until the user chooses to send it.
+
+Validation: 82 plugin tests, production release checks, installer fixtures, dependency audit, and a live Obsidian layout and control-state review passed.
 # PeriCode 0.3.8
 
 Restores Claude Code and Grok Build subscription connections through their installed, signed-in command-line applications. Clipboard access and broad vault enumeration remain removed. Local process execution is required and disclosed for these subscription routes and explicitly approved stdio MCP servers.
