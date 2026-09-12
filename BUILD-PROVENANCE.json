@@ -1,7 +1,7 @@
 {
-  "version": "0.3.7",
+  "version": "0.3.8",
   "sourceRepository": "https://github.com/eddyficial/pericode",
-  "sourceCommit": "11951735d5a45ba0e79ea55dde691ccd96e7617d",
+  "sourceCommit": "7e69db617c87e8e338d1c7f9858d05f318b37847",
   "sourceDirectory": "plugins/obsidian",
   "license": "MIT",
   "build": "npm ci && npm test; cd plugins/obsidian && npm ci && npm run release",
@@ -9,15 +9,15 @@
     "pluginTests": 82,
     "schemaTestsWithoutCodeGeneration": 4,
     "installerAndReleaseChecks": "passed locally; reproducible CI release build required before publication",
-    "productionDependencyAudit": "zero known advisories",
+    "productionDependencyAudit": "zero known advisories in prior release; CI audit required",
     "sdkTests": 352,
-    "communityReview": "0.3.7 hosted inspection pending",
-    "bundleCapabilityScan": "no Node filesystem, child-process, clipboard, or broad Vault enumeration signatures"
+    "communityReview": "0.3.8 hosted inspection pending",
+    "bundleCapabilityScan": "no Node filesystem, clipboard, or broad Vault enumeration signatures; local process execution disclosed"
   },
   "releaseWorkflow": ".github/workflows/release.yml",
   "limitations": [
-    "Claude Code and Grok Build subscription bridges await the separate localhost companion.",
-    "Live provider inference was not repeated in this release.",
+    "Claude Code and Grok Build subscription routes require their installed command-line applications and local process execution.",
     "Community malware and network scans are controlled by the review service."
   ]
 }
+

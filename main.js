@@ -13221,7 +13221,7 @@ var require_cross_spawn = __commonJS({
     var cp = require("child_process");
     var parse3 = require_parse();
     var enoent = require_enoent();
-    function spawn3(command, args, options) {
+    function spawn5(command, args, options) {
       const parsed = parse3(command, args, options);
       const spawned = cp.spawn(parsed.command, parsed.args, parsed.options);
       enoent.hookChildProcess(spawned, parsed);
@@ -13233,8 +13233,8 @@ var require_cross_spawn = __commonJS({
       result.error = result.error || enoent.verifyENOENTSync(result.status, parsed);
       return result;
     }
-    module2.exports = spawn3;
-    module2.exports.spawn = spawn3;
+    module2.exports = spawn5;
+    module2.exports.spawn = spawn5;
     module2.exports.sync = spawnSync;
     module2.exports._parse = parse3;
     module2.exports._enoent = enoent;
@@ -15750,16 +15750,7 @@ init_sdk_entry();
 
 // src/grokCode.ts
 init_scoped_fetch();
-
-// src/noProcessExecution.ts
-init_scoped_fetch();
-function unavailable() {
-  throw new Error("Launching local executables is unavailable in the Obsidian community plugin.");
-}
-var spawn2 = unavailable;
-var execFile = unavailable;
-
-// src/grokCode.ts
+var import_node_child_process2 = require("node:child_process");
 init_safeVaultFs();
 init_safeVaultFs();
 var import_node_os3 = require("node:os");
@@ -15767,6 +15758,7 @@ var import_node_path11 = require("node:path");
 
 // src/claudeCode.ts
 init_scoped_fetch();
+var import_node_child_process = require("node:child_process");
 init_safeVaultFs();
 init_safeVaultFs();
 var import_node_os2 = require("node:os");
@@ -15803,7 +15795,7 @@ function claudeEnvironment() {
 }
 async function claudeAuthStatus() {
   return new Promise((resolve5, reject) => {
-    execFile(claudeExecutable(), ["auth", "status"], { windowsHide: true, env: claudeEnvironment(), timeout: 15e3, maxBuffer: 64e3 }, (error2, stdout) => {
+    (0, import_node_child_process.execFile)(claudeExecutable(), ["auth", "status"], { windowsHide: true, env: claudeEnvironment(), timeout: 15e3, maxBuffer: 64e3 }, (error2, stdout) => {
       try {
         const status = JSON.parse(stdout);
         resolve5({ loggedIn: status.loggedIn === true, subscription: status.subscriptionType ?? "" });
@@ -15816,7 +15808,7 @@ async function claudeAuthStatus() {
 function stopProcess(child) {
   if (!child.pid || child.exitCode !== null) return;
   if (process.platform === "win32") {
-    const killer = spawn2("taskkill", ["/PID", String(child.pid), "/T", "/F"], { windowsHide: true, stdio: "ignore" });
+    const killer = (0, import_node_child_process.spawn)("taskkill", ["/PID", String(child.pid), "/T", "/F"], { windowsHide: true, stdio: "ignore" });
     killer.on("error", () => child.kill());
   } else child.kill("SIGTERM");
 }
@@ -15998,7 +15990,7 @@ async function* claudeCodeTurn(options) {
       const systemFile = (0, import_node_path10.join)(folder, "system.txt");
       await writeFile(systemFile, args.systemPrompt, { mode: 384 });
       if (args.signal.aborted) return;
-      child = spawn2(
+      child = (0, import_node_child_process.spawn)(
         executable,
         claudeArguments(args.model, args.maxIterations, systemFile, bridge.config),
         { cwd: args.cwd, windowsHide: true, env: claudeEnvironment(), stdio: ["pipe", "pipe", "pipe"] }
@@ -16145,7 +16137,7 @@ var grokSessionMeta = (maxTurns = 1) => ({
 function stopGrok(child) {
   if (!child.pid || child.exitCode !== null) return;
   if (process.platform === "win32") {
-    const stop = spawn2("taskkill", ["/PID", String(child.pid), "/T", "/F"], { windowsHide: true, stdio: "ignore" });
+    const stop = (0, import_node_child_process2.spawn)("taskkill", ["/PID", String(child.pid), "/T", "/F"], { windowsHide: true, stdio: "ignore" });
     stop.on("error", () => child.kill());
   } else child.kill("SIGTERM");
 }
@@ -16242,7 +16234,7 @@ function parseGrokModels(value) {
 async function connectGrok(signal) {
   const cwd = await grokWorkspace();
   if (signal?.aborted) throw new Error("Grok connection cancelled.");
-  const client = new GrokConnection(spawn2(grokExecutable(), grokArguments(), { cwd, env: grokEnvironment(), windowsHide: true, stdio: ["pipe", "pipe", "pipe"] }));
+  const client = new GrokConnection((0, import_node_child_process2.spawn)(grokExecutable(), grokArguments(), { cwd, env: grokEnvironment(), windowsHide: true, stdio: ["pipe", "pipe", "pipe"] }));
   const abort = () => client.close(new Error("Grok request cancelled."));
   signal?.addEventListener("abort", abort, { once: true });
   client.child.once("close", () => signal?.removeEventListener("abort", abort));
@@ -16499,6 +16491,7 @@ ${raw}`;
 
 // src/subscriptionModels.ts
 init_scoped_fetch();
+var import_node_child_process3 = require("node:child_process");
 var import_node_os4 = require("node:os");
 var import_node_crypto5 = require("node:crypto");
 init_sdk_entry();
@@ -16515,7 +16508,7 @@ async function claudeAccountModels() {
   if (!status.loggedIn) throw new Error("Connect your Claude subscription in PeriCode settings, then refresh.");
   const models = await new Promise((resolve5, reject) => {
     const id = (0, import_node_crypto5.randomUUID)();
-    const child = spawn2(
+    const child = (0, import_node_child_process3.spawn)(
       claudeExecutable(),
       [
         "-p",
@@ -17322,9 +17315,9 @@ var OnboardingWizard = class extends import_obsidian5.Modal {
       this.render();
     };
     if (provider === "grok-oauth") {
-      new import_obsidian5.Setting(el).setName("Grok subscription").setDesc("Requires the forthcoming PeriCode localhost companion. Use the Grok API connection for now.");
+      new import_obsidian5.Setting(el).setName("Grok subscription").setDesc("Uses your installed and signed-in Grok Build.");
     } else if (provider === "claude-oauth") {
-      new import_obsidian5.Setting(el).setName("Claude subscription").setDesc("Requires the forthcoming PeriCode localhost companion. Use the Anthropic API connection for now.");
+      new import_obsidian5.Setting(el).setName("Claude subscription").setDesc("Uses your installed and signed-in Claude Code.");
     } else if (provider === "copilot" || provider === "codex-oauth") {
       new import_obsidian5.Setting(el).setName("Connect subscription").setDesc("Already signed in? Load models to check your saved connection.").addButton((b2) => b2.setButtonText("Sign in").onClick(() => {
         const Login = provider === "copilot" ? CopilotLoginModal : CodexLoginModal;
@@ -17354,7 +17347,7 @@ var OnboardingWizard = class extends import_obsidian5.Modal {
       }
       this.render();
     }));
-    new import_obsidian5.Setting(el).setName("Available models").addButton((b2) => b2.setButtonText(this.loading ? "Loading models\u2026" : "Load models").setDisabled(this.dirty || provider === "claude-oauth" || provider === "grok-oauth").onClick(() => void this.checkModels()));
+    new import_obsidian5.Setting(el).setName("Available models").addButton((b2) => b2.setButtonText(this.loading ? "Loading models\u2026" : "Load models").setDisabled(this.dirty).onClick(() => void this.checkModels()));
     if (this.catalog) new import_obsidian5.Setting(el).setName("Model").addDropdown((d) => {
       d.selectEl.setAttribute("aria-label", "Model");
       d.addOption("", "Choose a model");
@@ -17453,9 +17446,9 @@ function shouldAutoOpenWizard(plugin) {
 // src/settingsProviders.ts
 init_scoped_fetch();
 var PROVIDER_OPTIONS = [
-  { id: "claude-oauth", name: "Claude", detail: "Companion required", group: "Coming soon", icon: "C" },
+  { id: "claude-oauth", name: "Claude", detail: "Claude Code subscription", group: "Subscriptions", icon: "C" },
   { id: "codex-oauth", name: "ChatGPT / Codex", detail: "ChatGPT subscription", group: "Subscriptions", icon: "O" },
-  { id: "grok-oauth", name: "Grok", detail: "Companion required", group: "Coming soon", icon: "X" },
+  { id: "grok-oauth", name: "Grok", detail: "Grok Build subscription", group: "Subscriptions", icon: "X" },
   { id: "ollama-cloud", name: "Ollama Cloud", detail: "Signed-in Ollama account", group: "Subscriptions", icon: "L" },
   { id: "copilot", name: "GitHub Copilot", detail: "Copilot subscription", group: "Subscriptions", icon: "GH" },
   { id: "anthropic", name: "Anthropic", detail: "API key", group: "API keys", icon: "A" },
@@ -17681,8 +17674,8 @@ var PericodeSettingsTab = class extends import_obsidian6.PluginSettingTab {
     head.createEl("h4", { text: providerDisplayName(provider) });
     head.createSpan({ text: selected?.detail ?? "Connection", cls: "pericode-settings-badge" });
     this.renderCredentials(card);
-    if (provider !== "claude-oauth" && provider !== "grok-oauth") this.renderModelPicker(card);
-    const subscriptionRoute = { openai: "codex-oauth", ollama: "ollama-cloud" }[provider];
+    this.renderModelPicker(card);
+    const subscriptionRoute = { anthropic: "claude-oauth", openai: "codex-oauth", xai: "grok-oauth", ollama: "ollama-cloud" }[provider];
     if (subscriptionRoute) {
       new import_obsidian6.Setting(container).setName("Already have a subscription?").setDesc("Use the provider's account connection instead of API billing.").addButton((b2) => b2.setButtonText("Use my subscription").onClick(async () => {
         if (this.modelLoading.size || !this.plugin.claimInteractiveTurn()) {
@@ -17706,7 +17699,7 @@ var PericodeSettingsTab = class extends import_obsidian6.PluginSettingTab {
     if (provider === "xai") {
       const note = container.createDiv({ cls: "pericode-settings-callout" });
       note.createEl("strong", { text: "Grok API access" });
-      note.createEl("p", { text: "Connect with an xAI API key. This connection uses API credits. Grok Build support will return through the separate localhost companion." });
+      note.createEl("p", { text: "Connect with an xAI API key. This connection uses API credits. Choose Use my subscription to connect through Grok Build instead." });
       note.createEl("a", { text: "Get an API key \u2197", href: "https://console.x.ai/", attr: { target: "_blank", rel: "noopener noreferrer" } });
     }
     container.createEl("p", { cls: "pericode-settings-footnote", text: "Prompts and attached notes are sent to your selected provider. Review access controls in Privacy & safety." });
@@ -17714,7 +17707,7 @@ var PericodeSettingsTab = class extends import_obsidian6.PluginSettingTab {
   renderCredentials(container) {
     const provider = this.plugin.settings.provider;
     if (provider === "grok-oauth") {
-      new import_obsidian6.Setting(container).setName("Grok subscription").setDesc("Unavailable in the community plugin until the localhost companion is released. Use the Grok API connection for now.");
+      new import_obsidian6.Setting(container).setName("Grok subscription").setDesc("Uses your installed Grok Build and its own sign-in. PeriCode does not store subscription tokens.");
     } else if (provider === "ollama-cloud") {
       new import_obsidian6.Setting(container).setName("Ollama account").setDesc("Uses the account signed in to your Ollama server. Run ollama signin, then ollama pull <cloud-model> on that server. Load models here after setup.");
       container.createEl("a", { text: "Ollama cloud setup", href: "https://docs.ollama.com/cloud", attr: { target: "_blank", rel: "noopener noreferrer" } });
@@ -19185,8 +19178,7 @@ var PericodeSettingsTab = class extends import_obsidian6.PluginSettingTab {
    * `deleteAuth` for disconnect.
    */
   renderOAuthStatus(container, selected) {
-    if (!selected || selected === "claude-oauth") new import_obsidian6.Setting(container).setName("Claude subscription").setDesc("Unavailable in the community plugin until the localhost companion is released. Use the Anthropic API connection for now.");
-    if (selected === "claude-oauth") return;
+    if (!selected || selected === "claude-oauth") new import_obsidian6.Setting(container).setName("Claude subscription").setDesc("Uses your installed Claude Code and its own sign-in. PeriCode does not store subscription tokens.");
     let stored = {};
     try {
       stored = listAuth();
@@ -21641,16 +21633,13 @@ var PericodeView = class extends import_obsidian10.ItemView {
     const toolStarts = /* @__PURE__ */ new Map();
     let envScope;
     try {
-      if (settings.provider === "claude-oauth" || settings.provider === "grok-oauth") {
-        throw new Error("This local executable subscription route requires the forthcoming PeriCode localhost companion. Choose the provider's API connection for now.");
-      }
       if (subscriptionProvider(settings.provider)) {
         this.statusEl.setText("Checking subscription models\u2026");
         requireAccountModel(settings.model, await loadAccountModels(settings));
         if (controller.signal.aborted) return;
       }
       envScope = applyProviderEnvFromSettings(settings);
-      const provider = settings.provider === "ollama-cloud" ? ollamaAccountProvider(settings.ollamaHost) : resolveProvider(settings.provider);
+      const provider = settings.provider === "ollama-cloud" ? ollamaAccountProvider(settings.ollamaHost) : resolveProvider(settings.provider === "grok-oauth" ? "xai" : settings.provider);
       const researching = this.modePicker.value === "research";
       const registry2 = researching ? researchRegistry(this.plugin.activeRegistry()) : this.plugin.activeRegistry();
       const gate = this.plugin.registry.beginTurn(this.makeAskFn(), controller.signal, settings.alwaysPromptForTools);
@@ -21692,7 +21681,7 @@ var PericodeView = class extends import_obsidian10.ItemView {
         cwd: this.plugin.vaultPath ?? process.cwd(),
         signal: controller.signal
       };
-      const turn = agentTurn(turnOptions);
+      const turn = settings.provider === "claude-oauth" ? claudeCodeTurn(turnOptions) : settings.provider === "grok-oauth" ? grokCodeTurn(turnOptions) : agentTurn(turnOptions);
       for await (const event of turn) {
         switch (event.kind) {
           case "text_delta":

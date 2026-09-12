@@ -1,3 +1,7 @@
+# PeriCode 0.3.8
+
+Restores Claude Code and Grok Build subscription connections through their installed, signed-in command-line applications. Clipboard access and broad vault enumeration remain removed. Local process execution is required and disclosed for these subscription routes and explicitly approved stdio MCP servers.
+
 ## 0.3.6
 
 PeriCode 0.3.6 makes setup and your first vault questions easier.

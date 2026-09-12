@@ -11,7 +11,7 @@ attestations. Verify a downloaded file with:
 gh attestation verify main.js --repo eddyficial/pericode-inside-obsidian
 ```
 
-See [the 0.3.7 security review](SECURITY-REVIEW-0.3.7.md) for changes and remaining
+See [the 0.3.8 security review](SECURITY-REVIEW-0.3.8.md) for changes and remaining
 capability disclosures.
 
 ## 0.3.4 access changes
@@ -32,12 +32,7 @@ secret-like filenames cannot be read through read_file. Trash stays recoverable;
 there is no permanent-delete option. CLI rollback files and syntax-check
 subprocesses are not used by these tools.
 
-Version 0.3.7 routes vault storage through Obsidian's adapter and no longer
-imports Node filesystem or process-launch modules. Note discovery uses a bounded,
-hidden-folder-excluding adapter walk. Clipboard buttons were removed. Local
-executables cannot be launched by the community plugin; use HTTP MCP endpoints.
-Claude Code and Grok Build subscription bridges are unavailable until the
-separate localhost companion is released. Their API connections remain available.
+Version 0.3.8 routes vault storage through Obsidian's adapter, uses bounded note discovery, and omits clipboard access. Claude Code and Grok Build subscription connections launch their installed command-line applications and use their existing sign-ins. This local process access is required for those subscription routes and is disclosed below.
 
 Obsidian's unavailable malware and network scans remain unavailable. Local
 static checks and dependency audits do not substitute for those scans or an
@@ -50,7 +45,7 @@ Research your notes, keep conversations across sessions, and review suggested
 revisions before changing a note. PeriCode runs its own agent loop in
 Obsidian and connects to the model provider you choose.
 
-**0.3.7 open-source preview · Desktop only · Obsidian 1.13.7 or newer**
+**0.3.8 open-source preview · Desktop only · Obsidian 1.13.7 or newer**
 
 ## Install PeriCode
 
@@ -126,9 +121,7 @@ include **Use my subscription**, which resets the model selection without
 moving or deleting API keys. Account limits apply; PeriCode does not silently
 fall back to API billing.
 
-- **Claude Code and Grok Build:** these local executable subscription routes are
-  paused in the community build while their localhost companion is prepared.
-  Use the Anthropic or Grok API connection in the meantime.
+- **Claude Code and Grok Build:** install and sign in to the matching command-line application, then choose the subscription in PeriCode and load models. PeriCode launches that local application for requests and does not store its subscription token.
 - **Ollama Cloud:** on your Ollama server, run `ollama signin`, then
   `ollama pull <cloud-model>`. Enter that server's address and load models.
   Only configured cloud models appear. The catalog is server inventory, not
@@ -168,7 +161,7 @@ Choose a mode before sending. Mode controls are disabled during an active reques
 
 ## Install the candidate
 
-On Windows, download the ZIP from the [Windows installer release](https://github.com/eddyficial/pericode/releases/tag/obsidian-0.3.7), extract it, and double-click **Install-PeriCode.cmd**. The community release contains only the three plugin files.
+On Windows, download the ZIP from the [Windows installer release](https://github.com/eddyficial/pericode/releases/tag/obsidian-0.3.8), extract it, and double-click **Install-PeriCode.cmd**. The community release contains only the three plugin files.
 It detects registered Obsidian vaults and asks you to choose when there is more
 than one. It copies and verifies the plugin, preserves data.json and vault notes,
 and backs up previous plugin files under `.obsidian/pericode-backups/`.
@@ -215,8 +208,8 @@ npm ci
 npm run release
 ```
 
-The candidate files and checksums are in `dist/community-0.3.7/`; the ZIP is in
-`dist/pericode-obsidian-0.3.7.zip`. `npm run dev:install` requires an explicit
+The candidate files and checksums are in `dist/community-0.3.8/`; the ZIP is in
+`dist/pericode-obsidian-0.3.8.zip`. `npm run dev:install` requires an explicit
 `PERICODE_OBSIDIAN_VAULT` environment variable so it never chooses a vault for you.
 
 ## Context and editing
