@@ -1,7 +1,7 @@
 {
   "version": "0.3.11",
   "sourceRepository": "https://github.com/eddyficial/pericode",
-  "sourceCommit": "4f6493a74e7609c80c52ae5442636f3321cf119b",
+  "sourceCommit": "4f6493aa064b5e1cabff9b84416b659ecabf2408",
   "sourceDirectory": "plugins/obsidian",
   "license": "MIT",
   "build": "npm ci && npm test; cd plugins/obsidian && npm ci && npm run release",
